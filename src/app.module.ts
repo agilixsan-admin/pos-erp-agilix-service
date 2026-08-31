@@ -13,8 +13,10 @@ import { AuthModule } from './modules/auth/auth.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
+import { ProductModule } from './modules/product/product.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
+import { PermissionGuard } from './common/guards/permission.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 @Module({
@@ -35,6 +37,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
           RbacModule,
           AuditModule,
           WebhookModule,
+          ProductModule,
         ]
       : []),
   ],
@@ -44,6 +47,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       ? [
           { provide: APP_GUARD, useClass: JwtAuthGuard },
           { provide: APP_GUARD, useClass: TenantStatusGuard },
+          { provide: APP_GUARD, useClass: PermissionGuard },
           { provide: APP_FILTER, useClass: HttpExceptionFilter },
         ]
       : []),
