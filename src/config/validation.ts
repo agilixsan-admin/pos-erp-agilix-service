@@ -5,6 +5,7 @@ export const configurationValidationSchema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3000),
+  CORS: Joi.string().default('*'),
   DB_HOST: Joi.string().default('localhost'),
   DB_PORT: Joi.number().port().default(5432),
   DB_USERNAME: Joi.string().default('postgres'),
@@ -17,6 +18,9 @@ export const configurationValidationSchema = Joi.object({
     .allow('')
     .when('NODE_ENV', { is: 'production', then: Joi.required() }),
   JWT_ACCESS_TOKEN_TTL: Joi.string().default('15m'),
+  JWT_EXPIRES_IN: Joi.string().optional(),
+  JWT_REFRESH_SECRET: Joi.string().optional().allow(''),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().optional(),
   CONSOLE_API_KEY: Joi.string()
     .min(1)
     .allow('')
