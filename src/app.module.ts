@@ -14,6 +14,8 @@ import { RbacModule } from './modules/rbac/rbac.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { ProductModule } from './modules/product/product.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { RecipeModule } from './modules/recipe/recipe.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -38,6 +40,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
           AuditModule,
           WebhookModule,
           ProductModule,
+          InventoryModule,
+          RecipeModule,
         ]
       : []),
   ],
