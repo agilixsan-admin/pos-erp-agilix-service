@@ -4,6 +4,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 
+import { User } from '../user/user.entity';
+
 class LoginDto {
   @IsEmail()
   email!: string;
@@ -28,7 +30,7 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@CurrentUser() user: unknown) {
+  me(@CurrentUser() user: User) {
     return {
       success: true,
       message: 'User retrieved successfully',
