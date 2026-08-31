@@ -103,4 +103,3 @@ export class QueryMovementDto {
   @IsDateString()
   endDate?: string;
 }
-

@@ -16,10 +16,42 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 import { ProductModule } from './modules/product/product.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { RecipeModule } from './modules/recipe/recipe.module';
+import { OrderModule } from './modules/order/order.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+
+const isProductionOrDevDb =
+  Boolean(process.env.DB_HOST) && process.env.NODE_ENV !== 'test';
+
+const conditionalModules = isProductionOrDevDb
+  ? [
+      DatabaseModule,
+      TenantModule,
+      OutletModule,
+      UserModule,
+      AuthModule,
+      RbacModule,
+      AuditModule,
+      WebhookModule,
+      ProductModule,
+      InventoryModule,
+      RecipeModule,
+      OrderModule,
+      PaymentModule,
+    ]
+  : [];
+
+const conditionalProviders = isProductionOrDevDb
+  ? [
+      { provide: APP_GUARD, useClass: JwtAuthGuard },
+      { provide: APP_GUARD, useClass: TenantStatusGuard },
+      { provide: APP_GUARD, useClass: PermissionGuard },
+      { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    ]
+  : [];
 
 @Module({
   imports: [
@@ -29,32 +61,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       load: [configuration],
       validationSchema: configurationValidationSchema,
     }),
-    ...(process.env.DB_HOST && process.env.NODE_ENV !== 'test'
-      ? [
-          DatabaseModule,
-          TenantModule,
-          OutletModule,
-          UserModule,
-          AuthModule,
-          RbacModule,
-          AuditModule,
-          WebhookModule,
-          ProductModule,
-          InventoryModule,
-          RecipeModule,
-        ]
-      : []),
+    ...conditionalModules,
   ],
   controllers: [HealthController],
-  providers: [
-    ...(process.env.DB_HOST && process.env.NODE_ENV !== 'test'
-      ? [
-          { provide: APP_GUARD, useClass: JwtAuthGuard },
-          { provide: APP_GUARD, useClass: TenantStatusGuard },
-          { provide: APP_GUARD, useClass: PermissionGuard },
-          { provide: APP_FILTER, useClass: HttpExceptionFilter },
-        ]
-      : []),
-  ],
+  providers: [...conditionalProviders],
 })
 export class AppModule {}
