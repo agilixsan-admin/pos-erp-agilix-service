@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import { Observable, finalize } from 'rxjs';
+import { Observable } from 'rxjs';
 
 @Injectable()
 export class AccessLogInterceptor implements NestInterceptor {
@@ -22,12 +22,12 @@ export class AccessLogInterceptor implements NestInterceptor {
 
     response.setHeader('x-request-id', requestId);
 
-    return next.handle().pipe(
-      finalize(() => {
-        this.logger.log(
-          `${request.method} ${request.originalUrl} ${response.statusCode} ${Date.now() - startedAt}ms requestId=${requestId}`,
-        );
-      }),
-    );
+    response.on('finish', () => {
+      this.logger.log(
+        `${request.method} ${request.originalUrl} ${response.statusCode} ${Date.now() - startedAt}ms requestId=${requestId}`,
+      );
+    });
+
+    return next.handle();
   }
 }
