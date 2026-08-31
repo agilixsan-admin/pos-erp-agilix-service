@@ -1,0 +1,38 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
+import { UserService } from '../user/user.service';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly users: UserService,
+    private readonly jwt: JwtService,
+  ) {}
+
+  async login(email: string, password: string) {
+    const user = await this.users.findByEmail(email);
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      !(await bcrypt.compare(password, user.passwordHash))
+    ) {
+      throw new UnauthorizedException({
+        success: false,
+        message: 'Invalid credentials',
+        code: 'INVALID_CREDENTIALS',
+      });
+    }
+    const payload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      outletId: user.outletId,
+      roleId: user.roleId,
+    };
+    return { accessToken: await this.jwt.signAsync(payload) };
+  }
+
+  validateUser(id: string) {
+    return this.users.findById(id);
+  }
+}
