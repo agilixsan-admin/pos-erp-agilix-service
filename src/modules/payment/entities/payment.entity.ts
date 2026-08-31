@@ -77,4 +77,3 @@ export class Payment {
   @JoinColumn({ name: 'created_by' })
   creator!: User | null;
 }
-

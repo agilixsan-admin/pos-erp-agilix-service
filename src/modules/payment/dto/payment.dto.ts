@@ -96,4 +96,3 @@ export class QueryTransactionDto {
   @IsString()
   search?: string;
 }
-

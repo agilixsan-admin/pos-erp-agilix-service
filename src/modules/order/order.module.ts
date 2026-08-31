@@ -25,4 +25,3 @@ import { OrderController } from './controllers/order.controller';
   exports: [OrderService],
 })
 export class OrderModule {}
-

@@ -173,7 +173,8 @@ export class OrderService {
 
   async findAll(tenantId: string, query: QueryOrderDto) {
     const page = query.page && query.page > 0 ? query.page : 1;
-    const limit = query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
     const skip = (page - 1) * limit;
 
     const qb = this.orderRepository
@@ -336,4 +337,3 @@ export class OrderService {
     });
   }
 }
-

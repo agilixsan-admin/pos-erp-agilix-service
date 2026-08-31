@@ -192,31 +192,73 @@ export class OrderPaymentTransaction1700000000004 implements MigrationInterface 
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_user"`);
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_reason"`);
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_order_item"`);
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_order"`);
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_outlet"`);
-    await queryRunner.query(`ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_tenant"`);
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_reason"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_order_item"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_order"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_outlet"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "voids" DROP CONSTRAINT "FK_voids_tenant"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_payment"`);
-    await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_order"`);
-    await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_outlet"`);
-    await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_tenant"`);
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_payment"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_order"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_outlet"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_transactions_tenant"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_user"`);
-    await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_order"`);
-    await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_outlet"`);
-    await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_tenant"`);
+    await queryRunner.query(
+      `ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_order"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_outlet"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_tenant"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_variant"`);
-    await queryRunner.query(`ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_product"`);
-    await queryRunner.query(`ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_order"`);
-    await queryRunner.query(`ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_tenant"`);
+    await queryRunner.query(
+      `ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_variant"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_product"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_order"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "order_items" DROP CONSTRAINT "FK_order_items_tenant"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_user"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_outlet"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_tenant"`);
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_outlet"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_tenant"`,
+    );
 
     await queryRunner.query(`DROP INDEX "IDX_transactions_tenant_outlet"`);
     await queryRunner.query(`DROP INDEX "IDX_transactions_order"`);
@@ -232,4 +274,3 @@ export class OrderPaymentTransaction1700000000004 implements MigrationInterface 
     await queryRunner.query(`DROP TABLE "orders"`);
   }
 }
-

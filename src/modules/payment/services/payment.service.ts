@@ -126,8 +126,7 @@ export class PaymentService {
         });
 
         for (const recipe of recipes) {
-          const deductionQty =
-            Number(item.quantity) * Number(recipe.quantity);
+          const deductionQty = Number(item.quantity) * Number(recipe.quantity);
 
           let stock = await stockRepo.findOne({
             where: {
@@ -189,7 +188,8 @@ export class PaymentService {
 
   async findPayments(tenantId: string, query: QueryPaymentDto) {
     const page = query.page && query.page > 0 ? query.page : 1;
-    const limit = query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
     const skip = (page - 1) * limit;
 
     const qb = this.paymentRepository
@@ -245,7 +245,8 @@ export class PaymentService {
 
   async findTransactions(tenantId: string, query: QueryTransactionDto) {
     const page = query.page && query.page > 0 ? query.page : 1;
-    const limit = query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
     const skip = (page - 1) * limit;
 
     const qb = this.transactionRepository
@@ -318,4 +319,3 @@ export class PaymentService {
     return trx;
   }
 }
-

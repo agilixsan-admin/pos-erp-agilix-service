@@ -67,4 +67,3 @@ export class Transaction {
   @JoinColumn({ name: 'payment_id' })
   payment!: Payment;
 }
-

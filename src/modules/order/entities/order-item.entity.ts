@@ -89,4 +89,3 @@ export class OrderItem {
   @JoinColumn({ name: 'variant_id' })
   variant!: ProductVariant;
 }
-

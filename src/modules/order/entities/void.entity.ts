@@ -69,4 +69,3 @@ export class Void {
   @JoinColumn({ name: 'voided_by' })
   voider!: User | null;
 }
-

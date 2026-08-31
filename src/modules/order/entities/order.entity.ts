@@ -103,4 +103,3 @@ export class Order {
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items!: OrderItem[];
 }
-

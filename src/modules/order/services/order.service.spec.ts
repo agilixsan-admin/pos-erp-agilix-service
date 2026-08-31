@@ -95,7 +95,10 @@ describe('OrderService', () => {
       ]);
 
       const managerOrderRepo = {
-        create: jest.fn((o: Record<string, unknown>) => ({ ...o, id: 'ord-1' })),
+        create: jest.fn((o: Record<string, unknown>) => ({
+          ...o,
+          id: 'ord-1',
+        })),
         save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
         findOne: jest.fn().mockResolvedValue({
           id: 'ord-1',
@@ -111,15 +114,17 @@ describe('OrderService', () => {
         save: jest.fn().mockResolvedValue({}),
       };
 
-      mockDataSource.transaction.mockImplementation((callback: (m: unknown) => Promise<unknown>) => {
-        return callback({
-          getRepository: (entityClass: unknown) => {
-            if (entityClass === Order) return managerOrderRepo;
-            if (entityClass === OrderItem) return managerItemRepo;
-            return managerAuditRepo;
-          },
-        });
-      });
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
 
       const result = await service.create('tenant-1', 'user-1', 'outlet-1', {
         items: [{ variantId: 'var-1', quantity: 2 }],
@@ -194,30 +199,40 @@ describe('OrderService', () => {
         save: jest.fn().mockResolvedValue(order),
       };
       const managerVoidRepo = {
-        create: jest.fn((v: Record<string, unknown>) => ({ ...v, id: 'void-1' })),
+        create: jest.fn((v: Record<string, unknown>) => ({
+          ...v,
+          id: 'void-1',
+        })),
         save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
       };
       const managerAuditRepo = {
         save: jest.fn().mockResolvedValue({}),
       };
 
-      mockDataSource.transaction.mockImplementation((callback: (m: unknown) => Promise<unknown>) => {
-        return callback({
-          getRepository: (entityClass: unknown) => {
-            if (entityClass === Order) return managerOrderRepo;
-            if (entityClass === Void) return managerVoidRepo;
-            return managerAuditRepo;
-          },
-        });
-      });
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === Void) return managerVoidRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
 
-      const result = await service.void('tenant-1', 'user-1', 'outlet-1', 'ord-1', {
-        reason: 'Customer cancelled order',
-      });
+      const result = await service.void(
+        'tenant-1',
+        'user-1',
+        'outlet-1',
+        'ord-1',
+        {
+          reason: 'Customer cancelled order',
+        },
+      );
 
       expect(result.order.status).toBe('VOID');
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 });
-
