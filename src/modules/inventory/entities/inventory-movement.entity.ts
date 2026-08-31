@@ -47,11 +47,7 @@ export class InventoryMovement {
   @Column({ type: 'varchar', nullable: true })
   notes!: string | null;
 
-  @Column({
-    name: 'movement_date',
-    type: 'timestamptz',
-    default: () => 'now()',
-  })
+  @Column({ name: 'movement_date', type: 'timestamptz', default: () => 'now()' })
   movementDate!: Date;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
@@ -83,3 +79,4 @@ export class InventoryMovement {
   @JoinColumn({ name: 'created_by' })
   creator!: User | null;
 }
+

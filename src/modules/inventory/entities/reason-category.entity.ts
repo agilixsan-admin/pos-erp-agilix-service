@@ -42,3 +42,4 @@ export class ReasonCategory {
   @JoinColumn({ name: 'tenant_id' })
   tenant!: Tenant;
 }
+
