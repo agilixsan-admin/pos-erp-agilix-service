@@ -34,7 +34,10 @@ export class AuditService {
    * Pass an EntityManager when calling from within an existing transaction
    * to ensure the audit record participates in the same transaction.
    */
-  record(options: AuditRecordOptions, manager?: EntityManager): Promise<AuditLog> {
+  record(
+    options: AuditRecordOptions,
+    manager?: EntityManager,
+  ): Promise<AuditLog> {
     const repo = manager ? manager.getRepository(AuditLog) : this.logs;
     return repo.save(
       repo.create({
@@ -50,8 +53,19 @@ export class AuditService {
   /**
    * Retrieve paginated audit logs scoped to a tenant.
    */
-  async findAll(tenantId: string, query: QueryAuditLogDto): Promise<PaginatedAuditLogs> {
-    const { page = 1, limit = 20, action, actorType, actorId, startDate, endDate } = query;
+  async findAll(
+    tenantId: string,
+    query: QueryAuditLogDto,
+  ): Promise<PaginatedAuditLogs> {
+    const {
+      page = 1,
+      limit = 20,
+      action,
+      actorType,
+      actorId,
+      startDate,
+      endDate,
+    } = query;
 
     const qb = this.logs
       .createQueryBuilder('log')

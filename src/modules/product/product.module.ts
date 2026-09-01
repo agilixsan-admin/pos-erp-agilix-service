@@ -10,7 +10,10 @@ import { CategoryController } from './controllers/category.controller';
 import { ProductController } from './controllers/product.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Category, Product, ProductVariant]), AuditModule],
+  imports: [
+    TypeOrmModule.forFeature([Category, Product, ProductVariant]),
+    AuditModule,
+  ],
   controllers: [CategoryController, ProductController],
   providers: [CategoryService, ProductService],
   exports: [CategoryService, ProductService],

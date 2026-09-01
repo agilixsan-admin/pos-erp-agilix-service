@@ -66,7 +66,12 @@ export class ProductController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const data = await this.productService.update(user.tenantId, user.id, id, dto);
+    const data = await this.productService.update(
+      user.tenantId,
+      user.id,
+      id,
+      dto,
+    );
     return {
       success: true,
       message: 'Product updated successfully',
