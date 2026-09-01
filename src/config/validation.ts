@@ -27,4 +27,5 @@ export const configurationValidationSchema = Joi.object({
     .when('NODE_ENV', { is: 'production', then: Joi.required() }),
   THROTTLE_TTL: Joi.number().default(60000),
   THROTTLE_LIMIT: Joi.number().default(120),
+  SWAGGER: Joi.string().valid('development', 'staging').optional().allow(''),
 }).unknown(true);
