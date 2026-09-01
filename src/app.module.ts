@@ -18,6 +18,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { RecipeModule } from './modules/recipe/recipe.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { ReportModule } from './modules/report/report.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -41,6 +42,7 @@ const conditionalModules = isProductionOrDevDb
       RecipeModule,
       OrderModule,
       PaymentModule,
+      ReportModule,
     ]
   : [];
 
