@@ -1,5 +1,8 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
+import { UserService } from '../user/user.service';
+import { AuditService } from '../audit/audit.service';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
@@ -23,12 +26,9 @@ describe('AuthService', () => {
   const signAsync = jest.fn().mockResolvedValue('signed-token');
   const auditRecord = jest.fn().mockResolvedValue(undefined);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockUserService: any = { findByEmail, findById };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockJwtService: any = { signAsync };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockAuditService: any = { record: auditRecord };
+  const mockUserService = { findByEmail, findById } as unknown as UserService;
+  const mockJwtService = { signAsync } as unknown as JwtService;
+  const mockAuditService = { record: auditRecord } as unknown as AuditService;
 
   let service: AuthService;
 
