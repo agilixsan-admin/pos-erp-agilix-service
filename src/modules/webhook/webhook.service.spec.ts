@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { WebhookService } from './webhook.service';
+import { AuditService } from '../audit/audit.service';
 
 describe('WebhookService', () => {
   const payload = {
@@ -10,13 +11,17 @@ describe('WebhookService', () => {
     data: { tenantId: 'tenant-1', reason: 'expired' },
   };
 
+  const mockAuditService = {
+    record: jest.fn().mockResolvedValue(undefined),
+  } as unknown as AuditService;
+
   it('rejects an invalid API key before opening a transaction', async () => {
     const transaction = jest.fn();
     const dataSource = { transaction } as unknown as DataSource;
     const config = {
       get: jest.fn().mockReturnValue('expected'),
     } as unknown as ConfigService;
-    const service = new WebhookService(dataSource, config);
+    const service = new WebhookService(dataSource, config, mockAuditService);
 
     await expect(service.process(payload, 'wrong')).rejects.toMatchObject({
       status: 401,
@@ -37,7 +42,7 @@ describe('WebhookService', () => {
     const config = {
       get: jest.fn().mockReturnValue('expected'),
     } as unknown as ConfigService;
-    const service = new WebhookService(dataSource, config);
+    const service = new WebhookService(dataSource, config, mockAuditService);
 
     await expect(service.process(payload, 'expected')).resolves.toEqual({
       success: true,

@@ -8,6 +8,7 @@ import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -48,6 +49,10 @@ describe('InventoryService', () => {
     transaction: jest.fn(),
   };
 
+  const mockAuditService = {
+    record: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -77,6 +82,10 @@ describe('InventoryService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();

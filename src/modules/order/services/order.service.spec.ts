@@ -8,6 +8,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('OrderService', () => {
   let service: OrderService;
@@ -41,6 +42,10 @@ describe('OrderService', () => {
     transaction: jest.fn(),
   };
 
+  const mockAuditService = {
+    record: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -70,6 +75,10 @@ describe('OrderService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();

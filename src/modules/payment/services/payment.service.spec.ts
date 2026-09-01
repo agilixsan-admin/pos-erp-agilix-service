@@ -9,6 +9,7 @@ import { Order } from '../../order/entities/order.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -28,6 +29,10 @@ describe('PaymentService', () => {
 
   const mockDataSource = {
     transaction: jest.fn(),
+  };
+
+  const mockAuditService = {
+    record: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -51,6 +56,10 @@ describe('PaymentService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();

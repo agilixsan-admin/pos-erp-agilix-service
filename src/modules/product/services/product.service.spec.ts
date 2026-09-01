@@ -6,6 +6,7 @@ import { ProductService } from './product.service';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
+import { AuditService } from '../../audit/audit.service';
 
 describe('ProductService', () => {
   let service: ProductService;
@@ -28,6 +29,9 @@ describe('ProductService', () => {
   const mockDataSource = {
     transaction: jest.fn(),
   };
+  const mockAuditService = {
+    record: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -49,6 +53,10 @@ describe('ProductService', () => {
         {
           provide: DataSource,
           useValue: mockDataSource,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -158,7 +166,7 @@ describe('ProductService', () => {
         },
       );
 
-      const result = await service.create('tenant-1', {
+      const result = await service.create('tenant-1', 'user-1', {
         name: 'Latte',
         variants: [{ name: 'Regular', price: 25000 }],
       });
@@ -171,7 +179,7 @@ describe('ProductService', () => {
       mockCategoryRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'user-1', {
           name: 'Latte',
           categoryId: 'cat-foreign',
         }),
@@ -204,7 +212,7 @@ describe('ProductService', () => {
         },
       );
 
-      const result = await service.delete('tenant-1', 'prod-1');
+      const result = await service.delete('tenant-1', 'user-1', 'prod-1');
       expect(result).toEqual({
         success: true,
         message: 'Product deleted successfully',
