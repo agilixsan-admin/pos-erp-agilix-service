@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { AuditService } from './audit.service';
 import { AuditLog } from './audit-log.entity';
 
@@ -67,14 +66,13 @@ describe('AuditService', () => {
     });
 
     it('uses the provided EntityManager repository when manager is given', async () => {
-      const managerRepo = {
-        create: jest.fn().mockReturnValue(mockLog),
-        save: jest.fn().mockResolvedValue(mockLog),
-      } as unknown as Repository<AuditLog>;
-
-      const manager = {
-        getRepository: jest.fn().mockReturnValue(managerRepo),
-      } as unknown as EntityManager;
+      const managerRepoCreate = jest.fn().mockReturnValue(mockLog);
+      const managerRepoSave = jest.fn().mockResolvedValue(mockLog);
+      const managerGetRepository = jest.fn().mockReturnValue({
+        create: managerRepoCreate,
+        save: managerRepoSave,
+      });
+      const manager = { getRepository: managerGetRepository };
 
       const result = await service.record(
         {
@@ -83,12 +81,12 @@ describe('AuditService', () => {
           actorType: 'USER',
           actorId: 'user-1',
         },
-        manager,
+        manager as unknown as import('typeorm').EntityManager,
       );
 
-      expect(manager.getRepository).toHaveBeenCalledWith(AuditLog);
-      expect(managerRepo.create).toHaveBeenCalled();
-      expect(managerRepo.save).toHaveBeenCalled();
+      expect(managerGetRepository).toHaveBeenCalledWith(AuditLog);
+      expect(managerRepoCreate).toHaveBeenCalled();
+      expect(managerRepoSave).toHaveBeenCalled();
       expect(mockRepo.save).not.toHaveBeenCalled();
       expect(result).toEqual(mockLog);
     });
@@ -158,14 +156,15 @@ describe('AuditService', () => {
     });
 
     it('propagates EntityManager errors when manager is provided', async () => {
-      const managerRepo = {
-        create: jest.fn().mockReturnValue(mockLog),
-        save: jest.fn().mockRejectedValue(new Error('Transaction rolled back')),
-      } as unknown as Repository<AuditLog>;
-
+      const managerRepoSave = jest
+        .fn()
+        .mockRejectedValue(new Error('Transaction rolled back'));
       const manager = {
-        getRepository: jest.fn().mockReturnValue(managerRepo),
-      } as unknown as EntityManager;
+        getRepository: jest.fn().mockReturnValue({
+          create: jest.fn().mockReturnValue(mockLog),
+          save: managerRepoSave,
+        }),
+      };
 
       await expect(
         service.record(
@@ -175,7 +174,7 @@ describe('AuditService', () => {
             actorType: 'USER',
             actorId: 'user-1',
           },
-          manager,
+          manager as unknown as import('typeorm').EntityManager,
         ),
       ).rejects.toThrow('Transaction rolled back');
     });
@@ -184,7 +183,7 @@ describe('AuditService', () => {
   // ─── findAll ──────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
-    const buildQb = (overrides: Partial<Record<string, jest.Mock>> = {}) => {
+    const buildQb = (overrides: Record<string, jest.Mock> = {}) => {
       const qb = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -193,7 +192,7 @@ describe('AuditService', () => {
         take: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([[mockLog], 1]),
         ...overrides,
-      } as unknown as SelectQueryBuilder<AuditLog>;
+      };
       mockRepo.createQueryBuilder.mockReturnValue(qb);
       return qb;
     };
@@ -221,10 +220,9 @@ describe('AuditService', () => {
 
       await service.findAll('tenant-1', { action: 'ORDER_CREATED' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'log.action = :action',
-        { action: 'ORDER_CREATED' },
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('log.action = :action', {
+        action: 'ORDER_CREATED',
+      });
     });
 
     it('applies actorType filter when provided', async () => {
@@ -232,10 +230,9 @@ describe('AuditService', () => {
 
       await service.findAll('tenant-1', { actorType: 'USER' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'log.actor_type = :actorType',
-        { actorType: 'USER' },
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('log.actor_type = :actorType', {
+        actorType: 'USER',
+      });
     });
 
     it('applies actorId filter when provided', async () => {
@@ -243,32 +240,33 @@ describe('AuditService', () => {
 
       await service.findAll('tenant-1', { actorId: 'user-1' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'log.actor_id = :actorId',
-        { actorId: 'user-1' },
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('log.actor_id = :actorId', {
+        actorId: 'user-1',
+      });
     });
 
     it('applies startDate filter when provided', async () => {
       const qb = buildQb();
 
-      await service.findAll('tenant-1', { startDate: '2026-09-01T00:00:00.000Z' });
+      await service.findAll('tenant-1', {
+        startDate: '2026-09-01T00:00:00.000Z',
+      });
 
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'log.created_at >= :startDate',
-        { startDate: '2026-09-01T00:00:00.000Z' },
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('log.created_at >= :startDate', {
+        startDate: '2026-09-01T00:00:00.000Z',
+      });
     });
 
     it('applies endDate filter when provided', async () => {
       const qb = buildQb();
 
-      await service.findAll('tenant-1', { endDate: '2026-09-30T23:59:59.000Z' });
+      await service.findAll('tenant-1', {
+        endDate: '2026-09-30T23:59:59.000Z',
+      });
 
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'log.created_at <= :endDate',
-        { endDate: '2026-09-30T23:59:59.000Z' },
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('log.created_at <= :endDate', {
+        endDate: '2026-09-30T23:59:59.000Z',
+      });
     });
 
     it('does not call andWhere when no filters are provided', async () => {
