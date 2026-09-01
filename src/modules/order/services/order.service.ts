@@ -10,7 +10,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
-import { AuditLog } from '../../audit/audit-log.entity';
+import { AuditService } from '../../audit/audit.service';
 import {
   CreateOrderDto,
   QueryOrderDto,
@@ -32,6 +32,7 @@ export class OrderService {
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
     private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -121,7 +122,6 @@ export class OrderService {
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const itemRepo = manager.getRepository(OrderItem);
-      const auditRepo = manager.getRepository(AuditLog);
 
       const orderNumber = this.generateOrderNumber();
 
@@ -152,17 +152,20 @@ export class OrderService {
 
       await itemRepo.save(items);
 
-      await auditRepo.save({
-        tenantId,
-        actorType: 'USER',
-        actorId: userId,
-        action: 'ORDER_CREATED',
-        metadata: {
-          orderId: savedOrder.id,
-          orderNumber: savedOrder.orderNumber,
-          totalAmount: savedOrder.totalAmount,
+      await this.audit.record(
+        {
+          action: 'ORDER_CREATED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            orderId: savedOrder.id,
+            orderNumber: savedOrder.orderNumber,
+            totalAmount: savedOrder.totalAmount,
+          },
         },
-      });
+        manager,
+      );
 
       return orderRepo.findOne({
         where: { id: savedOrder.id, tenantId },
@@ -302,7 +305,6 @@ export class OrderService {
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const voidRepo = manager.getRepository(Void);
-      const auditRepo = manager.getRepository(AuditLog);
 
       order.status = 'VOID';
       await orderRepo.save(order);
@@ -318,17 +320,20 @@ export class OrderService {
 
       const savedVoid = await voidRepo.save(voidRecord);
 
-      await auditRepo.save({
-        tenantId,
-        actorType: 'USER',
-        actorId: userId,
-        action: 'ORDER_VOIDED',
-        metadata: {
-          orderId: order.id,
-          voidId: savedVoid.id,
-          reason: dto.reason,
+      await this.audit.record(
+        {
+          action: 'ORDER_VOIDED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            orderId: order.id,
+            voidId: savedVoid.id,
+            reason: dto.reason,
+          },
         },
-      });
+        manager,
+      );
 
       return {
         order,

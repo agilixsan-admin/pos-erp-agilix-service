@@ -8,6 +8,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
+import { AuditService } from '../../audit/audit.service';
 import {
   CreateProductDto,
   QueryProductsDto,
@@ -24,6 +25,7 @@ export class ProductService {
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
     private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(tenantId: string, query: QueryProductsDto) {
@@ -95,7 +97,7 @@ export class ProductService {
     return product;
   }
 
-  async create(tenantId: string, dto: CreateProductDto) {
+  async create(tenantId: string, userId: string, dto: CreateProductDto) {
     if (dto.categoryId) {
       const category = await this.categoryRepository.findOne({
         where: { id: dto.categoryId, tenantId },
@@ -140,6 +142,20 @@ export class ProductService {
 
       await variantRepo.save(variants);
 
+      await this.audit.record(
+        {
+          action: 'PRODUCT_CREATED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            productId: savedProduct.id,
+            productName: savedProduct.name,
+          },
+        },
+        manager,
+      );
+
       return productRepo.findOne({
         where: { id: savedProduct.id, tenantId },
         relations: { category: true, variants: true },
@@ -147,7 +163,12 @@ export class ProductService {
     });
   }
 
-  async update(tenantId: string, id: string, dto: UpdateProductDto) {
+  async update(
+    tenantId: string,
+    userId: string,
+    id: string,
+    dto: UpdateProductDto,
+  ) {
     await this.findById(tenantId, id);
 
     if (dto.categoryId) {
@@ -185,7 +206,6 @@ export class ProductService {
           dto.variants.filter((v) => v.id).map((v) => v.id as string),
         );
 
-        // Soft remove variants omitted in update
         const variantsToRemove = product.variants.filter(
           (v) => !updatedVariantIds.has(v.id),
         );
@@ -218,6 +238,17 @@ export class ProductService {
         }
       }
 
+      await this.audit.record(
+        {
+          action: 'PRODUCT_UPDATED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: { productId: id, productName: dto.name },
+        },
+        manager,
+      );
+
       return productRepo.findOne({
         where: { id, tenantId },
         relations: { category: true, variants: true },
@@ -225,7 +256,7 @@ export class ProductService {
     });
   }
 
-  async delete(tenantId: string, id: string) {
+  async delete(tenantId: string, userId: string, id: string) {
     const product = await this.findById(tenantId, id);
 
     return this.dataSource.transaction(async (manager) => {
@@ -236,6 +267,17 @@ export class ProductService {
         await variantRepo.softRemove(product.variants);
       }
       await productRepo.softRemove(product);
+
+      await this.audit.record(
+        {
+          action: 'PRODUCT_DELETED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: { productId: id, productName: product.name },
+        },
+        manager,
+      );
 
       return { success: true, message: 'Product deleted successfully' };
     });

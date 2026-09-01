@@ -11,7 +11,7 @@ import { Order } from '../../order/entities/order.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
-import { AuditLog } from '../../audit/audit-log.entity';
+import { AuditService } from '../../audit/audit.service';
 import {
   CreatePaymentDto,
   QueryPaymentDto,
@@ -28,6 +28,7 @@ export class PaymentService {
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
   ) {}
 
   private generateTransactionNumber(): string {
@@ -86,7 +87,6 @@ export class PaymentService {
       const recipeRepo = manager.getRepository(Recipe);
       const stockRepo = manager.getRepository(InventoryStock);
       const movementRepo = manager.getRepository(InventoryMovement);
-      const auditRepo = manager.getRepository(AuditLog);
 
       const payment = paymentRepo.create({
         tenantId,
@@ -164,19 +164,22 @@ export class PaymentService {
         }
       }
 
-      await auditRepo.save({
-        tenantId,
-        actorType: 'USER',
-        actorId: userId,
-        action: 'PAYMENT_PROCESSED',
-        metadata: {
-          orderId: order.id,
-          paymentId: savedPayment.id,
-          transactionId: savedTrx.id,
-          transactionNumber: savedTrx.transactionNumber,
-          totalAmount: orderTotal,
+      await this.audit.record(
+        {
+          action: 'PAYMENT_PROCESSED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            orderId: order.id,
+            paymentId: savedPayment.id,
+            transactionId: savedTrx.id,
+            transactionNumber: savedTrx.transactionNumber,
+            totalAmount: orderTotal,
+          },
         },
-      });
+        manager,
+      );
 
       return {
         payment: savedPayment,

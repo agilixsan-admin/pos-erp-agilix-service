@@ -5,7 +5,7 @@ import { InventoryStock } from './entities/inventory-stock.entity';
 import { InventoryMovement } from './entities/inventory-movement.entity';
 import { ReasonCategory } from './entities/reason-category.entity';
 import { Outlet } from '../outlet/outlet.entity';
-import { AuditLog } from '../audit/audit-log.entity';
+import { AuditModule } from '../audit/audit.module';
 import { InventoryService } from './services/inventory.service';
 import { InventoryController } from './controllers/inventory.controller';
 
@@ -17,8 +17,8 @@ import { InventoryController } from './controllers/inventory.controller';
       InventoryMovement,
       ReasonCategory,
       Outlet,
-      AuditLog,
     ]),
+    AuditModule,
   ],
   controllers: [InventoryController],
   providers: [InventoryService],

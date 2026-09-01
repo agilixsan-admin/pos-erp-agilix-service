@@ -10,7 +10,7 @@ import { ConsoleWebhookDto } from './console-webhook.dto';
 import { ExternalCommand } from './external-command.entity';
 import { Tenant } from '../tenant/tenant.entity';
 import { Outlet } from '../outlet/outlet.entity';
-import { AuditLog } from '../audit/audit-log.entity';
+import { AuditService } from '../audit/audit.service';
 import { TenantStatus } from '../tenant/tenant-status.enum';
 
 const supportedEvents = new Set([
@@ -25,6 +25,7 @@ export class WebhookService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async process(payload: ConsoleWebhookDto, apiKey: string | undefined) {
@@ -125,12 +126,17 @@ export class WebhookService {
           processedAt: new Date(),
         }),
       );
-      await manager.getRepository(AuditLog).save({
-        tenantId,
-        actorType: 'CONSOLE',
-        action: payload.event,
-        metadata: { eventId: payload.eventId },
-      });
+
+      await this.audit.record(
+        {
+          action: payload.event,
+          tenantId,
+          actorType: 'CONSOLE',
+          metadata: { eventId: payload.eventId },
+        },
+        manager,
+      );
+
       return { success: true, message: 'Event processed successfully' };
     });
   }

@@ -11,7 +11,7 @@ import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
-import { AuditLog } from '../../audit/audit-log.entity';
+import { AuditService } from '../../audit/audit.service';
 import {
   CreateInventoryItemDto,
   QueryInventoryDto,
@@ -39,6 +39,7 @@ export class InventoryService {
     @InjectRepository(Outlet)
     private readonly outletRepository: Repository<Outlet>,
     private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(tenantId: string, query: QueryInventoryDto) {
@@ -251,7 +252,6 @@ export class InventoryService {
     return this.dataSource.transaction(async (manager) => {
       const stockRepo = manager.getRepository(InventoryStock);
       const movementRepo = manager.getRepository(InventoryMovement);
-      const auditRepo = manager.getRepository(AuditLog);
 
       let stock = await stockRepo.findOne({
         where: {
@@ -305,20 +305,23 @@ export class InventoryService {
       });
       const savedMovement = await movementRepo.save(movement);
 
-      await auditRepo.save({
-        tenantId,
-        actorType: 'USER',
-        actorId: userId,
-        action: 'INVENTORY_ADJUSTMENT',
-        metadata: {
-          movementId: savedMovement.id,
-          itemId: dto.itemId,
-          type: dto.type,
-          quantity: dto.quantity,
-          previousStock: currentQty,
-          currentStock: newQty,
+      await this.audit.record(
+        {
+          action: 'INVENTORY_ADJUSTMENT',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            movementId: savedMovement.id,
+            itemId: dto.itemId,
+            type: dto.type,
+            quantity: dto.quantity,
+            previousStock: currentQty,
+            currentStock: newQty,
+          },
         },
-      });
+        manager,
+      );
 
       return {
         movement: savedMovement,

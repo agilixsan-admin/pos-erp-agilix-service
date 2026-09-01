@@ -51,7 +51,7 @@ export class ProductController {
   @Post()
   @Permissions('product.create')
   async create(@CurrentUser() user: User, @Body() dto: CreateProductDto) {
-    const data = await this.productService.create(user.tenantId, dto);
+    const data = await this.productService.create(user.tenantId, user.id, dto);
     return {
       success: true,
       message: 'Product created successfully',
@@ -66,7 +66,7 @@ export class ProductController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const data = await this.productService.update(user.tenantId, id, dto);
+    const data = await this.productService.update(user.tenantId, user.id, id, dto);
     return {
       success: true,
       message: 'Product updated successfully',
@@ -80,7 +80,7 @@ export class ProductController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.productService.delete(user.tenantId, id);
+    const data = await this.productService.delete(user.tenantId, user.id, id);
     return {
       success: true,
       message: 'Product deleted successfully',
