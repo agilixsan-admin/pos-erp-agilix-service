@@ -1,0 +1,212 @@
+{
+  "paths": {
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get list produk dengan pagination dan filter",
+        "operationId": "getProducts",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 },
+          { "name": "search", "in": "query", "type": "string" },
+          { "name": "categoryId", "in": "query", "type": "string" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+        ],
+        "responses": {
+          "200": {
+            "description": "List produk",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174010" },
+                      "name": { "example": "Americano" },
+                      "category": { "example": { "id": "cat-1", "name": "Coffee" } },
+                      "status": { "example": "ACTIVE" },
+                      "variants": {
+                        "type": "array",
+                        "example": [
+                          { "id": "var-1", "name": "Regular", "price": 25000 },
+                          { "id": "var-2", "name": "Large", "price": 30000 }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "meta": {
+                  "example": { "page": 1, "limit": 20, "total": 45, "totalPages": 3 }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Products"],
+        "summary": "Buat produk baru beserta varian",
+        "operationId": "createProduct",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "variants"],
+              "properties": {
+                "name": { "type": "string", "example": "Americano" },
+                "description": { "type": "string", "example": "Espresso dengan air panas" },
+                "categoryId": { "type": "string", "example": "cat-1" },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name", "price"],
+                    "properties": {
+                      "name": { "type": "string", "example": "Regular" },
+                      "price": { "type": "number", "example": 25000 },
+                      "sku": { "type": "string", "example": "AMR-REG" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Produk berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Product created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174010",
+                    "name": "Americano",
+                    "status": "ACTIVE",
+                    "variants": [{ "id": "var-1", "name": "Regular", "price": 25000 }]
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "403": { "description": "Permission denied atau tenant locked" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get detail produk by ID",
+        "operationId": "getProductById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail produk",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174010",
+                    "name": "Americano",
+                    "description": "Espresso dengan air panas",
+                    "category": { "id": "cat-1", "name": "Coffee" },
+                    "status": "ACTIVE",
+                    "variants": [
+                      { "id": "var-1", "name": "Regular", "price": 25000, "sku": "AMR-REG" }
+                    ],
+                    "createdAt": "2026-09-01T10:00:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Product not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Products"],
+        "summary": "Update produk",
+        "operationId": "updateProduct",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Americano Updated" },
+                "description": { "type": "string" },
+                "categoryId": { "type": "string" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Produk berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Product updated successfully" },
+                "data": { "example": { "id": "123e4567-e89b-12d3-a456-426614174010", "name": "Americano Updated" } }
+              }
+            }
+          },
+          "404": { "description": "Product not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Hapus produk (soft delete)",
+        "operationId": "deleteProduct",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Produk berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Product deleted successfully" },
+                "data": { "example": null }
+              }
+            }
+          },
+          "404": { "description": "Product not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}

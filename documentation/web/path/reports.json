@@ -1,0 +1,182 @@
+{
+  "paths": {
+    "/reports": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get summary report (revenue, orders, transaksi per periode)",
+        "operationId": "getSummaryReport",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "startDate", "in": "query", "required": true, "type": "string", "format": "date-time", "example": "2026-09-01T00:00:00Z" },
+          { "name": "endDate", "in": "query", "required": true, "type": "string", "format": "date-time", "example": "2026-09-30T23:59:59Z" },
+          { "name": "outletId", "in": "query", "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary report",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "summary": {
+                  "example": {
+                    "totalRevenue": 2500000,
+                    "totalOrders": 48,
+                    "totalTransactions": 45,
+                    "averageOrderValue": 52083
+                  }
+                },
+                "byPaymentMethod": {
+                  "example": [
+                    { "method": "CASH", "total": 1800000, "count": 30 },
+                    { "method": "QRIS", "total": 700000, "count": 15 }
+                  ]
+                },
+                "meta": { "example": { "startDate": "2026-09-01T00:00:00Z", "endDate": "2026-09-30T23:59:59Z", "outletId": null } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/reports/sales": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get sales report (by date, product, payment method)",
+        "operationId": "getSalesReport",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "startDate", "in": "query", "required": true, "type": "string", "format": "date-time" },
+          { "name": "endDate", "in": "query", "required": true, "type": "string", "format": "date-time" },
+          { "name": "outletId", "in": "query", "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sales report",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "summary": {
+                  "example": { "totalRevenue": 2500000, "totalOrders": 48, "totalTransactions": 45, "averageOrderValue": 52083 }
+                },
+                "byDate": {
+                  "type": "array",
+                  "example": [
+                    { "date": "2026-09-01", "revenue": 850000, "transactions": 16, "orders": 16 }
+                  ]
+                },
+                "byProduct": {
+                  "type": "array",
+                  "example": [
+                    { "productId": "prod-1", "productName": "Americano", "variantName": "Regular", "quantitySold": 30, "revenue": 750000 }
+                  ]
+                },
+                "byPaymentMethod": {
+                  "type": "array",
+                  "example": [
+                    { "method": "CASH", "total": 1800000, "count": 30 }
+                  ]
+                },
+                "meta": { "example": { "startDate": "2026-09-01T00:00:00Z", "endDate": "2026-09-30T23:59:59Z", "outletId": null } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/reports/inventory": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get inventory report (current stock per item)",
+        "operationId": "getInventoryReport",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string" },
+          { "name": "search", "in": "query", "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory report",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "example": [
+                    {
+                      "itemId": "item-1",
+                      "itemName": "Coffee Beans",
+                      "unit": "gram",
+                      "minimumStock": 500,
+                      "outlets": [
+                        { "outletId": "outlet-1", "outletName": "Outlet Utama", "currentStock": 4500, "isLow": false }
+                      ],
+                      "totalStock": 4500
+                    }
+                  ]
+                },
+                "meta": { "example": { "outletId": null } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/reports/inventory/movements": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get inventory movements history",
+        "operationId": "getInventoryMovementsReport",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 },
+          { "name": "outletId", "in": "query", "type": "string" },
+          { "name": "itemId", "in": "query", "type": "string" },
+          { "name": "movementType", "in": "query", "type": "string", "enum": ["IN", "OUT", "SALE", "ADJUSTMENT", "VOID"] },
+          { "name": "startDate", "in": "query", "type": "string", "format": "date-time" },
+          { "name": "endDate", "in": "query", "type": "string", "format": "date-time" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory movements",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "example": [
+                    {
+                      "id": "mov-1",
+                      "date": "2026-09-01T10:00:00Z",
+                      "itemName": "Coffee Beans",
+                      "movementType": "SALE",
+                      "quantity": -36,
+                      "unit": "gram",
+                      "outletName": "Outlet Utama",
+                      "referenceType": "ORDER",
+                      "referenceId": "ord-1"
+                    }
+                  ]
+                },
+                "meta": { "example": { "page": 1, "limit": 20, "total": 120, "totalPages": 6 } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "paths": {
+    "/outlets": {
+      "get": {
+        "tags": ["Outlets"],
+        "summary": "Get list outlet milik tenant",
+        "operationId": "getOutlets",
+        "produces": ["application/json"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List outlet",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174002" },
+                      "name": { "example": "Outlet Utama" },
+                      "address": { "example": "Jl. Sudirman No. 1, Jakarta" },
+                      "phone": { "example": "+628123456789" },
+                      "status": { "example": "ACTIVE" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Outlets"],
+        "summary": "Buat outlet baru",
+        "operationId": "createOutlet",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Outlet Cabang 2" },
+                "address": { "type": "string", "example": "Jl. Thamrin No. 10, Jakarta" },
+                "phone": { "type": "string", "example": "+628123456790" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Outlet berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Outlet created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174002",
+                    "name": "Outlet Cabang 2",
+                    "status": "ACTIVE"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied atau tenant locked" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/outlets/{id}": {
+      "get": {
+        "tags": ["Outlets"],
+        "summary": "Get detail outlet by ID",
+        "operationId": "getOutletById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail outlet",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174002",
+                    "name": "Outlet Utama",
+                    "address": "Jl. Sudirman No. 1, Jakarta",
+                    "phone": "+628123456789",
+                    "status": "ACTIVE",
+                    "createdAt": "2026-09-01T10:00:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Outlets"],
+        "summary": "Update outlet",
+        "operationId": "updateOutlet",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Outlet Utama Updated" },
+                "address": { "type": "string", "example": "Jl. Sudirman No. 2, Jakarta" },
+                "phone": { "type": "string", "example": "+628123456791" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outlet berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Outlet updated successfully" },
+                "data": { "example": { "id": "123e4567-e89b-12d3-a456-426614174002", "name": "Outlet Utama Updated" } }
+              }
+            }
+          },
+          "404": { "description": "Outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Outlets"],
+        "summary": "Hapus outlet",
+        "operationId": "deleteOutlet",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outlet berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Outlet deleted successfully" },
+                "data": { "example": null }
+              }
+            }
+          },
+          "404": { "description": "Outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}

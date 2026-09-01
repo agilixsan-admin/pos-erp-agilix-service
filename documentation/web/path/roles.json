@@ -1,0 +1,187 @@
+{
+  "paths": {
+    "/roles": {
+      "get": {
+        "tags": ["Roles"],
+        "summary": "Get list role dalam tenant",
+        "operationId": "getRoles",
+        "produces": ["application/json"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List role",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174070" },
+                      "name": { "example": "CASHIER" },
+                      "menuAccess": {
+                        "type": "array",
+                        "example": ["order.read", "order.create", "payment.create", "transaction.read"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Roles"],
+        "summary": "Buat role baru",
+        "operationId": "createRole",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "menuAccess"],
+              "properties": {
+                "name": { "type": "string", "example": "Inventory Staff" },
+                "menuAccess": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "example": ["inventory.read", "inventory.adjust", "product.read"]
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Role berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Role created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174070",
+                    "name": "Inventory Staff",
+                    "menuAccess": ["inventory.read", "inventory.adjust", "product.read"]
+                  }
+                }
+              }
+            }
+          },
+          "409": { "description": "Role name sudah ada" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/roles/{id}": {
+      "get": {
+        "tags": ["Roles"],
+        "summary": "Get detail role by ID",
+        "operationId": "getRoleById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail role",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174070",
+                    "name": "CASHIER",
+                    "menuAccess": ["order.read", "order.create", "payment.create", "transaction.read"],
+                    "createdAt": "2026-09-01T10:00:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Role not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Roles"],
+        "summary": "Update role",
+        "operationId": "updateRole",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Senior Cashier" },
+                "menuAccess": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "example": ["order.read", "order.create", "order.void", "payment.create"]
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Role updated successfully" },
+                "data": { "example": { "id": "123e4567-e89b-12d3-a456-426614174070", "name": "Senior Cashier" } }
+              }
+            }
+          },
+          "404": { "description": "Role not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Roles"],
+        "summary": "Hapus role",
+        "operationId": "deleteRole",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Role deleted successfully" },
+                "data": { "example": null }
+              }
+            }
+          },
+          "400": { "description": "Role masih digunakan oleh user" },
+          "404": { "description": "Role not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "paths": {
+    "/webhooks/console": {
+      "post": {
+        "tags": ["Webhook"],
+        "summary": "Terima event dari Agilix Console",
+        "operationId": "webhookConsole",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "description": "Console API Key"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["event", "eventId", "timestamp", "data"],
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "enum": ["tenant.created", "tenant.locked", "tenant.unlocked", "tenant.updated", "tenant.subscription.updated", "tenant.subscription.expired"],
+                  "example": "tenant.locked"
+                },
+                "eventId": {
+                  "type": "string",
+                  "example": "evt-123e4567-e89b-12d3-a456-426614174000"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-09-01T10:00:00.000Z"
+                },
+                "data": {
+                  "type": "object",
+                  "example": {
+                    "tenantId": "123e4567-e89b-12d3-a456-426614174001",
+                    "reason": "subscription_expired"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event berhasil diproses",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Event processed successfully" }
+              }
+            }
+          },
+          "400": { "description": "Invalid payload atau unknown event" },
+          "401": { "description": "Invalid or missing API Key" },
+          "409": { "description": "Duplicate event (sudah diproses)" },
+          "500": { "description": "Internal server error (retryable)" }
+        }
+      }
+    }
+  }
+}
