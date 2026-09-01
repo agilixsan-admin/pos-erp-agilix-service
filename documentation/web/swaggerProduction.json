@@ -1,0 +1,39 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Agilix POS Service API Documentation - Production",
+    "version": "1.0.0",
+    "title": "Agilix POS Service API"
+  },
+  "host": "pos-api.agilix.com",
+  "basePath": "/api/v1",
+  "schemes": ["https"],
+  "tags": [
+    { "name": "Auth", "description": "Authentication & authorization" },
+    { "name": "Webhook", "description": "Console → POS webhook integration" },
+    { "name": "Outlets", "description": "Outlet management" },
+    { "name": "Products", "description": "Product & variant management" },
+    { "name": "Inventory", "description": "Inventory & stock management" },
+    { "name": "Orders", "description": "Order management" },
+    { "name": "Payments", "description": "Payment processing" },
+    { "name": "Transactions", "description": "Transaction history" },
+    { "name": "Users", "description": "User management" },
+    { "name": "Roles", "description": "Role & permission management" },
+    { "name": "Reports", "description": "Operational reporting" },
+    { "name": "Audit Logs", "description": "System audit logs" }
+  ],
+  "securityDefinitions": {
+    "Bearer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Enter token with format: Bearer {token}"
+    },
+    "ConsoleApiKey": {
+      "type": "apiKey",
+      "name": "x-api-key",
+      "in": "header",
+      "description": "Console API Key untuk webhook authentication"
+    }
+  }
+}
