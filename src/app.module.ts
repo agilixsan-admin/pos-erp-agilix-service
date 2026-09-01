@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { configurationValidationSchema } from './config/validation';
 import { DatabaseModule } from './database/database.module';
@@ -63,9 +64,19 @@ const conditionalProviders = isProductionOrDevDb
       load: [configuration],
       validationSchema: configurationValidationSchema,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000, // 1 minute window
+        limit: 120, // 120 requests per minute
+      },
+    ]),
     ...conditionalModules,
   ],
   controllers: [HealthController],
-  providers: [...conditionalProviders],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    ...conditionalProviders,
+  ],
 })
 export class AppModule {}

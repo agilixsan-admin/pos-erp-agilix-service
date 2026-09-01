@@ -21,4 +21,8 @@ export default () => ({
   console: {
     apiKey: process.env.CONSOLE_API_KEY,
   },
+  throttle: {
+    ttl: Number(process.env.THROTTLE_TTL ?? 60000),
+    limit: Number(process.env.THROTTLE_LIMIT ?? 120),
+  },
 });
