@@ -1,0 +1,128 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Unit Test + Lint + Build
+  # Jalan di semua push dan PR — cepat, tidak butuh Docker
+  # ---------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Integration Test (E2E penuh dengan PostgreSQL + Redis nyata)
+  # Hanya jalan saat push ke main — lebih lambat tapi paling realistis
+  # ---------------------------------------------------------------------------
+  integration-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agilix_test
+          POSTGRES_PASSWORD: agilix_test_password
+          POSTGRES_DB: agilix_console_test
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U agilix_test -d agilix_pos_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npx jest --config ./test/jest-integration.json --runInBand --forceExit
+        env:
+          NODE_ENV: test
+          # DB_* wajib ada untuk ConfigModule validation (validationSchema Joi)
+          DB_HOST: localhost
+          DB_PORT: 5435
+          DB_USERNAME: agilix_test
+          DB_PASSWORD: agilix_test_password
+          DB_NAME: agilix_pos_test
+          # TEST_DB_* dipakai oleh integration-setup.ts untuk override koneksi
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: 5435
+          TEST_DB_USERNAME: agilix_test
+          TEST_DB_PASSWORD: agilix_test_password
+          TEST_DB_NAME: agilix_pos_test
+          TEST_REDIS_HOST: localhost
+          TEST_REDIS_PORT: 6380
+          JWT_SECRET: ci-integration-test-jwt-secret-min-32-chars
+          JWT_REFRESH_SECRET: ci-integration-test-refresh-secret-min-32-chars
+          JWT_EXPIRES_IN: 15m
+          JWT_REFRESH_EXPIRES_IN: 7d
+          SMTP_HOST: localhost
+          SMTP_PORT: 1025
+          SMTP_USERNAME: ''
+          SMTP_PASSWORD: ''
+          SMTP_FROM: test@agilix.id
+          SEED_SUPER_ADMIN_EMAIL: superadmin@test.agilix.id
+          SEED_SUPER_ADMIN_PASSWORD: SuperAdmin@Test123
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Deploy ke VPS
+  # Hanya jalan kalau unit test DAN integration test keduanya pass
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: [test, integration-test]
+    runs-on: ubuntu-latest
+    environment: Production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove unnecessary files
+        run: rm -rf .git node_modules
+
+      - name: Send files to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          port: ${{ secrets.SERVER_PORT }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: '.'
+          target: /home/agilix-data-tier/agilix-pos
+          overwrite: true

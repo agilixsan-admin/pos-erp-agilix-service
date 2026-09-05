@@ -28,4 +28,22 @@ export const configurationValidationSchema = Joi.object({
   THROTTLE_TTL: Joi.number().default(60000),
   THROTTLE_LIMIT: Joi.number().default(120),
   SWAGGER: Joi.string().valid('development', 'staging').optional().allow(''),
+  STORAGE_DRIVER: Joi.string().valid('s3', 'minio', 'local').default('s3'),
+  S3_ENDPOINT: Joi.string().optional().allow(''),
+  S3_REGION: Joi.string().default('us-east-1'),
+  S3_ACCESS_KEY_ID: Joi.string().default('minioadmin'),
+  S3_SECRET_ACCESS_KEY: Joi.string().default('minioadmin'),
+  S3_BUCKET: Joi.string().default('aglix-pos'),
+  S3_FORCE_PATH_STYLE: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true),
+  S3_PUBLIC_URL: Joi.string().optional().allow(''),
+  MINIO_ENDPOINT: Joi.string().optional().allow(''),
+  MINIO_PORT: Joi.number().optional(),
+  MINIO_USE_SSL: Joi.boolean().truthy('true').falsy('false').optional(),
+  MINIO_ACCESS_KEY: Joi.string().optional().allow(''),
+  MINIO_SECRET_KEY: Joi.string().optional().allow(''),
+  MINIO_BUCKET: Joi.string().optional().allow(''),
+  MINIO_PUBLIC_URL: Joi.string().optional().allow(''),
 }).unknown(true);

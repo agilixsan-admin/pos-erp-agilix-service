@@ -7,6 +7,7 @@ import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
 import { AuditService } from '../../audit/audit.service';
+import { StorageService } from '../../storage/services/storage.service';
 
 describe('ProductService', () => {
   let service: ProductService;
@@ -31,6 +32,10 @@ describe('ProductService', () => {
   };
   const mockAuditService = {
     record: jest.fn().mockResolvedValue(undefined),
+  };
+  const mockStorageService = {
+    uploadProductImage: jest.fn(),
+    deleteProductImage: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -57,6 +62,10 @@ describe('ProductService', () => {
         {
           provide: AuditService,
           useValue: mockAuditService,
+        },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
         },
       ],
     }).compile();
@@ -221,6 +230,105 @@ describe('ProductService', () => {
       expect(managerVariantRepo.softRemove).toHaveBeenCalledWith(
         product.variants,
       );
+    });
+  });
+
+  describe('uploadImage', () => {
+    it('successfully uploads image, deletes old image if exists, and updates product', async () => {
+      const product = {
+        id: 'prod-1',
+        tenantId: 'tenant-1',
+        imageUrl:
+          'http://localhost:9000/aglix-pos/uploads/tenant-1/products/old.webp',
+      };
+      mockProductRepo.findOne.mockResolvedValue(product);
+      mockStorageService.uploadProductImage.mockResolvedValue(
+        'http://localhost:9000/aglix-pos/uploads/tenant-1/products/new.webp',
+      );
+      mockProductRepo.save.mockImplementation((p: Product) =>
+        Promise.resolve(p),
+      );
+
+      const file = {
+        buffer: Buffer.from('test'),
+        mimetype: 'image/png',
+        originalname: 'test.png',
+        size: 1024,
+      } as Express.Multer.File;
+
+      const result = await service.uploadImage(
+        'tenant-1',
+        'user-1',
+        'prod-1',
+        file,
+      );
+
+      expect(mockStorageService.deleteProductImage).toHaveBeenCalledWith(
+        'tenant-1',
+        'http://localhost:9000/aglix-pos/uploads/tenant-1/products/old.webp',
+      );
+      expect(mockStorageService.uploadProductImage).toHaveBeenCalledWith(
+        'tenant-1',
+        'prod-1',
+        file,
+      );
+      expect(result.imageUrl).toBe(
+        'http://localhost:9000/aglix-pos/uploads/tenant-1/products/new.webp',
+      );
+      expect(mockProductRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'PRODUCT_IMAGE_UPLOADED' }),
+      );
+    });
+
+    it('throws NotFoundException if product does not exist for tenant', async () => {
+      mockProductRepo.findOne.mockResolvedValue(null);
+
+      const file = {
+        buffer: Buffer.from('test'),
+        mimetype: 'image/png',
+        originalname: 'test.png',
+        size: 1024,
+      } as Express.Multer.File;
+
+      await expect(
+        service.uploadImage('tenant-1', 'user-1', 'non-existent', file),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteImage', () => {
+    it('deletes image from storage and resets product imageUrl to null', async () => {
+      const product = {
+        id: 'prod-1',
+        tenantId: 'tenant-1',
+        imageUrl:
+          'http://localhost:9000/aglix-pos/uploads/tenant-1/products/old.webp',
+      };
+      mockProductRepo.findOne.mockResolvedValue(product);
+      mockProductRepo.save.mockImplementation((p: Product) =>
+        Promise.resolve(p),
+      );
+
+      const result = await service.deleteImage('tenant-1', 'user-1', 'prod-1');
+
+      expect(mockStorageService.deleteProductImage).toHaveBeenCalledWith(
+        'tenant-1',
+        'http://localhost:9000/aglix-pos/uploads/tenant-1/products/old.webp',
+      );
+      expect(result.product.imageUrl).toBeNull();
+      expect(mockProductRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'PRODUCT_IMAGE_DELETED' }),
+      );
+    });
+
+    it('throws NotFoundException when trying to delete image of non-existent product', async () => {
+      mockProductRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteImage('tenant-1', 'user-1', 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

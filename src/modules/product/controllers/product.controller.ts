@@ -8,7 +8,11 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+
 import { ProductService } from '../services/product.service';
 import {
   CreateProductDto,
@@ -89,6 +93,45 @@ export class ProductController {
     return {
       success: true,
       message: 'Product deleted successfully',
+      data,
+    };
+  }
+
+  @Post(':id/image')
+  @Permissions('product.update')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const data = await this.productService.uploadImage(
+      user.tenantId,
+      user.id,
+      id,
+      file,
+    );
+    return {
+      success: true,
+      message: 'Product image uploaded successfully',
+      data,
+    };
+  }
+
+  @Delete(':id/image')
+  @Permissions('product.update')
+  async deleteImage(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.productService.deleteImage(
+      user.tenantId,
+      user.id,
+      id,
+    );
+    return {
+      success: true,
+      message: 'Product image deleted successfully',
       data,
     };
   }

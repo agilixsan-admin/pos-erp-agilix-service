@@ -26,4 +26,30 @@ export default () => ({
     limit: Number(process.env.THROTTLE_LIMIT ?? 120),
   },
   swagger: process.env.SWAGGER ?? '',
+  storage: {
+    driver: process.env.STORAGE_DRIVER ?? 's3',
+    s3: {
+      endpoint:
+        process.env.S3_ENDPOINT ??
+        (process.env.MINIO_ENDPOINT
+          ? `http://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT ?? 9000}`
+          : 'http://localhost:9000'),
+      region: process.env.S3_REGION ?? 'us-east-1',
+      accessKeyId:
+        process.env.S3_ACCESS_KEY_ID ??
+        process.env.MINIO_ACCESS_KEY ??
+        'minioadmin',
+      secretAccessKey:
+        process.env.S3_SECRET_ACCESS_KEY ??
+        process.env.MINIO_SECRET_KEY ??
+        'minioadmin',
+      bucket: process.env.S3_BUCKET ?? process.env.MINIO_BUCKET ?? 'aglix-pos',
+      forcePathStyle:
+        process.env.S3_FORCE_PATH_STYLE === 'false' ? false : true,
+      publicUrl:
+        process.env.S3_PUBLIC_URL ??
+        process.env.MINIO_PUBLIC_URL ??
+        'http://localhost:9000/aglix-pos',
+    },
+  },
 });

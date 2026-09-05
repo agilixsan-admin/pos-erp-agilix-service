@@ -33,6 +33,9 @@ export class Product {
   @Column({ type: 'varchar', nullable: true })
   description!: string | null;
 
+  @Column({ name: 'image_url', type: 'varchar', nullable: true })
+  imageUrl!: string | null;
+
   @Column({ default: 'ACTIVE' })
   status!: string;
 

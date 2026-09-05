@@ -9,6 +9,7 @@ import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
 import { AuditService } from '../../audit/audit.service';
+import { StorageService } from '../../storage/services/storage.service';
 import {
   CreateProductDto,
   QueryProductsDto,
@@ -26,6 +27,7 @@ export class ProductService {
     private readonly categoryRepository: Repository<Category>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(tenantId: string, query: QueryProductsDto) {
@@ -281,5 +283,89 @@ export class ProductService {
 
       return { success: true, message: 'Product deleted successfully' };
     });
+  }
+
+  async uploadImage(
+    tenantId: string,
+    userId: string,
+    productId: string,
+    file: Express.Multer.File,
+  ) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, tenantId },
+      relations: { category: true, variants: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND',
+      });
+    }
+
+    if (product.imageUrl) {
+      await this.storageService.deleteProductImage(tenantId, product.imageUrl);
+    }
+
+    const imageUrl = await this.storageService.uploadProductImage(
+      tenantId,
+      productId,
+      file,
+    );
+
+    product.imageUrl = imageUrl;
+    await this.productRepository.save(product);
+
+    await this.audit.record({
+      action: 'PRODUCT_IMAGE_UPLOADED',
+      tenantId,
+      actorType: 'USER',
+      actorId: userId,
+      metadata: {
+        productId: product.id,
+        imageUrl,
+      },
+    });
+
+    return {
+      product,
+      imageUrl,
+    };
+  }
+
+  async deleteImage(tenantId: string, userId: string, productId: string) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, tenantId },
+      relations: { category: true, variants: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND',
+      });
+    }
+
+    if (product.imageUrl) {
+      await this.storageService.deleteProductImage(tenantId, product.imageUrl);
+      product.imageUrl = null;
+      await this.productRepository.save(product);
+
+      await this.audit.record({
+        action: 'PRODUCT_IMAGE_DELETED',
+        tenantId,
+        actorType: 'USER',
+        actorId: userId,
+        metadata: {
+          productId: product.id,
+        },
+      });
+    }
+
+    return {
+      product,
+    };
   }
 }
