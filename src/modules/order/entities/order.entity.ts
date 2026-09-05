@@ -12,6 +12,7 @@ import {
 import { Tenant } from '../../tenant/tenant.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { User } from '../../user/user.entity';
+import { Table } from '../../table/entities/table.entity';
 import { OrderItem } from './order-item.entity';
 
 @Entity('orders')
@@ -36,6 +37,9 @@ export class Order {
 
   @Column({ name: 'order_type', default: 'DINE_IN' })
   orderType!: string;
+
+  @Column({ name: 'table_id', type: 'uuid', nullable: true })
+  tableId!: string | null;
 
   @Column({ name: 'table_number', type: 'varchar', nullable: true })
   tableNumber!: string | null;
@@ -95,6 +99,10 @@ export class Order {
   @ManyToOne(() => Outlet, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'outlet_id' })
   outlet!: Outlet;
+
+  @ManyToOne(() => Table, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'table_id' })
+  table!: Table | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'created_by' })

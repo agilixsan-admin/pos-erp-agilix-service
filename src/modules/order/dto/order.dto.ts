@@ -42,6 +42,10 @@ export class CreateOrderDto {
   orderType?: 'DINE_IN' | 'TAKE_AWAY' = 'DINE_IN';
 
   @IsOptional()
+  @IsUUID()
+  tableId?: string;
+
+  @IsOptional()
   @IsString()
   tableNumber?: string;
 

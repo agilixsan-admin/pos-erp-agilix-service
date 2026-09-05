@@ -10,6 +10,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
+import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import {
   CreateOrderDto,
@@ -31,6 +32,8 @@ export class OrderService {
     private readonly outletRepository: Repository<Outlet>,
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
+    @InjectRepository(Table)
+    private readonly tableRepository: Repository<Table>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
   ) {}
@@ -119,9 +122,48 @@ export class OrderService {
       0,
     );
 
+    const orderType = dto.orderType ?? 'DINE_IN';
+
+    if (orderType === 'TAKE_AWAY' && dto.tableId) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Table assignment is not allowed for TAKE_AWAY orders',
+        code: 'TABLE_NOT_ALLOWED',
+      });
+    }
+
+    let assignedTable: Table | null = null;
+    if (dto.tableId) {
+      assignedTable = await this.tableRepository.findOne({
+        where: { id: dto.tableId, tenantId, outletId: targetOutletId },
+      });
+
+      if (!assignedTable) {
+        throw new BadRequestException({
+          success: false,
+          message: 'Table not found or does not belong to this outlet',
+          code: 'TABLE_NOT_FOUND',
+        });
+      }
+
+      if (assignedTable.status !== 'AVAILABLE') {
+        throw new BadRequestException({
+          success: false,
+          message: `Table "${assignedTable.name}" is not available (current status: ${assignedTable.status})`,
+          code: 'TABLE_NOT_AVAILABLE',
+        });
+      }
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const itemRepo = manager.getRepository(OrderItem);
+      const tableRepo = manager.getRepository(Table);
+
+      if (assignedTable) {
+        assignedTable.status = 'OCCUPIED';
+        await tableRepo.save(assignedTable);
+      }
 
       const orderNumber = this.generateOrderNumber();
 
@@ -130,8 +172,10 @@ export class OrderService {
         outletId: targetOutletId,
         orderNumber,
         status: 'PENDING',
-        orderType: dto.orderType ?? 'DINE_IN',
-        tableNumber: dto.tableNumber ?? null,
+        orderType,
+        tableId: assignedTable ? assignedTable.id : null,
+        tableNumber:
+          dto.tableNumber ?? (assignedTable ? assignedTable.name : null),
         customerName: dto.customerName ?? null,
         subtotal: calculatedSubtotal,
         discountAmount,
@@ -162,6 +206,7 @@ export class OrderService {
             orderId: savedOrder.id,
             orderNumber: savedOrder.orderNumber,
             totalAmount: savedOrder.totalAmount,
+            tableId: assignedTable?.id,
           },
         },
         manager,
@@ -169,7 +214,7 @@ export class OrderService {
 
       return orderRepo.findOne({
         where: { id: savedOrder.id, tenantId },
-        relations: { items: true, outlet: true, creator: true },
+        relations: { items: true, outlet: true, creator: true, table: true },
       });
     });
   }
@@ -187,6 +232,7 @@ export class OrderService {
       .leftJoinAndSelect('order.creator', 'creator')
       .leftJoinAndSelect('order.payments', 'payment')
       .leftJoinAndSelect('order.transaction', 'transaction')
+      .leftJoinAndSelect('order.table', 'table')
       .where('order.tenantId = :tenantId', { tenantId });
 
     if (query.outletId) {
@@ -246,6 +292,7 @@ export class OrderService {
       .leftJoinAndSelect('order.creator', 'creator')
       .leftJoinAndSelect('order.payments', 'payment')
       .leftJoinAndSelect('order.transaction', 'transaction')
+      .leftJoinAndSelect('order.table', 'table')
       .where('order.id = :id AND order.tenantId = :tenantId', {
         id,
         tenantId,
@@ -305,9 +352,20 @@ export class OrderService {
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const voidRepo = manager.getRepository(Void);
+      const tableRepo = manager.getRepository(Table);
 
       order.status = 'VOID';
       await orderRepo.save(order);
+
+      if (order.tableId) {
+        const table = await tableRepo.findOne({
+          where: { id: order.tableId, tenantId },
+        });
+        if (table && table.status === 'OCCUPIED') {
+          table.status = 'AVAILABLE';
+          await tableRepo.save(table);
+        }
+      }
 
       const voidRecord = voidRepo.create({
         tenantId,

@@ -11,6 +11,7 @@ import { Order } from '../../order/entities/order.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
+import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import {
   CreatePaymentDto,
@@ -87,6 +88,7 @@ export class PaymentService {
       const recipeRepo = manager.getRepository(Recipe);
       const stockRepo = manager.getRepository(InventoryStock);
       const movementRepo = manager.getRepository(InventoryMovement);
+      const tableRepo = manager.getRepository(Table);
 
       const payment = paymentRepo.create({
         tenantId,
@@ -118,6 +120,17 @@ export class PaymentService {
       order.status = 'COMPLETED';
       order.completedAt = new Date();
       await orderRepo.save(order);
+
+      // Release table if order was assigned to a table
+      if (order.tableId) {
+        const table = await tableRepo.findOne({
+          where: { id: order.tableId, tenantId },
+        });
+        if (table && table.status === 'OCCUPIED') {
+          table.status = 'AVAILABLE';
+          await tableRepo.save(table);
+        }
+      }
 
       // Automatic Recipe-based Stock Deduction
       for (const item of order.items) {

@@ -9,6 +9,7 @@ import { Order } from '../../order/entities/order.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
+import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 
 describe('PaymentService', () => {
@@ -130,6 +131,10 @@ describe('PaymentService', () => {
         })),
         save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
       };
+      const managerTableRepo = {
+        findOne: jest.fn(),
+        save: jest.fn(),
+      };
       const managerAuditRepo = {
         save: jest.fn().mockResolvedValue({}),
       };
@@ -144,6 +149,7 @@ describe('PaymentService', () => {
               if (entityClass === Recipe) return managerRecipeRepo;
               if (entityClass === InventoryStock) return managerStockRepo;
               if (entityClass === InventoryMovement) return managerMovementRepo;
+              if (entityClass === Table) return managerTableRepo;
               return managerAuditRepo;
             },
           });
@@ -159,6 +165,90 @@ describe('PaymentService', () => {
       expect(result.payment.changeAmount).toBe(10000);
       expect(result.order.status).toBe('COMPLETED');
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('releases occupied table when payment completes for order with tableId', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        orderNumber: 'ORD-123',
+        status: 'PENDING',
+        totalAmount: 50000,
+        tableId: 'tbl-1',
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(order);
+
+      const managerPaymentRepo = {
+        create: jest.fn((p: Record<string, unknown>) => ({
+          ...p,
+          id: 'pay-1',
+        })),
+        save: jest.fn((p: Record<string, unknown>) => Promise.resolve(p)),
+      };
+      const managerTrxRepo = {
+        create: jest.fn((t: Record<string, unknown>) => ({
+          ...t,
+          id: 'trx-1',
+        })),
+        save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
+      };
+      const managerOrderRepo = {
+        save: jest.fn().mockResolvedValue(order),
+      };
+      const managerRecipeRepo = {
+        find: jest.fn().mockResolvedValue([]),
+      };
+      const managerStockRepo = {
+        findOne: jest.fn(),
+        save: jest.fn(),
+      };
+      const managerMovementRepo = {
+        create: jest.fn(),
+        save: jest.fn(),
+      };
+      const managerTableRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'tbl-1',
+          status: 'OCCUPIED',
+        }),
+        save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
+      };
+      const managerAuditRepo = {
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Payment) return managerPaymentRepo;
+              if (entityClass === Transaction) return managerTrxRepo;
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === Recipe) return managerRecipeRepo;
+              if (entityClass === InventoryStock) return managerStockRepo;
+              if (entityClass === InventoryMovement) return managerMovementRepo;
+              if (entityClass === Table) return managerTableRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
+
+      const result = await service.create('tenant-1', 'user-1', {
+        orderId: 'ord-1',
+        paymentMethod: 'QRIS',
+        amount: 50000,
+      });
+
+      expect(result.order.status).toBe('COMPLETED');
+      expect(managerTableRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'tbl-1',
+          status: 'AVAILABLE',
+        }),
+      );
     });
 
     it('rejects payment if order is already completed/paid (duplicate protection)', async () => {
