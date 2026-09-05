@@ -5,11 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { ConsoleWebhookDto } from './console-webhook.dto';
 import { ExternalCommand } from './external-command.entity';
 import { Tenant } from '../tenant/tenant.entity';
 import { Outlet } from '../outlet/outlet.entity';
+import { PosSettings } from '../settings/entities/pos-settings.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantStatus } from '../tenant/tenant-status.enum';
 
@@ -18,6 +19,7 @@ const supportedEvents = new Set([
   'tenant.updated',
   'tenant.locked',
   'tenant.unlocked',
+  'tenant.deleted',
 ]);
 
 @Injectable()
@@ -86,6 +88,27 @@ export class WebhookService {
               }),
             ),
           );
+
+          const settingsRepository = manager.getRepository(PosSettings);
+          const existingSettings = await settingsRepository.findOne({
+            where: { tenantId, outletId: IsNull() },
+          });
+          if (!existingSettings) {
+            await settingsRepository.save(
+              settingsRepository.create({
+                tenantId,
+                outletId: null,
+                taxEnabled: false,
+                taxRate: 0,
+                taxName: 'Tax',
+                discountEnabled: false,
+                discountType: 'PERCENTAGE',
+                discountValue: 0,
+                cashEnabled: true,
+                qrisEnabled: true,
+              }),
+            );
+          }
         }
       } else {
         if (!tenant)
@@ -94,7 +117,10 @@ export class WebhookService {
             message: 'Tenant not found',
             code: 'TENANT_NOT_FOUND',
           });
-        if (payload.event === 'tenant.locked')
+        if (
+          payload.event === 'tenant.locked' ||
+          payload.event === 'tenant.deleted'
+        )
           tenant.status = TenantStatus.LOCKED;
         if (payload.event === 'tenant.unlocked')
           tenant.status = TenantStatus.ACTIVE;
