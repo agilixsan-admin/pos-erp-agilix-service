@@ -50,7 +50,7 @@ export class QueryPaymentDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['PENDING', 'SUCCESS', 'FAILED'])
+  @IsIn(['PENDING', 'SUCCESS', 'EXPIRED', 'FAILED'])
   status?: string;
 
   @IsOptional()
@@ -60,6 +60,16 @@ export class QueryPaymentDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+}
+
+export class GenerateQrisDto {
+  @IsUUID()
+  orderId!: string;
+}
+
+export class SimulateQrisPayDto {
+  @IsUUID()
+  paymentId!: string;
 }
 
 export class QueryTransactionDto {

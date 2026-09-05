@@ -46,4 +46,11 @@ export const configurationValidationSchema = Joi.object({
   MINIO_SECRET_KEY: Joi.string().optional().allow(''),
   MINIO_BUCKET: Joi.string().optional().allow(''),
   MINIO_PUBLIC_URL: Joi.string().optional().allow(''),
+  QRIS_PROVIDER: Joi.string().valid('mock', 'midtrans').default('mock'),
+  MIDTRANS_SERVER_KEY: Joi.string().optional().allow(''),
+  MIDTRANS_CLIENT_KEY: Joi.string().optional().allow(''),
+  MIDTRANS_IS_PRODUCTION: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
 }).unknown(true);

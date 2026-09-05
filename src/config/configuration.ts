@@ -52,4 +52,12 @@ export default () => ({
         'http://localhost:9000/aglix-pos',
     },
   },
+  payment: {
+    qrisProvider: process.env.QRIS_PROVIDER ?? 'mock',
+    midtrans: {
+      serverKey: process.env.MIDTRANS_SERVER_KEY ?? '',
+      clientKey: process.env.MIDTRANS_CLIENT_KEY ?? '',
+      isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+    },
+  },
 });

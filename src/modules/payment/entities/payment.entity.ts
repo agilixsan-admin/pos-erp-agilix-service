@@ -15,6 +15,8 @@ import { User } from '../../user/user.entity';
 
 @Entity('payments')
 @Index(['orderId'])
+@Index(['tenantId', 'gatewayReference'])
+@Index(['tenantId', 'status'])
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -49,8 +51,33 @@ export class Payment {
   @Column({ name: 'reference_number', type: 'varchar', nullable: true })
   referenceNumber!: string | null;
 
-  @Column({ name: 'paid_at', type: 'timestamptz', default: () => 'now()' })
-  paidAt!: Date;
+  @Column({ name: 'qr_string', type: 'text', nullable: true })
+  qrString!: string | null;
+
+  @Column({ name: 'qr_url', type: 'text', nullable: true })
+  qrUrl!: string | null;
+
+  @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })
+  expiresAt!: Date | null;
+
+  @Column({
+    name: 'gateway_provider',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  gatewayProvider!: string | null;
+
+  @Column({
+    name: 'gateway_reference',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  gatewayReference!: string | null;
+
+  @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
+  paidAt!: Date | null;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy!: string | null;

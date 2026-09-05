@@ -10,6 +10,7 @@ import {
 import { PaymentService } from '../services/payment.service';
 import {
   CreatePaymentDto,
+  GenerateQrisDto,
   QueryPaymentDto,
   QueryTransactionDto,
 } from '../dto/payment.dto';
@@ -49,6 +50,74 @@ export class PaymentController {
     return {
       success: true,
       message: 'Payment processed and transaction completed successfully',
+      data,
+    };
+  }
+
+  @Post('payments/qris/generate')
+  @Permissions('payment.create')
+  async generateQris(@CurrentUser() user: User, @Body() dto: GenerateQrisDto) {
+    const data = await this.paymentService.generateQris(
+      user.tenantId,
+      user.id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Dynamic QRIS generated successfully',
+      data,
+    };
+  }
+
+  @Get('payments/qris/status/:orderId')
+  @Permissions('payment.read')
+  async getQrisStatus(
+    @CurrentUser() user: User,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    const data = await this.paymentService.getQrisStatus(
+      user.tenantId,
+      orderId,
+    );
+    return {
+      success: true,
+      message: 'QRIS status retrieved successfully',
+      data,
+    };
+  }
+
+  @Post('payments/qris/check/:orderId')
+  @Permissions('payment.create')
+  async checkQrisStatus(
+    @CurrentUser() user: User,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+  ) {
+    const data = await this.paymentService.checkQrisStatus(
+      user.tenantId,
+      user.id,
+      orderId,
+    );
+    return {
+      success: true,
+      message: 'QRIS status checked successfully',
+      data,
+    };
+  }
+
+  @Post('payments/qris/simulate-pay/:paymentId')
+  @Permissions('payment.create')
+  async simulateQrisPayment(
+    @CurrentUser() user: User,
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+  ) {
+    const data = await this.paymentService.simulateQrisPayment(
+      user.tenantId,
+      user.id,
+      paymentId,
+    );
+    return {
+      success: true,
+      message: 'Simulated QRIS payment settled successfully',
       data,
     };
   }
