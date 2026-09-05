@@ -21,6 +21,7 @@ import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { ReportModule } from './modules/report/report.module';
 import { TableModule } from './modules/table/table.module';
+import { PrinterModule } from './modules/printer/printer.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -46,6 +47,7 @@ const conditionalModules = isProductionOrDevDb
       PaymentModule,
       ReportModule,
       TableModule,
+      PrinterModule,
     ]
   : [];
 
