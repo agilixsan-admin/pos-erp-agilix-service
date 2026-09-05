@@ -1,0 +1,94 @@
+{
+  "paths": {
+    "/settings": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get konfigurasi operasional POS (tax, discount, payment methods, logo)",
+        "operationId": "getPosSettings",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Outlet UUID (opsional, fallback ke tenant setting jika tidak diset)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pengaturan POS",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Settings retrieved successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174095",
+                    "tenantId": "123e4567-e89b-12d3-a456-426614174001",
+                    "outletId": "123e4567-e89b-12d3-a456-426614174002",
+                    "taxPercentage": 11,
+                    "discountPercentage": 0,
+                    "isCashEnabled": true,
+                    "isQrisEnabled": true,
+                    "billHeaderLogo": "https://storage.agilix.com/logos/cafe.png",
+                    "billFooterText": "Terima kasih atas kunjungan Anda!"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Update konfigurasi operasional POS",
+        "operationId": "updatePosSettings",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002", "description": "Kosongkan untuk setting global tenant" },
+                "taxPercentage": { "type": "number", "example": 11 },
+                "discountPercentage": { "type": "number", "example": 5 },
+                "isCashEnabled": { "type": "boolean", "example": true },
+                "isQrisEnabled": { "type": "boolean", "example": true },
+                "billHeaderLogo": { "type": "string", "example": "https://storage.agilix.com/logos/cafe.png" },
+                "billFooterText": { "type": "string", "example": "Follow kami di @agilixcafe" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pengaturan berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Settings updated successfully" },
+                "data": {
+                  "example": {
+                    "taxPercentage": 11,
+                    "discountPercentage": 5,
+                    "isCashEnabled": true,
+                    "isQrisEnabled": true,
+                    "billFooterText": "Follow kami di @agilixcafe"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

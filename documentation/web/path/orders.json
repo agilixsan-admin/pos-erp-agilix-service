@@ -226,6 +226,54 @@
         },
         "security": [{ "Bearer": [] }]
       }
+    },
+    "/orders/{id}/print": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Cetak struk / bill pesanan ke printer POS",
+        "operationId": "printOrder",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Order UUID (harus berstatus COMPLETED)" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["printerType"],
+              "properties": {
+                "printerType": { "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"], "example": "RECEIPT" },
+                "printerId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174094" },
+                "paperWidth": { "type": "string", "enum": ["58MM", "80MM"], "example": "80MM" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Print job berhasil diproses",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Bill print job processed successfully" },
+                "data": {
+                  "example": {
+                    "mode": "NETWORK",
+                    "printer": { "id": "123e4567-e89b-12d3-a456-426614174094", "name": "Kasir Utama Printer" },
+                    "rawPayload": "Base64EscPosPayload=="
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Hanya order COMPLETED yang dapat dicetak atau printer belum diset" },
+          "404": { "description": "Order not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
     }
   }
 }

@@ -6,7 +6,9 @@
         "summary": "Get list role dalam tenant",
         "operationId": "getRoles",
         "produces": ["application/json"],
-        "parameters": [],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter role by outlet UUID" }
+        ],
         "responses": {
           "200": {
             "description": "List role",
@@ -21,6 +23,8 @@
                     "properties": {
                       "id": { "example": "123e4567-e89b-12d3-a456-426614174070" },
                       "name": { "example": "CASHIER" },
+                      "description": { "example": "Cashier front staff" },
+                      "outletId": { "example": "123e4567-e89b-12d3-a456-426614174002" },
                       "menuAccess": {
                         "type": "array",
                         "example": ["order.read", "order.create", "payment.create", "transaction.read"]
@@ -49,14 +53,16 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "menuAccess"],
+              "required": ["name", "permissions"],
               "properties": {
                 "name": { "type": "string", "example": "Inventory Staff" },
-                "menuAccess": {
+                "permissions": {
                   "type": "array",
                   "items": { "type": "string" },
                   "example": ["inventory.read", "inventory.adjust", "product.read"]
-                }
+                },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "description": { "type": "string", "example": "Staff managing inventory and stock" }
               }
             }
           }
@@ -73,13 +79,15 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174070",
                     "name": "Inventory Staff",
+                    "description": "Staff managing inventory and stock",
+                    "outletId": "123e4567-e89b-12d3-a456-426614174002",
                     "menuAccess": ["inventory.read", "inventory.adjust", "product.read"]
                   }
                 }
               }
             }
           },
-          "409": { "description": "Role name sudah ada" },
+          "409": { "description": "Role name sudah ada pada outlet ini" },
           "403": { "description": "Permission denied" }
         },
         "security": [{ "Bearer": [] }]
@@ -105,6 +113,8 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174070",
                     "name": "CASHIER",
+                    "description": "Cashier front staff",
+                    "outletId": "123e4567-e89b-12d3-a456-426614174002",
                     "menuAccess": ["order.read", "order.create", "payment.create", "transaction.read"],
                     "createdAt": "2026-09-01T10:00:00Z"
                   }
@@ -132,11 +142,12 @@
               "type": "object",
               "properties": {
                 "name": { "type": "string", "example": "Senior Cashier" },
-                "menuAccess": {
+                "permissions": {
                   "type": "array",
                   "items": { "type": "string" },
                   "example": ["order.read", "order.create", "order.void", "payment.create"]
-                }
+                },
+                "description": { "type": "string", "example": "Head cashier with void permission" }
               }
             }
           }

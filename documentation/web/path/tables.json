@@ -1,0 +1,199 @@
+{
+  "paths": {
+    "/tables": {
+      "get": {
+        "tags": ["Tables"],
+        "summary": "Get list meja dengan pagination dan filter",
+        "operationId": "getTables",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["AVAILABLE", "OCCUPIED", "RESERVED"], "description": "Filter by status" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search table number" },
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 }
+        ],
+        "responses": {
+          "200": {
+            "description": "List meja",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Tables retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174093" },
+                      "tableNumber": { "example": "A1" },
+                      "capacity": { "example": 4 },
+                      "status": { "example": "AVAILABLE" },
+                      "outletId": { "example": "123e4567-e89b-12d3-a456-426614174002" }
+                    }
+                  }
+                },
+                "meta": { "example": { "page": 1, "limit": 20, "total": 12, "totalPages": 1 } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Tables"],
+        "summary": "Buat meja baru",
+        "operationId": "createTable",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["tableNumber", "capacity"],
+              "properties": {
+                "tableNumber": { "type": "string", "example": "A1" },
+                "capacity": { "type": "integer", "example": 4 },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "status": { "type": "string", "enum": ["AVAILABLE", "OCCUPIED", "RESERVED"], "example": "AVAILABLE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Meja berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Table created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174093",
+                    "tableNumber": "A1",
+                    "capacity": 4,
+                    "status": "AVAILABLE",
+                    "outletId": "123e4567-e89b-12d3-a456-426614174002"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "409": { "description": "Nomor meja sudah ada pada outlet ini" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/tables/{id}": {
+      "get": {
+        "tags": ["Tables"],
+        "summary": "Get detail meja by ID",
+        "operationId": "getTableById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail meja",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Table retrieved successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174093",
+                    "tableNumber": "A1",
+                    "capacity": 4,
+                    "status": "AVAILABLE"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Table not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Tables"],
+        "summary": "Update informasi meja",
+        "operationId": "updateTable",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "tableNumber": { "type": "string", "example": "A1-VIP" },
+                "capacity": { "type": "integer", "example": 6 },
+                "status": { "type": "string", "enum": ["AVAILABLE", "OCCUPIED", "RESERVED"], "example": "AVAILABLE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meja berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Table updated successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174093",
+                    "tableNumber": "A1-VIP",
+                    "capacity": 6,
+                    "status": "AVAILABLE"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Table not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Tables"],
+        "summary": "Hapus meja",
+        "operationId": "deleteTable",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meja berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Table deleted successfully" }
+              }
+            }
+          },
+          "400": { "description": "Meja sedang OCCUPIED, tidak bisa dihapus" },
+          "404": { "description": "Table not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

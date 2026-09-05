@@ -1,0 +1,210 @@
+{
+  "paths": {
+    "/printers": {
+      "get": {
+        "tags": ["Printers"],
+        "summary": "Get list printer terkonfigurasi pada outlet",
+        "operationId": "getPrinters",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "printerType", "in": "query", "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"], "description": "Filter by printer type" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List printer",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printers retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174094" },
+                      "name": { "example": "Kasir Utama Printer" },
+                      "printerType": { "example": "RECEIPT" },
+                      "connectionType": { "example": "NETWORK" },
+                      "paperWidth": { "example": "80MM" },
+                      "ipAddress": { "example": "192.168.1.200" },
+                      "port": { "example": 9100 },
+                      "isDefault": { "example": true }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Printers"],
+        "summary": "Tambah konfigurasi printer baru",
+        "operationId": "createPrinter",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "printerType", "connectionType", "paperWidth"],
+              "properties": {
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "name": { "type": "string", "example": "Kasir Utama Printer" },
+                "printerType": { "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"], "example": "RECEIPT" },
+                "connectionType": { "type": "string", "enum": ["NETWORK", "BLUETOOTH", "USB"], "example": "NETWORK" },
+                "paperWidth": { "type": "string", "enum": ["58MM", "80MM"], "example": "80MM" },
+                "ipAddress": { "type": "string", "example": "192.168.1.200" },
+                "port": { "type": "integer", "example": 9100 },
+                "macAddress": { "type": "string", "example": "00:11:22:33:44:55" },
+                "isDefault": { "type": "boolean", "example": true }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Printer berhasil dikonfigurasi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174094",
+                    "name": "Kasir Utama Printer",
+                    "printerType": "RECEIPT",
+                    "connectionType": "NETWORK",
+                    "paperWidth": "80MM",
+                    "ipAddress": "192.168.1.200",
+                    "port": 9100,
+                    "isDefault": true
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error atau outletId required" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/printers/{id}": {
+      "get": {
+        "tags": ["Printers"],
+        "summary": "Get detail printer by ID",
+        "operationId": "getPrinterById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail printer",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer retrieved successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174094",
+                    "name": "Kasir Utama Printer",
+                    "printerType": "RECEIPT",
+                    "connectionType": "NETWORK",
+                    "paperWidth": "80MM",
+                    "ipAddress": "192.168.1.200",
+                    "port": 9100,
+                    "isDefault": true
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Printer not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Printers"],
+        "summary": "Update konfigurasi printer",
+        "operationId": "updatePrinter",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Kasir 1 EPSON" },
+                "printerType": { "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"] },
+                "connectionType": { "type": "string", "enum": ["NETWORK", "BLUETOOTH", "USB"] },
+                "paperWidth": { "type": "string", "enum": ["58MM", "80MM"] },
+                "ipAddress": { "type": "string", "example": "192.168.1.201" },
+                "port": { "type": "integer", "example": 9100 },
+                "isDefault": { "type": "boolean", "example": true }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Printer berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer updated successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174094",
+                    "name": "Kasir 1 EPSON"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Printer not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Printers"],
+        "summary": "Hapus konfigurasi printer",
+        "operationId": "deletePrinter",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Printer berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Printer not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

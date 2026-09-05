@@ -19,6 +19,11 @@
     { "name": "Transactions", "description": "Transaction history" },
     { "name": "Users", "description": "User management" },
     { "name": "Roles", "description": "Role & permission management" },
+    { "name": "Categories", "description": "Product category management" },
+    { "name": "Recipes", "description": "Recipe & composition management" },
+    { "name": "Tables", "description": "Table & occupancy management" },
+    { "name": "Printers", "description": "Printer configuration & bill printing" },
+    { "name": "Settings", "description": "POS operational settings & configuration" },
     { "name": "Reports", "description": "Operational reporting" },
     { "name": "Audit Logs", "description": "System audit logs" }
   ],

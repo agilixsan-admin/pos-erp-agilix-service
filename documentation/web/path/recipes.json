@@ -1,0 +1,134 @@
+{
+  "paths": {
+    "/recipes/variants/{variantId}": {
+      "get": {
+        "tags": ["Recipes"],
+        "summary": "Get komposisi resep bahan baku untuk variant produk",
+        "operationId": "getRecipeByVariantId",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "variantId", "in": "path", "required": true, "type": "string", "description": "Product Variant UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Komposisi recipe",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Variant recipe retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174092" },
+                      "variantId": { "example": "123e4567-e89b-12d3-a456-426614174011" },
+                      "inventoryItemId": { "example": "123e4567-e89b-12d3-a456-426614174020" },
+                      "quantity": { "example": 18 },
+                      "unit": { "example": "gram" },
+                      "inventoryItem": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "example": "123e4567-e89b-12d3-a456-426614174020" },
+                          "name": { "example": "Coffee Beans" },
+                          "unit": { "example": "gram" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Variant not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Recipes"],
+        "summary": "Set atau timpa komposisi resep bahan baku untuk variant",
+        "operationId": "setVariantRecipes",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "variantId", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["items"],
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["inventoryItemId", "quantity"],
+                    "properties": {
+                      "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174020" },
+                      "quantity": { "type": "number", "example": 18 },
+                      "unit": { "type": "string", "example": "gram" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe berhasil disimpan",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Variant recipe updated successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174092" },
+                      "quantity": { "example": 18 },
+                      "unit": { "example": "gram" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error atau duplicate inventory item" },
+          "404": { "description": "Variant atau inventory item not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Recipes"],
+        "summary": "Hapus seluruh resep komposisi variant",
+        "operationId": "deleteVariantRecipes",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "variantId", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Variant recipe deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Variant not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

@@ -1,0 +1,182 @@
+{
+  "paths": {
+    "/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Get list kategori produk",
+        "operationId": "getCategories",
+        "produces": ["application/json"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List kategori",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Categories retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "Coffee" },
+                      "description": { "example": "Coffee beverages" },
+                      "createdAt": { "example": "2026-09-01T10:00:00Z" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Categories"],
+        "summary": "Buat kategori baru",
+        "operationId": "createCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Non-Coffee" },
+                "description": { "type": "string", "example": "Non-coffee beverages" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Kategori berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Category created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174091",
+                    "name": "Non-Coffee",
+                    "description": "Non-coffee beverages"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Get detail kategori by ID",
+        "operationId": "getCategoryById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail kategori",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Category retrieved successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174090",
+                    "name": "Coffee",
+                    "description": "Coffee beverages"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Category not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Categories"],
+        "summary": "Update kategori",
+        "operationId": "updateCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Artisan Coffee" },
+                "description": { "type": "string", "example": "Specialty & artisan coffee" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kategori berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Category updated successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174090",
+                    "name": "Artisan Coffee"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Category not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Categories"],
+        "summary": "Hapus kategori",
+        "operationId": "deleteCategory",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kategori berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Category deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Category not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

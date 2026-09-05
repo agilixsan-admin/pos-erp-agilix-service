@@ -105,6 +105,151 @@
         },
         "security": [{ "Bearer": [] }]
       }
+    },
+    "/payments/qris/generate": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Generate QRIS dinamis untuk order",
+        "operationId": "generateQris",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["orderId"],
+              "properties": {
+                "orderId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174030" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Dynamic QRIS berhasil di-generate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Dynamic QRIS generated successfully" },
+                "data": {
+                  "example": {
+                    "paymentId": "123e4567-e89b-12d3-a456-426614174041",
+                    "orderId": "123e4567-e89b-12d3-a456-426614174030",
+                    "amount": 75000,
+                    "qrString": "00020101021226590014ID.LINKAJA.WWW01189360091100000000005204581253033605405750005802ID5911AGILIX CAFE6007JAKARTA6304ABCD",
+                    "qrUrl": "https://api.midtrans.com/v2/qris/123/qr-code",
+                    "expiresAt": "2026-09-01T10:45:00Z",
+                    "status": "PENDING"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Order sudah lunas atau metode QRIS dinonaktifkan" },
+          "404": { "description": "Order not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/payments/qris/status/{orderId}": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Polling status pembayaran QRIS",
+        "operationId": "getQrisStatus",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status QRIS",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "QRIS status retrieved successfully" },
+                "data": {
+                  "example": {
+                    "orderId": "123e4567-e89b-12d3-a456-426614174030",
+                    "paymentId": "123e4567-e89b-12d3-a456-426614174041",
+                    "status": "PAID",
+                    "paidAt": "2026-09-01T10:32:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "QRIS payment not found for this order" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/payments/qris/check/{orderId}": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Kasir melakukan pengecekan langsung / inquiry status ke gateway",
+        "operationId": "checkQrisStatus",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hasil inquiry gateway",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "QRIS status checked successfully" },
+                "data": {
+                  "example": {
+                    "orderId": "123e4567-e89b-12d3-a456-426614174030",
+                    "status": "PAID"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Order or payment not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/payments/qris/simulate-pay/{paymentId}": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Simulasi settlement pembayaran QRIS (sandbox testing)",
+        "operationId": "simulateQrisPayment",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "paymentId", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Simulasi berhasil, payment dan order menjadi COMPLETED",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Simulated QRIS payment settled successfully" },
+                "data": {
+                  "example": {
+                    "paymentId": "123e4567-e89b-12d3-a456-426614174041",
+                    "status": "PAID"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Payment bukan QRIS atau sudah lunas" },
+          "404": { "description": "Payment not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
     }
   }
 }

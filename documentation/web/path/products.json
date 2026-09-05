@@ -207,6 +207,62 @@
         },
         "security": [{ "Bearer": [] }]
       }
+    },
+    "/products/{id}/image": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Upload foto produk (WebP optimized)",
+        "operationId": "uploadProductImage",
+        "consumes": ["multipart/form-data"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          { "name": "file", "in": "formData", "required": true, "type": "file", "description": "Image file (jpg, jpeg, png, webp, max 5MB)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Foto berhasil diupload dan dioptimasi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Product image uploaded successfully" },
+                "data": {
+                  "example": {
+                    "imageUrl": "https://storage.agilix.com/products/tenant-1/prod-1.webp"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Format file tidak valid atau ukuran melebihi limit" },
+          "404": { "description": "Product not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Hapus foto produk",
+        "operationId": "deleteProductImage",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Foto berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Product image deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Product not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
     }
   }
 }

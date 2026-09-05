@@ -65,6 +65,46 @@
           "500": { "description": "Internal server error (retryable)" }
         }
       }
+    },
+    "/webhooks/payment": {
+      "post": {
+        "tags": ["Webhook"],
+        "summary": "Webhook callback dari Payment Gateway (Midtrans/Mock QRIS)",
+        "operationId": "webhookPayment",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "order_id": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174030" },
+                "transaction_status": { "type": "string", "example": "settlement" },
+                "fraud_status": { "type": "string", "example": "accept" },
+                "status_code": { "type": "string", "example": "200" },
+                "gross_amount": { "type": "string", "example": "75000.00" },
+                "signature_key": { "type": "string", "example": "sha512signature..." }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Callback webhook berhasil diverifikasi dan order diselesaikan",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Payment webhook processed successfully" }
+              }
+            }
+          },
+          "400": { "description": "Invalid payload atau signature verification failed" }
+        }
+      }
     }
   }
 }

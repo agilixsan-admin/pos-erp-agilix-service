@@ -47,14 +47,62 @@
         "security": [{ "Bearer": [] }]
       }
     },
-    "/inventory/{itemId}": {
+    "/inventory/items": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Buat item bahan baku / inventory baru",
+        "operationId": "createInventoryItem",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "unit"],
+              "properties": {
+                "name": { "type": "string", "example": "Fresh Milk" },
+                "unit": { "type": "string", "example": "ml" },
+                "minimumStock": { "type": "number", "example": 1000 },
+                "description": { "type": "string", "example": "Fresh pasteurized milk" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Item berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Inventory item created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174021",
+                    "name": "Fresh Milk",
+                    "unit": "ml",
+                    "minimumStock": 1000
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/items/{id}": {
       "get": {
         "tags": ["Inventory"],
         "summary": "Get detail inventory item by ID",
         "operationId": "getInventoryItem",
         "produces": ["application/json"],
         "parameters": [
-          { "name": "itemId", "in": "path", "required": true, "type": "string" }
+          { "name": "id", "in": "path", "required": true, "type": "string" }
         ],
         "responses": {
           "200": {
@@ -63,15 +111,15 @@
               "type": "object",
               "properties": {
                 "success": { "example": true },
+                "message": { "example": "Inventory item retrieved successfully" },
                 "data": {
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174020",
                     "name": "Coffee Beans",
                     "unit": "gram",
                     "minimumStock": 500,
-                    "status": "ACTIVE",
                     "stocks": [
-                      { "outletId": "outlet-1", "outletName": "Outlet Utama", "quantity": 4500 }
+                      { "outletId": "outlet-1", "quantity": 4500 }
                     ]
                   }
                 }
@@ -81,12 +129,140 @@
           "404": { "description": "Inventory item not found" }
         },
         "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Update item inventory",
+        "operationId": "updateInventoryItem",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Premium Arabica Beans" },
+                "unit": { "type": "string", "example": "gram" },
+                "minimumStock": { "type": "number", "example": 800 }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Inventory item updated successfully" }
+              }
+            }
+          },
+          "404": { "description": "Inventory item not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "summary": "Hapus item inventory",
+        "operationId": "deleteInventoryItem",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Inventory item deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Inventory item not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/items/{id}/stocks": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Inisialisasi / set stok awal item pada outlet",
+        "operationId": "setInventoryStock",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["outletId", "quantity"],
+              "properties": {
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "quantity": { "type": "number", "example": 5000 }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stok berhasil diset",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Inventory stock updated successfully" }
+              }
+            }
+          },
+          "404": { "description": "Item atau outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/movements": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get list history pergerakan stok",
+        "operationId": "getInventoryMovements",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 },
+          { "name": "outletId", "in": "query", "type": "string" },
+          { "name": "itemId", "in": "query", "type": "string" },
+          { "name": "movementType", "in": "query", "type": "string", "enum": ["IN", "OUT", "SALE", "ADJUSTMENT", "VOID"] }
+        ],
+        "responses": {
+          "200": {
+            "description": "List pergerakan stok",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": { "type": "array", "items": { "type": "object" } }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
       }
     },
     "/inventory/adjustments": {
       "post": {
         "tags": ["Inventory"],
-        "summary": "Buat stock adjustment",
+        "summary": "Buat stock adjustment (penyesuaian stok opname)",
         "operationId": "createAdjustment",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -116,7 +292,7 @@
               "type": "object",
               "properties": {
                 "success": { "example": true },
-                "message": { "example": "Stock adjustment created successfully" },
+                "message": { "example": "Stock adjustment completed successfully" },
                 "data": {
                   "example": {
                     "previousStock": 3500,
@@ -130,6 +306,97 @@
           "400": { "description": "Insufficient stock atau validation error" },
           "403": { "description": "Permission denied atau tenant locked" },
           "404": { "description": "Item atau outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/reason-categories": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get list kategori alasan adjustment stok",
+        "operationId": "getReasonCategories",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "type", "in": "query", "type": "string", "enum": ["IN", "OUT"] }
+        ],
+        "responses": {
+          "200": {
+            "description": "List reason categories",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": { "type": "array", "items": { "type": "object" } }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Buat kategori alasan adjustment baru",
+        "operationId": "createReasonCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "type"],
+              "properties": {
+                "name": { "type": "string", "example": "Barang Rusak / Basi" },
+                "type": { "type": "string", "enum": ["IN", "OUT"], "example": "OUT" },
+                "description": { "type": "string", "example": "Pengurangan akibat basi" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Reason category created" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/reason-categories/{id}": {
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Update kategori alasan adjustment",
+        "operationId": "updateReasonCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Barang Kadaluarsa" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Reason category updated" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "summary": "Hapus kategori alasan adjustment",
+        "operationId": "deleteReasonCategory",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Reason category deleted" }
         },
         "security": [{ "Bearer": [] }]
       }
