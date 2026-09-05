@@ -10,6 +10,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
+import { SettingsService } from '../../settings/services/settings.service';
 
 describe('OrderService', () => {
   let service: OrderService;
@@ -52,6 +53,17 @@ describe('OrderService', () => {
     record: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockSettingsService = {
+    getSettings: jest.fn().mockResolvedValue({
+      taxEnabled: false,
+      taxRate: 0,
+      taxName: 'Tax',
+      discountEnabled: false,
+      discountType: 'PERCENTAGE',
+      discountValue: 0,
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -89,6 +101,10 @@ describe('OrderService', () => {
         {
           provide: AuditService,
           useValue: mockAuditService,
+        },
+        {
+          provide: SettingsService,
+          useValue: mockSettingsService,
         },
       ],
     }).compile();
@@ -155,6 +171,71 @@ describe('OrderService', () => {
 
       expect(result).toBeDefined();
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('applies tax and discount automatically according to operational settings', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        taxEnabled: true,
+        taxRate: 10,
+        taxName: 'PB1',
+        discountEnabled: true,
+        discountType: 'PERCENTAGE',
+        discountValue: 10,
+      });
+
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 100000,
+          tenantId: 'tenant-1',
+          product: { name: 'Americano' },
+        },
+      ]);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => {
+          createdOrder = o;
+          return { ...o, id: 'ord-tax' };
+        }),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+        findOne: jest.fn().mockResolvedValue({ id: 'ord-tax' }),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => i),
+        save: jest.fn().mockResolvedValue([]),
+      };
+      const managerAuditRepo = {
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(100000);
+      expect(createdOrder?.['discountAmount']).toBe(10000);
+      expect(createdOrder?.['taxAmount']).toBe(9000);
+      expect(createdOrder?.['totalAmount']).toBe(99000);
     });
 
     it('creates DINE_IN order with assigned table and marks it OCCUPIED', async () => {

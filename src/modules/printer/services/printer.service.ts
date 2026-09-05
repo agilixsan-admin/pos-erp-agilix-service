@@ -11,6 +11,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { Order } from '../../order/entities/order.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { AuditService } from '../../audit/audit.service';
+import { SettingsService } from '../../settings/services/settings.service';
 import { EscPosBuilderService, EscPosResult } from './escpos-builder.service';
 import { NetworkPrinterDriver } from './network-printer.driver';
 import {
@@ -35,6 +36,7 @@ export class PrinterService {
     private readonly audit: AuditService,
     private readonly escposBuilder: EscPosBuilderService,
     private readonly networkPrinterDriver: NetworkPrinterDriver,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async findAll(tenantId: string, query: QueryPrinterDto) {
@@ -347,11 +349,17 @@ export class PrinterService {
       const payments = await this.paymentRepository.find({
         where: { orderId: order.id, tenantId },
       });
+      const settings = await this.settingsService.getSettings(
+        tenantId,
+        order.outletId,
+      );
       result = this.escposBuilder.buildReceipt({
         order,
         payments,
         cashierName: cashierName ?? 'Kasir',
         paperSize: printer.paperSize,
+        footerNote: settings.billFooterText || undefined,
+        taxName: settings.taxName || undefined,
       });
     } else if (targetType === 'KITCHEN') {
       result = this.escposBuilder.buildKitchenTicket({

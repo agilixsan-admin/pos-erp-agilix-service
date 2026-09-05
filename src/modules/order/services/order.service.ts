@@ -12,6 +12,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
+import { SettingsService } from '../../settings/services/settings.service';
 import {
   CreateOrderDto,
   QueryOrderDto,
@@ -36,6 +37,7 @@ export class OrderService {
     private readonly tableRepository: Repository<Table>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -115,8 +117,31 @@ export class OrderService {
       });
     }
 
-    const discountAmount = Number(dto.discountAmount ?? 0);
-    const taxAmount = Number(dto.taxAmount ?? 0);
+    const settings = await this.settingsService.getSettings(
+      tenantId,
+      targetOutletId,
+    );
+
+    let discountAmount = Number(dto.discountAmount ?? 0);
+    if (settings.discountEnabled && discountAmount === 0) {
+      if (settings.discountType === 'PERCENTAGE') {
+        discountAmount = Math.round(
+          (calculatedSubtotal * Number(settings.discountValue)) / 100,
+        );
+      } else {
+        discountAmount = Math.min(
+          calculatedSubtotal,
+          Number(settings.discountValue),
+        );
+      }
+    }
+
+    let taxAmount = 0;
+    if (settings.taxEnabled) {
+      const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+      taxAmount = Math.round((taxableBase * Number(settings.taxRate)) / 100);
+    }
+
     const totalAmount = Math.max(
       calculatedSubtotal - discountAmount + taxAmount,
       0,

@@ -14,6 +14,7 @@ import { Payment } from '../../payment/entities/payment.entity';
 import { AuditService } from '../../audit/audit.service';
 import { EscPosBuilderService } from './escpos-builder.service';
 import { NetworkPrinterDriver } from './network-printer.driver';
+import { SettingsService } from '../../settings/services/settings.service';
 
 describe('PrinterService', () => {
   let service: PrinterService;
@@ -50,12 +51,22 @@ describe('PrinterService', () => {
   let dataSource: {
     transaction: jest.Mock;
   };
+  let settingsService: {
+    getSettings: jest.Mock;
+  };
 
   const mockTenantId = 'tenant-uuid-1';
   const mockOutletId = 'outlet-uuid-1';
   const mockUserId = 'user-uuid-1';
 
   beforeEach(async () => {
+    settingsService = {
+      getSettings: jest.fn().mockResolvedValue({
+        taxName: 'PB1',
+        billFooterText: 'Thank you for your visit!',
+      }),
+    };
+
     printerRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
@@ -139,6 +150,7 @@ describe('PrinterService', () => {
         { provide: AuditService, useValue: auditService },
         { provide: EscPosBuilderService, useValue: escposBuilder },
         { provide: NetworkPrinterDriver, useValue: networkDriver },
+        { provide: SettingsService, useValue: settingsService },
       ],
     }).compile();
 
@@ -381,6 +393,8 @@ describe('PrinterService', () => {
         expect.objectContaining({
           cashierName: 'Kasir Budi',
           paperSize: '58mm',
+          taxName: 'PB1',
+          footerNote: 'Thank you for your visit!',
         }),
       );
       expect(result.status).toBe('READY_TO_PRINT');

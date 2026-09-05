@@ -12,6 +12,7 @@ import { InventoryMovement } from '../../inventory/entities/inventory-movement.e
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { QRIS_PROVIDER_TOKEN } from '../interfaces/qris-provider.interface';
+import { SettingsService } from '../../settings/services/settings.service';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -48,6 +49,13 @@ describe('PaymentService', () => {
     parseWebhookPayload: jest.fn(),
   };
 
+  const mockSettingsService = {
+    getSettings: jest.fn().mockResolvedValue({
+      cashEnabled: true,
+      qrisEnabled: true,
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -77,6 +85,10 @@ describe('PaymentService', () => {
         {
           provide: AuditService,
           useValue: mockAuditService,
+        },
+        {
+          provide: SettingsService,
+          useValue: mockSettingsService,
         },
       ],
     }).compile();
@@ -266,6 +278,29 @@ describe('PaymentService', () => {
         }),
       );
     });
+
+    it('throws BadRequestException if CASH payment method is disabled in settings', async () => {
+      mockOrderRepo.findOne.mockResolvedValue({
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        totalAmount: 50000,
+        items: [],
+      });
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        cashEnabled: false,
+        qrisEnabled: true,
+      });
+
+      await expect(
+        service.create('tenant-1', 'user-1', {
+          orderId: 'ord-1',
+          paymentMethod: 'CASH',
+          amount: 50000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('generateQris', () => {
@@ -311,6 +346,26 @@ describe('PaymentService', () => {
         }),
       );
       expect(mockPaymentRepo.save).toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if QRIS payment method is disabled in settings', async () => {
+      mockOrderRepo.findOne.mockResolvedValue({
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        totalAmount: 50000,
+      });
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        cashEnabled: true,
+        qrisEnabled: false,
+      });
+
+      await expect(
+        service.generateQris('tenant-1', 'user-1', {
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('returns existing unexpired pending QRIS if already generated', async () => {

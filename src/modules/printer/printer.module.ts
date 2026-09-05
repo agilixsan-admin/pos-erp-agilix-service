@@ -5,6 +5,7 @@ import { Outlet } from '../outlet/outlet.entity';
 import { Order } from '../order/entities/order.entity';
 import { Payment } from '../payment/entities/payment.entity';
 import { AuditModule } from '../audit/audit.module';
+import { SettingsModule } from '../settings/settings.module';
 import { PrinterService } from './services/printer.service';
 import { EscPosBuilderService } from './services/escpos-builder.service';
 import { NetworkPrinterDriver } from './services/network-printer.driver';
@@ -15,6 +16,7 @@ import { OrderPrintController } from './controllers/order-print.controller';
   imports: [
     TypeOrmModule.forFeature([Printer, Outlet, Order, Payment]),
     AuditModule,
+    SettingsModule,
   ],
   controllers: [PrinterController, OrderPrintController],
   providers: [PrinterService, EscPosBuilderService, NetworkPrinterDriver],

@@ -15,6 +15,7 @@ export interface ReceiptData {
   cashierName?: string;
   paperSize?: PrinterPaperSize;
   footerNote?: string;
+  taxName?: string;
 }
 
 @Injectable()
@@ -165,7 +166,29 @@ export class EscPosBuilderService {
     append(divider);
 
     // Totals
+    const subtotal = Number(data.order.subtotal);
+    const discountAmount = Number(data.order.discountAmount);
+    const taxAmount = Number(data.order.taxAmount);
     const totalAmount = Number(data.order.totalAmount);
+
+    append(
+      this.padTwoColumns('Subtotal', this.formatCurrency(subtotal), width),
+    );
+    if (discountAmount > 0) {
+      append(
+        this.padTwoColumns(
+          'Diskon',
+          `-${this.formatCurrency(discountAmount)}`,
+          width,
+        ),
+      );
+    }
+    if (taxAmount > 0) {
+      const taxLabel = data.taxName || 'Pajak';
+      append(
+        this.padTwoColumns(taxLabel, this.formatCurrency(taxAmount), width),
+      );
+    }
     append(
       this.padTwoColumns('TOTAL', this.formatCurrency(totalAmount), width),
       {

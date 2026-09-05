@@ -9,6 +9,7 @@ import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { Table } from '../table/entities/table.entity';
 import { AuditModule } from '../audit/audit.module';
+import { SettingsModule } from '../settings/settings.module';
 import { PaymentService } from './services/payment.service';
 import { PaymentController } from './controllers/payment.controller';
 import { PaymentWebhookController } from './controllers/payment-webhook.controller';
@@ -28,6 +29,7 @@ import { QRIS_PROVIDER_TOKEN } from './interfaces/qris-provider.interface';
       Table,
     ]),
     AuditModule,
+    SettingsModule,
   ],
   controllers: [PaymentController, PaymentWebhookController],
   providers: [

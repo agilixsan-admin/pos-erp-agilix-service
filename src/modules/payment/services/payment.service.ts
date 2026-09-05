@@ -20,6 +20,7 @@ import {
   QueryPaymentDto,
   QueryTransactionDto,
 } from '../dto/payment.dto';
+import { SettingsService } from '../../settings/services/settings.service';
 import { QRIS_PROVIDER_TOKEN } from '../interfaces/qris-provider.interface';
 import type { IQrisProvider } from '../interfaces/qris-provider.interface';
 
@@ -36,6 +37,7 @@ export class PaymentService {
     private readonly qrisProvider: IQrisProvider,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   private generateTransactionNumber(): string {
@@ -187,6 +189,25 @@ export class PaymentService {
       });
     }
 
+    const settings = await this.settingsService.getSettings(
+      tenantId,
+      order.outletId,
+    );
+    if (dto.paymentMethod === 'CASH' && !settings.cashEnabled) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Cash payment is disabled for this outlet',
+        code: 'PAYMENT_METHOD_DISABLED',
+      });
+    }
+    if (dto.paymentMethod === 'QRIS' && !settings.qrisEnabled) {
+      throw new BadRequestException({
+        success: false,
+        message: 'QRIS payment is disabled for this outlet',
+        code: 'PAYMENT_METHOD_DISABLED',
+      });
+    }
+
     const orderTotal = Number(order.totalAmount);
     if (dto.amount < orderTotal) {
       throw new BadRequestException({
@@ -247,6 +268,18 @@ export class PaymentService {
         success: false,
         message: `Cannot process payment for an order with status ${order.status}`,
         code: 'ORDER_INACTIVE',
+      });
+    }
+
+    const settings = await this.settingsService.getSettings(
+      tenantId,
+      order.outletId,
+    );
+    if (!settings.qrisEnabled) {
+      throw new BadRequestException({
+        success: false,
+        message: 'QRIS payment is disabled for this outlet',
+        code: 'PAYMENT_METHOD_DISABLED',
       });
     }
 
