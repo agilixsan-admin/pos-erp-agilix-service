@@ -91,14 +91,48 @@ async function bootstrap() {
   }
 
   const port = config.get<number>('port') ?? 3000;
+  const nodeEnv = config.get<string>('nodeEnv', 'development');
+  const dbHost = config.get<string>('database.host', 'localhost');
+  const dbPort = config.get<number>('database.port', 5432);
+  const dbName = config.get<string>('database.name', 'aglix_pos');
+  const storageDriver = config.get<string>('storage.driver', 's3');
+  const storageEndpoint = config.get<string>(
+    'storage.s3.endpoint',
+    'http://localhost:9000',
+  );
+  const storageBucket = config.get<string>('storage.s3.bucket', 'aglix-pos');
+  const qrisProvider = config.get<string>('payment.qrisProvider', 'mock');
   const dataSource = app.get(DataSource, { strict: false });
-  if (dataSource?.isInitialized) {
-    logger.log(
-      `Database connected: ${config.get<string>('database.name')}@${config.get<string>('database.host')}:${config.get<number>('database.port')}`,
-    );
-  }
 
   await app.listen(port);
-  logger.log(`Application running on http://localhost:${port}`);
+
+  logger.log(
+    '================================================================',
+  );
+  logger.log(`  Agilix POS Backend Service [${nodeEnv.toUpperCase()}]`);
+  logger.log(
+    '================================================================',
+  );
+  if (dataSource?.isInitialized) {
+    logger.log(
+      `  [Database]  CONNECTED -> PostgreSQL: ${dbName} (${dbHost}:${dbPort})`,
+    );
+  } else {
+    logger.warn(`  [Database]  NOT CONNECTED or DataSource uninitialized`);
+  }
+  logger.log(
+    `  [Storage]   ${storageDriver.toUpperCase()} (MinIO/S3) -> ${storageEndpoint}`,
+  );
+  logger.log(`              Target Bucket : "${storageBucket}"`);
+  logger.log(
+    `  [Payment]   Dynamic QRIS Provider : ${qrisProvider.toUpperCase()}`,
+  );
+  logger.log(`  [API Base]  http://localhost:${port}/api/v1`);
+  if (swaggerEnv === 'development' || swaggerEnv === 'staging') {
+    logger.log(`  [Swagger]   http://localhost:${port}/api-docs`);
+  }
+  logger.log(
+    '================================================================',
+  );
 }
 void bootstrap();

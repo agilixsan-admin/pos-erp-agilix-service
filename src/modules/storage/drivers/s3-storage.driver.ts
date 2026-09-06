@@ -15,6 +15,7 @@ import { IStorageDriver } from '../interfaces/storage-driver.interface';
 export class S3StorageDriver implements IStorageDriver, OnModuleInit {
   private readonly logger = new Logger(S3StorageDriver.name);
   private client: S3Client;
+  private endpoint: string;
   private bucket: string;
   private publicUrl: string;
 
@@ -37,6 +38,7 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
       true,
     );
 
+    this.endpoint = endpoint;
     this.bucket = this.config.get<string>('storage.s3.bucket', 'aglix-pos');
     this.publicUrl = this.config.get<string>(
       'storage.s3.publicUrl',
@@ -65,6 +67,9 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
           Bucket: this.bucket,
         }),
       );
+      this.logger.log(
+        `S3/MinIO Storage connected: Bucket "${this.bucket}" ready at ${this.endpoint}`,
+      );
     } catch {
       try {
         await this.client.send(
@@ -72,10 +77,12 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
             Bucket: this.bucket,
           }),
         );
-        this.logger.log(`Created S3/MinIO bucket: ${this.bucket}`);
+        this.logger.log(
+          `S3/MinIO Storage connected: Bucket "${this.bucket}" created and ready at ${this.endpoint}`,
+        );
       } catch (createErr: unknown) {
         this.logger.warn(
-          `Could not verify or create S3/MinIO bucket (${this.bucket}): ${
+          `Could not connect to S3/MinIO bucket "${this.bucket}" at ${this.endpoint}: ${
             createErr instanceof Error ? createErr.message : String(createErr)
           }`,
         );
