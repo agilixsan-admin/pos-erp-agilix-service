@@ -1,13 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Tenant } from '../modules/tenant/tenant.entity';
-import { Outlet } from '../modules/outlet/outlet.entity';
-import { User } from '../modules/user/user.entity';
-import { Role } from '../modules/rbac/role.entity';
-import { ExternalCommand } from '../modules/webhook/external-command.entity';
-import { AuditLog } from '../modules/audit/audit-log.entity';
-import { Foundation1700000000000 } from './migrations/1700000000000-Foundation';
+import { ALL_MIGRATIONS } from './migrations';
 
 @Module({
   imports: [
@@ -23,10 +17,12 @@ import { Foundation1700000000000 } from './migrations/1700000000000-Foundation';
         database: config.get<string>('database.name'),
         ssl: config.get<boolean>('database.ssl'),
         logging: config.get<boolean>('database.logging'),
-        entities: [Tenant, Outlet, User, Role, ExternalCommand, AuditLog],
-        migrations: [Foundation1700000000000],
-        synchronize: false,
         autoLoadEntities: true,
+        migrations: ALL_MIGRATIONS,
+        migrationsRun:
+          config.get<string>('nodeEnv') !== 'production' ||
+          process.env.DB_MIGRATIONS_RUN === 'true',
+        synchronize: false,
       }),
     }),
   ],

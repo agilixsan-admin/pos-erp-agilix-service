@@ -28,6 +28,9 @@ export class Outlet {
   @Column({ type: 'varchar', nullable: true })
   address!: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  phone!: string | null;
+
   @Column({ default: 'ACTIVE' })
   status!: string;
 

@@ -12,6 +12,8 @@ import { Tenant } from '../tenant/tenant.entity';
 import { Outlet } from '../outlet/outlet.entity';
 import { PosSettings } from '../settings/entities/pos-settings.entity';
 import { TenantStatus } from '../tenant/tenant-status.enum';
+import { Role } from '../rbac/role.entity';
+import { User } from '../user/user.entity';
 import { ConsoleWebhookDto } from './console-webhook.dto';
 
 describe('WebhookService', () => {
@@ -183,9 +185,31 @@ describe('WebhookService', () => {
         save: jest.fn((entity: Partial<Tenant>) => Promise.resolve(entity)),
       };
       const outletRepo = {
-        create: jest.fn((dto: Partial<Outlet>) => ({ ...dto })),
+        create: jest.fn((dto: Partial<Outlet>) => ({ ...dto, id: 'outlet-1' })),
         save: jest.fn((entities: Partial<Outlet>[]) =>
-          Promise.resolve(entities),
+          Promise.resolve(
+            entities.map((e, idx) => ({ ...e, id: `outlet-${idx + 1}` })),
+          ),
+        ),
+      };
+      const roleRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((dto: Partial<Role>) => ({
+          ...dto,
+          id: 'role-owner-1',
+        })),
+        save: jest.fn((entity: Partial<Role>) =>
+          Promise.resolve({ ...entity, id: 'role-owner-1' }),
+        ),
+      };
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((dto: Partial<User>) => ({
+          ...dto,
+          id: 'user-owner-1',
+        })),
+        save: jest.fn((entity: Partial<User>) =>
+          Promise.resolve({ ...entity, id: 'user-owner-1' }),
         ),
       };
       const settingsRepo = {
@@ -207,6 +231,8 @@ describe('WebhookService', () => {
         getRepository: jest.fn((entityClass: unknown) => {
           if (entityClass === Tenant) return tenantRepo;
           if (entityClass === Outlet) return outletRepo;
+          if (entityClass === Role) return roleRepo;
+          if (entityClass === User) return userRepo;
           if (entityClass === PosSettings) return settingsRepo;
           if (entityClass === ExternalCommand) return commandRepo;
           throw new Error('Unknown entity');
@@ -278,6 +304,24 @@ describe('WebhookService', () => {
         }),
       );
       expect(settingsRepo.save).toHaveBeenCalled();
+
+      // Verifies Owner Role and Owner User creation for POS login
+      expect(roleRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-new-1',
+          name: 'Owner',
+          menuAccess: ['*'],
+        }),
+      );
+      expect(userRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-new-1',
+          email: 'budi@coffee.com',
+          name: 'Budi',
+          isSuperAdmin: true,
+          status: 'ACTIVE',
+        }),
+      );
 
       // Verifies Command status & Audit log
       expect(commandRepo.save).toHaveBeenCalledWith(

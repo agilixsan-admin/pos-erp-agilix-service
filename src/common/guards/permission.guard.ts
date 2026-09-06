@@ -22,7 +22,12 @@ export class PermissionGuard implements CanActivate {
     const user = context.switchToHttp().getRequest<AuthenticatedRequest>().user;
     if (user?.isSuperAdmin) return true;
     const menuAccess = user?.role?.menuAccess ?? [];
-    if (requiredMenus.every((menu) => menuAccess.includes(menu))) return true;
+    if (
+      menuAccess.includes('*') ||
+      requiredMenus.every((menu) => menuAccess.includes(menu))
+    ) {
+      return true;
+    }
     throw new ForbiddenException({
       success: false,
       message: 'Permission denied',

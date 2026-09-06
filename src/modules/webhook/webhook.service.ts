@@ -13,6 +13,9 @@ import { Outlet } from '../outlet/outlet.entity';
 import { PosSettings } from '../settings/entities/pos-settings.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantStatus } from '../tenant/tenant-status.enum';
+import { Role } from '../rbac/role.entity';
+import { User } from '../user/user.entity';
+import * as bcrypt from 'bcryptjs';
 
 const supportedEvents = new Set([
   'tenant.created',
@@ -78,7 +81,7 @@ export class WebhookService {
             });
           }
           const outletRepository = manager.getRepository(Outlet);
-          await outletRepository.save(
+          const createdOutlets = await outletRepository.save(
             Array.from({ length: outletCount }, (_, index) =>
               outletRepository.create({
                 tenantId,
@@ -88,6 +91,54 @@ export class WebhookService {
               }),
             ),
           );
+
+          const firstOutlet = createdOutlets[0];
+
+          // 1. Provision Default Owner Role (Full POS Access)
+          const roleRepository = manager.getRepository(Role);
+          let role = await roleRepository.findOne({
+            where: { tenantId, name: 'Owner' },
+          });
+          if (!role) {
+            role = await roleRepository.save(
+              roleRepository.create({
+                tenantId,
+                outletId: firstOutlet.id,
+                name: 'Owner',
+                description: 'Pemilik bisnis dengan akses penuh POS',
+                menuAccess: ['*'],
+                status: 'ACTIVE',
+              }),
+            );
+          }
+
+          // 2. Provision Default Owner User for POS Login
+          const userRepository = manager.getRepository(User);
+          const existingUser = await userRepository.findOne({
+            where: { email: tenant.ownerEmail },
+          });
+          if (!existingUser) {
+            const rawPassword =
+              typeof payload.data.initialPassword === 'string' &&
+              payload.data.initialPassword.trim()
+                ? payload.data.initialPassword.trim()
+                : 'Password123!';
+            const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 12);
+            const passwordHash = await bcrypt.hash(rawPassword, saltRounds);
+
+            await userRepository.save(
+              userRepository.create({
+                tenantId,
+                outletId: firstOutlet.id,
+                roleId: role.id,
+                name: tenant.ownerName,
+                email: tenant.ownerEmail,
+                passwordHash,
+                isSuperAdmin: true,
+                status: 'ACTIVE',
+              }),
+            );
+          }
 
           const settingsRepository = manager.getRepository(PosSettings);
           const existingSettings = await settingsRepository.findOne({

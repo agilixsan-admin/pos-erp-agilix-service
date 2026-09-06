@@ -85,6 +85,15 @@ describe('PermissionGuard', () => {
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
+  it('allows request when user role has wildcard "*" menuAccess', () => {
+    const ctx = buildContext({ role: { menuAccess: ['*'] } }, [
+      'outlet.read',
+      'outlet.create',
+    ]);
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
   it('throws ForbiddenException when only some required permissions are present', () => {
     const ctx = buildContext({ role: { menuAccess: ['order.create'] } }, [
       'order.create',

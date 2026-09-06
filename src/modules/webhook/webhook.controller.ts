@@ -19,8 +19,9 @@ export class WebhookController {
   @HttpCode(HttpStatus.OK)
   process(
     @Body() payload: ConsoleWebhookDto,
-    @Headers('x-agilix-api-key') apiKey?: string,
+    @Headers('x-agilix-api-key') agilixApiKey?: string,
+    @Headers('x-api-key') xApiKey?: string,
   ) {
-    return this.webhook.process(payload, apiKey);
+    return this.webhook.process(payload, agilixApiKey ?? xApiKey);
   }
 }
