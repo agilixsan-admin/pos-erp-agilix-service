@@ -22,8 +22,13 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
-  // Security headers
-  app.use(helmet());
+  // Security headers — disable CSP and COEP for Swagger UI compatibility
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // Request body size limit — prevent large payload attacks
   app.use(express.json({ limit: '1mb' }));
@@ -88,6 +93,11 @@ async function bootstrap() {
         }
         swaggerDocument['paths'] = mergedPaths;
       }
+
+      // Dynamically remove static host & schemes so Swagger UI automatically uses
+      // current browser host & port (e.g. localhost:4500 instead of hardcoded localhost:3000)
+      delete swaggerDocument['host'];
+      delete swaggerDocument['schemes'];
 
       app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

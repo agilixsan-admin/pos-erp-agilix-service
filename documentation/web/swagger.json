@@ -9,6 +9,7 @@
   "basePath": "/api/v1",
   "schemes": ["http"],
   "tags": [
+    { "name": "Health", "description": "Service health check" },
     { "name": "Auth", "description": "Authentication & authorization" },
     { "name": "Webhook", "description": "Console → POS webhook integration" },
     { "name": "Outlets", "description": "Outlet management" },
