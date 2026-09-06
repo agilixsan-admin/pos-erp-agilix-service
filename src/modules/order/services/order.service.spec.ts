@@ -11,6 +11,7 @@ import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
+import { PackagingService } from '../../packaging/services/packaging.service';
 
 describe('OrderService', () => {
   let service: OrderService;
@@ -64,6 +65,10 @@ describe('OrderService', () => {
     }),
   };
 
+  const mockPackagingService = {
+    findApplicableForOrder: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -105,6 +110,10 @@ describe('OrderService', () => {
         {
           provide: SettingsService,
           useValue: mockSettingsService,
+        },
+        {
+          provide: PackagingService,
+          useValue: mockPackagingService,
         },
       ],
     }).compile();
@@ -236,6 +245,68 @@ describe('OrderService', () => {
       expect(createdOrder?.['discountAmount']).toBe(10000);
       expect(createdOrder?.['taxAmount']).toBe(9000);
       expect(createdOrder?.['totalAmount']).toBe(99000);
+    });
+
+    it('creates TAKE_AWAY order with automatically calculated packaging fee', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 20000,
+          tenantId: 'tenant-1',
+          product: { name: 'Latte' },
+        },
+      ]);
+      mockPackagingService.findApplicableForOrder.mockResolvedValue([
+        { id: 'pkg-1', name: 'Paper Cup', extraPrice: 2000 },
+        { id: 'pkg-2', name: 'Plastic Bag', extraPrice: 1000 },
+      ]);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => {
+          createdOrder = o;
+          return { ...o, id: 'ord-takeaway' };
+        }),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+        findOne: jest.fn().mockResolvedValue({ id: 'ord-takeaway' }),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => i),
+        save: jest.fn().mockResolvedValue([]),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              return { save: jest.fn().mockResolvedValue({}) };
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        orderType: 'TAKE_AWAY',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(20000);
+      expect(createdOrder?.['packagingFee']).toBe(3000);
+      expect(createdOrder?.['totalAmount']).toBe(23000);
+      expect(mockPackagingService.findApplicableForOrder).toHaveBeenCalledWith(
+        'tenant-1',
+        'outlet-1',
+        'TAKE_AWAY',
+      );
     });
 
     it('creates DINE_IN order with assigned table and marks it OCCUPIED', async () => {

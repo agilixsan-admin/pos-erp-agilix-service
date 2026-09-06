@@ -10,6 +10,7 @@ import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { Table } from '../../table/entities/table.entity';
+import { Packaging } from '../../packaging/entities/packaging.entity';
 import { AuditService } from '../../audit/audit.service';
 import { QRIS_PROVIDER_TOKEN } from '../interfaces/qris-provider.interface';
 import { SettingsService } from '../../settings/services/settings.service';
@@ -275,6 +276,114 @@ describe('PaymentService', () => {
         expect.objectContaining({
           id: 'tbl-1',
           status: 'AVAILABLE',
+        }),
+      );
+    });
+
+    it('deducts packaging inventory for TAKE_AWAY orders during settlement', async () => {
+      const order = {
+        id: 'ord-takeaway',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        orderNumber: 'ORD-TAKEAWAY-1',
+        status: 'PENDING',
+        totalAmount: 25000,
+        orderType: 'TAKE_AWAY',
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(order);
+
+      const managerPaymentRepo = {
+        create: jest.fn((p: Record<string, unknown>) => ({
+          ...p,
+          id: 'pay-1',
+        })),
+        save: jest.fn((p: Record<string, unknown>) => Promise.resolve(p)),
+      };
+      const managerTrxRepo = {
+        create: jest.fn((t: Record<string, unknown>) => ({
+          ...t,
+          id: 'trx-1',
+        })),
+        save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
+      };
+      const managerOrderRepo = {
+        save: jest.fn().mockResolvedValue(order),
+      };
+      const managerRecipeRepo = {
+        find: jest.fn().mockResolvedValue([]),
+      };
+      const managerStockRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'stock-pkg',
+          quantity: 50,
+        }),
+        save: jest.fn((s: Record<string, unknown>) => Promise.resolve(s)),
+      };
+      const managerMovementRepo = {
+        create: jest.fn((m: Record<string, unknown>) => ({
+          ...m,
+          id: 'mov-pkg',
+        })),
+        save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
+      };
+      const managerPackagingRepo = {
+        createQueryBuilder: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getMany: jest.fn().mockResolvedValue([
+            {
+              id: 'pkg-1',
+              name: 'Eco Box',
+              inventoryItemId: 'item-box',
+            },
+          ]),
+        }),
+      };
+      const managerTableRepo = {
+        findOne: jest.fn(),
+        save: jest.fn(),
+      };
+      const managerAuditRepo = {
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Payment) return managerPaymentRepo;
+              if (entityClass === Transaction) return managerTrxRepo;
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === Recipe) return managerRecipeRepo;
+              if (entityClass === InventoryStock) return managerStockRepo;
+              if (entityClass === InventoryMovement) return managerMovementRepo;
+              if (entityClass === Packaging) return managerPackagingRepo;
+              if (entityClass === Table) return managerTableRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
+
+      const result = await service.create('tenant-1', 'user-1', {
+        orderId: 'ord-takeaway',
+        paymentMethod: 'CASH',
+        amount: 25000,
+      });
+
+      expect(result.order.status).toBe('COMPLETED');
+      expect(managerStockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'stock-pkg',
+          quantity: 49,
+        }),
+      );
+      expect(managerMovementRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inventoryItemId: 'item-box',
+          movementType: 'SALE',
+          quantity: 1,
         }),
       );
     });

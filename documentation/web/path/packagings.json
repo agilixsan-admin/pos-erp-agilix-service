@@ -1,0 +1,222 @@
+{
+  "paths": {
+    "/packagings": {
+      "get": {
+        "tags": ["Packaging"],
+        "summary": "Get paginated list of packaging configurations",
+        "operationId": "getPackagings",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"], "description": "Filter by status" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by packaging name" },
+          { "name": "page", "in": "query", "type": "integer", "default": 1, "description": "Page number" },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20, "description": "Items per page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of packagings retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "Paper Bag Medium" },
+                      "extraPrice": { "example": 2000 },
+                      "applyToOrderType": { "example": "TAKE_AWAY" },
+                      "status": { "example": "ACTIVE" },
+                      "outletId": { "example": "123e4567-e89b-12d3-a456-426614174002" },
+                      "inventoryItemId": { "example": "123e4567-e89b-12d3-a456-426614174050" }
+                    }
+                  }
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "page": { "example": 1 },
+                    "limit": { "example": 20 },
+                    "total": { "example": 1 },
+                    "totalPages": { "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Packaging"],
+        "summary": "Create a new packaging configuration",
+        "operationId": "createPackaging",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Paper Bag Medium" },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
+                "extraPrice": { "type": "number", "example": 2000 },
+                "applyToOrderType": { "type": "string", "enum": ["TAKE_AWAY", "ALL", "CUSTOM"], "example": "TAKE_AWAY" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Packaging created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "name": { "example": "Paper Bag Medium" },
+                    "extraPrice": { "example": 2000 },
+                    "applyToOrderType": { "example": "TAKE_AWAY" },
+                    "status": { "example": "ACTIVE" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error or invalid foreign key" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/packagings/{id}": {
+      "get": {
+        "tags": ["Packaging"],
+        "summary": "Get packaging configuration detail by ID",
+        "operationId": "getPackagingById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Packaging UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packaging detail retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "name": { "example": "Paper Bag Medium" },
+                    "extraPrice": { "example": 2000 },
+                    "applyToOrderType": { "example": "TAKE_AWAY" },
+                    "status": { "example": "ACTIVE" },
+                    "outlet": { "type": "object" },
+                    "inventoryItem": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Packaging not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Packaging"],
+        "summary": "Update packaging configuration",
+        "operationId": "updatePackaging",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Packaging UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Paper Bag Large" },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
+                "extraPrice": { "type": "number", "example": 3000 },
+                "applyToOrderType": { "type": "string", "enum": ["TAKE_AWAY", "ALL", "CUSTOM"], "example": "TAKE_AWAY" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packaging updated successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "name": { "example": "Paper Bag Large" },
+                    "extraPrice": { "example": 3000 }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Packaging not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Packaging"],
+        "summary": "Soft delete packaging configuration",
+        "operationId": "deletePackaging",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Packaging UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packaging deleted successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Packaging deleted successfully" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Packaging not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

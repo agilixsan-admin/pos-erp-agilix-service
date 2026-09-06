@@ -8,6 +8,7 @@ import { Recipe } from '../recipe/entities/recipe.entity';
 import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { Table } from '../table/entities/table.entity';
+import { Packaging } from '../packaging/entities/packaging.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
 import { PaymentService } from './services/payment.service';
@@ -27,6 +28,7 @@ import { QRIS_PROVIDER_TOKEN } from './interfaces/qris-provider.interface';
       InventoryStock,
       InventoryMovement,
       Table,
+      Packaging,
     ]),
     AuditModule,
     SettingsModule,

@@ -69,6 +69,15 @@ export class Order {
   taxAmount!: number;
 
   @Column({
+    name: 'packaging_fee',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
+  packagingFee!: number;
+
+  @Column({
     name: 'total_amount',
     type: 'decimal',
     precision: 12,

@@ -8,6 +8,7 @@ import { ProductVariant } from '../product/entities/product-variant.entity';
 import { Table } from '../table/entities/table.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
+import { PackagingModule } from '../packaging/packaging.module';
 import { OrderService } from './services/order.service';
 import { OrderController } from './controllers/order.controller';
 
@@ -23,6 +24,7 @@ import { OrderController } from './controllers/order.controller';
     ]),
     AuditModule,
     SettingsModule,
+    PackagingModule,
   ],
 
   controllers: [OrderController],

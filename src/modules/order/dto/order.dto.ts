@@ -64,6 +64,11 @@ export class CreateOrderDto {
   taxAmount?: number = 0;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  packagingFee?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 

@@ -13,6 +13,7 @@ import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
+import { PackagingService } from '../../packaging/services/packaging.service';
 import {
   CreateOrderDto,
   QueryOrderDto,
@@ -38,6 +39,7 @@ export class OrderService {
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly settingsService: SettingsService,
+    private readonly packagingService: PackagingService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -136,17 +138,6 @@ export class OrderService {
       }
     }
 
-    let taxAmount = 0;
-    if (settings.taxEnabled) {
-      const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
-      taxAmount = Math.round((taxableBase * Number(settings.taxRate)) / 100);
-    }
-
-    const totalAmount = Math.max(
-      calculatedSubtotal - discountAmount + taxAmount,
-      0,
-    );
-
     const orderType = dto.orderType ?? 'DINE_IN';
 
     if (orderType === 'TAKE_AWAY' && dto.tableId) {
@@ -156,6 +147,31 @@ export class OrderService {
         code: 'TABLE_NOT_ALLOWED',
       });
     }
+
+    let packagingFee = Number(dto.packagingFee ?? 0);
+    if (orderType === 'TAKE_AWAY' && dto.packagingFee === undefined) {
+      const applicablePackagings =
+        await this.packagingService.findApplicableForOrder(
+          tenantId,
+          targetOutletId,
+          orderType,
+        );
+      packagingFee = applicablePackagings.reduce(
+        (sum, p) => sum + Number(p.extraPrice || 0),
+        0,
+      );
+    }
+
+    let taxAmount = 0;
+    if (settings.taxEnabled) {
+      const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+      taxAmount = Math.round((taxableBase * Number(settings.taxRate)) / 100);
+    }
+
+    const totalAmount = Math.max(
+      calculatedSubtotal - discountAmount + packagingFee + taxAmount,
+      0,
+    );
 
     let assignedTable: Table | null = null;
     if (dto.tableId) {
@@ -205,6 +221,7 @@ export class OrderService {
         subtotal: calculatedSubtotal,
         discountAmount,
         taxAmount,
+        packagingFee,
         totalAmount,
         notes: dto.notes ?? null,
         createdBy: userId,
@@ -231,6 +248,7 @@ export class OrderService {
             orderId: savedOrder.id,
             orderNumber: savedOrder.orderNumber,
             totalAmount: savedOrder.totalAmount,
+            packagingFee: savedOrder.packagingFee,
             tableId: assignedTable?.id,
           },
         },

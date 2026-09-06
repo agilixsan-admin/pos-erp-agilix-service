@@ -24,6 +24,7 @@
     { "name": "Tables", "description": "Table & occupancy management" },
     { "name": "Printers", "description": "Printer configuration & bill printing" },
     { "name": "Settings", "description": "POS operational settings & configuration" },
+    { "name": "Packaging", "description": "Packaging & takeaway inventory management" },
     { "name": "Reports", "description": "Operational reporting" },
     { "name": "Audit Logs", "description": "System audit logs" }
   ],

@@ -174,6 +174,16 @@ export class EscPosBuilderService {
     append(
       this.padTwoColumns('Subtotal', this.formatCurrency(subtotal), width),
     );
+    const packagingFee = Number(data.order.packagingFee || 0);
+    if (packagingFee > 0) {
+      append(
+        this.padTwoColumns(
+          'Biaya Kemasan',
+          this.formatCurrency(packagingFee),
+          width,
+        ),
+      );
+    }
     if (discountAmount > 0) {
       append(
         this.padTwoColumns(
