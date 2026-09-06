@@ -80,6 +80,24 @@ describe('ensureDatabaseExists', () => {
     expect(mockClientInstance.connect).not.toHaveBeenCalled();
   });
 
+  it('allows database names with hyphens like agilix-POS', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.DB_HOST = 'localhost';
+    process.env.DB_NAME = 'agilix-POS';
+
+    mockClientInstance.connect.mockResolvedValueOnce(undefined);
+    mockClientInstance.query.mockResolvedValueOnce({ rowCount: 1 });
+    mockClientInstance.end.mockResolvedValueOnce(undefined);
+
+    await ensureDatabaseExists();
+
+    expect(mockClientInstance.connect).toHaveBeenCalled();
+    expect(mockClientInstance.query).toHaveBeenCalledWith(
+      'SELECT 1 FROM pg_database WHERE datname = $1;',
+      ['agilix-POS'],
+    );
+  });
+
   it('does not create database if it already exists', async () => {
     process.env.NODE_ENV = 'development';
     process.env.DB_HOST = 'localhost';

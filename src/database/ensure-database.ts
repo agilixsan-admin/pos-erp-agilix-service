@@ -40,8 +40,8 @@ export async function ensureDatabaseExists(logger?: Logger): Promise<void> {
   const defaultDb = process.env.DB_DEFAULT_NAME ?? 'postgres';
   const ssl = process.env.DB_SSL === 'true';
 
-  // Sanitize target database name to prevent SQL identifier injection
-  if (!/^[a-zA-Z0-9_]+$/.test(targetDb)) {
+  // Sanitize target database name to prevent SQL identifier injection (alphanumeric, underscores, hyphens)
+  if (!/^[a-zA-Z0-9_-]+$/.test(targetDb)) {
     log.warn(
       `[Database] Target database name "${targetDb}" contains invalid characters. Skipping auto-creation.`,
     );
