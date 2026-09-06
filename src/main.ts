@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -10,9 +11,14 @@ import * as swaggerUi from 'swagger-ui-express';
 import * as express from 'express';
 import { AppModule } from './app.module';
 import { AccessLogInterceptor } from './common/interceptors/access-log.interceptor';
+import { ensureDatabaseExists } from './database/ensure-database';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Auto-verify/create database if missing (Dev/Staging only, manual in Production)
+  await ensureDatabaseExists(logger);
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 

@@ -8,6 +8,8 @@ export default () => ({
     username: process.env.DB_USERNAME ?? 'postgres',
     password: process.env.DB_PASSWORD ?? '',
     name: process.env.DB_NAME ?? 'aglix_pos',
+    defaultName: process.env.DB_DEFAULT_NAME ?? 'postgres',
+    autoCreate: process.env.DB_AUTO_CREATE === 'false' ? false : true,
     ssl: process.env.DB_SSL === 'true',
     logging: process.env.DB_LOGGING === 'true',
   },

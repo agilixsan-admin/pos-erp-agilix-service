@@ -11,6 +11,8 @@ export const configurationValidationSchema = Joi.object({
   DB_USERNAME: Joi.string().default('postgres'),
   DB_PASSWORD: Joi.string().allow('').default(''),
   DB_NAME: Joi.string().default('aglix_pos'),
+  DB_DEFAULT_NAME: Joi.string().default('postgres'),
+  DB_AUTO_CREATE: Joi.boolean().truthy('true').falsy('false').optional(),
   DB_SSL: Joi.boolean().truthy('true').falsy('false').default(false),
   DB_LOGGING: Joi.boolean().truthy('true').falsy('false').default(false),
   JWT_SECRET: Joi.string()
