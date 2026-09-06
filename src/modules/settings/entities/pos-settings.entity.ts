@@ -38,13 +38,18 @@ export class PosSettings {
   })
   taxRate!: number;
 
-  @Column({ name: 'tax_name', length: 50, default: 'PB1' })
+  @Column({ name: 'tax_name', type: 'varchar', length: 50, default: 'PB1' })
   taxName!: string;
 
   @Column({ name: 'discount_enabled', default: false })
   discountEnabled!: boolean;
 
-  @Column({ name: 'discount_type', length: 20, default: 'PERCENTAGE' })
+  @Column({
+    name: 'discount_type',
+    type: 'varchar',
+    length: 20,
+    default: 'PERCENTAGE',
+  })
   discountType!: DiscountType;
 
   @Column({
@@ -62,7 +67,12 @@ export class PosSettings {
   @Column({ name: 'qris_enabled', default: true })
   qrisEnabled!: boolean;
 
-  @Column({ name: 'bill_logo_url', length: 500, nullable: true })
+  @Column({
+    name: 'bill_logo_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
   billLogoUrl!: string | null;
 
   @Column({

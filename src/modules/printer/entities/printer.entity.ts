@@ -30,31 +30,36 @@ export class Printer {
   @Column({ name: 'outlet_id', type: 'uuid' })
   outletId!: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ length: 20 })
+  @Column({ type: 'varchar', length: 20 })
   type!: PrinterType;
 
-  @Column({ name: 'connection_type', length: 20 })
+  @Column({ name: 'connection_type', type: 'varchar', length: 20 })
   connectionType!: PrinterConnectionType;
 
-  @Column({ name: 'paper_size', length: 10, default: '58mm' })
+  @Column({ name: 'paper_size', type: 'varchar', length: 10, default: '58mm' })
   paperSize!: PrinterPaperSize;
 
-  @Column({ name: 'ip_address', length: 45, nullable: true })
+  @Column({ name: 'ip_address', type: 'varchar', length: 45, nullable: true })
   ipAddress!: string | null;
 
   @Column({ type: 'int', nullable: true, default: 9100 })
   port!: number | null;
 
-  @Column({ name: 'bluetooth_mac', length: 100, nullable: true })
+  @Column({
+    name: 'bluetooth_mac',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   bluetoothMac!: string | null;
 
   @Column({ name: 'is_default', default: false })
   isDefault!: boolean;
 
-  @Column({ length: 20, default: 'ACTIVE' })
+  @Column({ type: 'varchar', length: 20, default: 'ACTIVE' })
   status!: PrinterStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

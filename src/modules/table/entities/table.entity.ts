@@ -35,7 +35,7 @@ export class Table {
   @Column({ type: 'int', default: 4 })
   capacity!: number;
 
-  @Column({ default: 'AVAILABLE' })
+  @Column({ type: 'varchar', length: 20, default: 'AVAILABLE' })
   status!: TableStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
