@@ -1,4 +1,10 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class CreateOutletDto {
   @IsString()
@@ -44,4 +50,3 @@ export class UpdateOutletDto {
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
 }
-

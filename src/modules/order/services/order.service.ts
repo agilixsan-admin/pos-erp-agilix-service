@@ -392,6 +392,14 @@ export class OrderService {
       });
     }
 
+    if (order.status === 'COMPLETED') {
+      throw new BadRequestException({
+        success: false,
+        message: 'Cannot void a completed order',
+        code: 'ORDER_LOCKED',
+      });
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const voidRepo = manager.getRepository(Void);

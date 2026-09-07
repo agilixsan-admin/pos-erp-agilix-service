@@ -36,9 +36,7 @@ describe('OutletController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OutletController],
-      providers: [
-        { provide: OutletService, useValue: mockOutletService },
-      ],
+      providers: [{ provide: OutletService, useValue: mockOutletService }],
     }).compile();
 
     controller = module.get<OutletController>(OutletController);
@@ -68,7 +66,10 @@ describe('OutletController', () => {
         success: true,
         data: mockOutlet,
       });
-      expect(mockOutletService.findById).toHaveBeenCalledWith('tenant-1', mockOutlet.id);
+      expect(mockOutletService.findById).toHaveBeenCalledWith(
+        'tenant-1',
+        mockOutlet.id,
+      );
     });
   });
 
@@ -89,7 +90,11 @@ describe('OutletController', () => {
         message: 'Outlet created successfully',
         data: mockOutlet,
       });
-      expect(mockOutletService.create).toHaveBeenCalledWith('tenant-1', 'user-1', dto);
+      expect(mockOutletService.create).toHaveBeenCalledWith(
+        'tenant-1',
+        'user-1',
+        dto,
+      );
     });
   });
 
@@ -135,4 +140,3 @@ describe('OutletController', () => {
     });
   });
 });
-
