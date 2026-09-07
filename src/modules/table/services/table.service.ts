@@ -45,12 +45,12 @@ export class TableService {
     }
 
     if (query.search) {
-      qb.andWhere('LOWER(table.name) LIKE LOWER(:search)', {
+      qb.andWhere('LOWER(table.tableNumber) LIKE LOWER(:search)', {
         search: `%${query.search}%`,
       });
     }
 
-    qb.orderBy('table.name', 'ASC');
+    qb.orderBy('table.tableNumber', 'ASC');
     qb.skip(skip).take(limit);
 
     const [items, total] = await qb.getManyAndCount();
@@ -100,22 +100,22 @@ export class TableService {
       where: {
         tenantId,
         outletId: dto.outletId,
-        name: dto.name,
+        tableNumber: dto.tableNumber,
       },
     });
 
     if (existing) {
       throw new ConflictException({
         success: false,
-        message: `Table with name "${dto.name}" already exists in this outlet`,
-        code: 'DUPLICATE_TABLE_NAME',
+        message: `Table with number "${dto.tableNumber}" already exists in this outlet`,
+        code: 'DUPLICATE_TABLE_NUMBER',
       });
     }
 
     const table = this.tableRepository.create({
       tenantId,
       outletId: dto.outletId,
-      name: dto.name,
+      tableNumber: dto.tableNumber,
       capacity: dto.capacity ?? 4,
       status: dto.status ?? 'AVAILABLE',
     });
@@ -129,7 +129,7 @@ export class TableService {
       actorId: userId,
       metadata: {
         tableId: saved.id,
-        tableName: saved.name,
+        tableNumber: saved.tableNumber,
         outletId: saved.outletId,
       },
     });
@@ -145,23 +145,23 @@ export class TableService {
   ) {
     const table = await this.findById(tenantId, id);
 
-    if (dto.name && dto.name !== table.name) {
+    if (dto.tableNumber && dto.tableNumber !== table.tableNumber) {
       const duplicate = await this.tableRepository.findOne({
         where: {
           tenantId,
           outletId: table.outletId,
-          name: dto.name,
+          tableNumber: dto.tableNumber,
         },
       });
 
       if (duplicate && duplicate.id !== table.id) {
         throw new ConflictException({
           success: false,
-          message: `Table with name "${dto.name}" already exists in this outlet`,
-          code: 'DUPLICATE_TABLE_NAME',
+          message: `Table with number "${dto.tableNumber}" already exists in this outlet`,
+          code: 'DUPLICATE_TABLE_NUMBER',
         });
       }
-      table.name = dto.name;
+      table.tableNumber = dto.tableNumber;
     }
 
     if (dto.capacity !== undefined) {
@@ -181,7 +181,7 @@ export class TableService {
       actorId: userId,
       metadata: {
         tableId: updated.id,
-        tableName: updated.name,
+        tableNumber: updated.tableNumber,
         status: updated.status,
       },
     });
@@ -210,7 +210,7 @@ export class TableService {
       actorId: userId,
       metadata: {
         tableId: id,
-        tableName: table.name,
+        tableNumber: table.tableNumber,
       },
     });
 

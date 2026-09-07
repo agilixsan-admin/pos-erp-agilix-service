@@ -15,7 +15,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 export type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'RESERVED';
 
 @Entity('tables')
-@Unique(['outletId', 'name'])
+@Unique(['outletId', 'tableNumber'])
 @Index(['tenantId'])
 @Index(['outletId'])
 @Index(['tenantId', 'status'])
@@ -29,8 +29,8 @@ export class Table {
   @Column({ name: 'outlet_id', type: 'uuid' })
   outletId!: string;
 
-  @Column()
-  name!: string;
+  @Column({ name: 'table_number' })
+  tableNumber!: string;
 
   @Column({ type: 'int', default: 4 })
   capacity!: number;

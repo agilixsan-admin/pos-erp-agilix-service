@@ -17,7 +17,7 @@ export class CreateTableDto {
 
   @IsString()
   @MinLength(1)
-  name!: string;
+  tableNumber!: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -35,7 +35,7 @@ export class UpdateTableDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
-  name?: string;
+  tableNumber?: string;
 
   @IsOptional()
   @Type(() => Number)

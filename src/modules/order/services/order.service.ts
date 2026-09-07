@@ -190,7 +190,7 @@ export class OrderService {
       if (assignedTable.status !== 'AVAILABLE') {
         throw new BadRequestException({
           success: false,
-          message: `Table "${assignedTable.name}" is not available (current status: ${assignedTable.status})`,
+          message: `Table "${assignedTable.tableNumber}" is not available (current status: ${assignedTable.status})`,
           code: 'TABLE_NOT_AVAILABLE',
         });
       }
@@ -216,7 +216,7 @@ export class OrderService {
         orderType,
         tableId: assignedTable ? assignedTable.id : null,
         tableNumber:
-          dto.tableNumber ?? (assignedTable ? assignedTable.name : null),
+          dto.tableNumber ?? (assignedTable ? assignedTable.tableNumber : null),
         customerName: dto.customerName ?? null,
         subtotal: calculatedSubtotal,
         discountAmount,

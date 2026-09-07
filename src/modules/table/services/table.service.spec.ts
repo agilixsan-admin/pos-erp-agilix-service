@@ -64,8 +64,18 @@ describe('TableService', () => {
       const take = jest.fn().mockReturnThis();
       const getManyAndCount = jest.fn().mockResolvedValue([
         [
-          { id: 'tbl-1', name: 'Table 1', status: 'AVAILABLE', capacity: 4 },
-          { id: 'tbl-2', name: 'Table 2', status: 'OCCUPIED', capacity: 2 },
+          {
+            id: 'tbl-1',
+            tableNumber: 'Table 1',
+            status: 'AVAILABLE',
+            capacity: 4,
+          },
+          {
+            id: 'tbl-2',
+            tableNumber: 'Table 2',
+            status: 'OCCUPIED',
+            capacity: 2,
+          },
         ],
         2,
       ]);
@@ -103,7 +113,7 @@ describe('TableService', () => {
         status: 'AVAILABLE',
       });
       expect(andWhere).toHaveBeenCalledWith(
-        'LOWER(table.name) LIKE LOWER(:search)',
+        'LOWER(table.tableNumber) LIKE LOWER(:search)',
         { search: '%Table%' },
       );
     });
@@ -114,7 +124,7 @@ describe('TableService', () => {
       const table = {
         id: 'tbl-1',
         tenantId: 'tenant-1',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
         status: 'AVAILABLE',
       };
       mockTableRepo.findOne.mockResolvedValue(table);
@@ -148,7 +158,7 @@ describe('TableService', () => {
         id: 'tbl-1',
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
-        name: 'Table 10',
+        tableNumber: 'Table 10',
         capacity: 4,
         status: 'AVAILABLE',
       };
@@ -157,7 +167,7 @@ describe('TableService', () => {
 
       const result = await service.create('tenant-1', 'user-1', {
         outletId: 'outlet-1',
-        name: 'Table 10',
+        tableNumber: 'Table 10',
         capacity: 4,
       });
 
@@ -177,7 +187,7 @@ describe('TableService', () => {
       await expect(
         service.create('tenant-1', 'user-1', {
           outletId: 'foreign-outlet',
-          name: 'Table 1',
+          tableNumber: 'Table 1',
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -189,13 +199,13 @@ describe('TableService', () => {
       });
       mockTableRepo.findOne.mockResolvedValue({
         id: 'existing-tbl',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
       });
 
       await expect(
         service.create('tenant-1', 'user-1', {
           outletId: 'outlet-1',
-          name: 'Table 1',
+          tableNumber: 'Table 1',
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -207,7 +217,7 @@ describe('TableService', () => {
         id: 'tbl-1',
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
         capacity: 4,
         status: 'AVAILABLE',
       };
@@ -216,16 +226,16 @@ describe('TableService', () => {
         .mockResolvedValueOnce(null); // duplicate check
       mockTableRepo.save.mockResolvedValue({
         ...existing,
-        name: 'Table 1-Updated',
+        tableNumber: 'Table 1-Updated',
         capacity: 6,
       });
 
       const result = await service.update('tenant-1', 'user-1', 'tbl-1', {
-        name: 'Table 1-Updated',
+        tableNumber: 'Table 1-Updated',
         capacity: 6,
       });
 
-      expect(result.name).toBe('Table 1-Updated');
+      expect(result.tableNumber).toBe('Table 1-Updated');
       expect(result.capacity).toBe(6);
       expect(mockAuditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -240,15 +250,15 @@ describe('TableService', () => {
         id: 'tbl-1',
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
       };
       mockTableRepo.findOne
         .mockResolvedValueOnce(existing) // findById
-        .mockResolvedValueOnce({ id: 'tbl-2', name: 'Table 2' }); // duplicate found with different ID
+        .mockResolvedValueOnce({ id: 'tbl-2', tableNumber: 'Table 2' }); // duplicate found with different ID
 
       await expect(
         service.update('tenant-1', 'user-1', 'tbl-1', {
-          name: 'Table 2',
+          tableNumber: 'Table 2',
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -259,7 +269,7 @@ describe('TableService', () => {
       const existing = {
         id: 'tbl-1',
         tenantId: 'tenant-1',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
         status: 'AVAILABLE',
       };
       mockTableRepo.findOne.mockResolvedValue(existing);
@@ -280,7 +290,7 @@ describe('TableService', () => {
       const occupied = {
         id: 'tbl-1',
         tenantId: 'tenant-1',
-        name: 'Table 1',
+        tableNumber: 'Table 1',
         status: 'OCCUPIED',
       };
       mockTableRepo.findOne.mockResolvedValue(occupied);

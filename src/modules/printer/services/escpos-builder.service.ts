@@ -135,7 +135,7 @@ export class EscPosBuilderService {
 
     const tableLabel =
       data.order.orderType === 'DINE_IN'
-        ? `Meja: ${data.order.table?.name || data.order.tableNumber || '-'}`
+        ? `Meja: ${data.order.table?.tableNumber || data.order.tableNumber || '-'}`
         : 'TAKE AWAY';
     append(
       this.padTwoColumns(`Tipe: ${data.order.orderType}`, tableLabel, width),
@@ -312,7 +312,7 @@ export class EscPosBuilderService {
     append(`No: ${data.order.orderNumber}`, { bold: true });
     const tableLabel =
       data.order.orderType === 'DINE_IN'
-        ? `Meja: ${data.order.table?.name || data.order.tableNumber || '-'}`
+        ? `Meja: ${data.order.table?.tableNumber || data.order.tableNumber || '-'}`
         : 'TAKE AWAY';
     append(`Tipe: ${data.order.orderType} (${tableLabel})`, { bold: true });
 
@@ -407,7 +407,7 @@ export class EscPosBuilderService {
     append(`No: ${data.order.orderNumber}`, { bold: true });
     const tableLabel =
       data.order.orderType === 'DINE_IN'
-        ? `Meja: ${data.order.table?.name || data.order.tableNumber || '-'}`
+        ? `Meja: ${data.order.table?.tableNumber || data.order.tableNumber || '-'}`
         : 'TAKE AWAY';
     append(`Tipe: ${data.order.orderType} (${tableLabel})`, { bold: true });
 
