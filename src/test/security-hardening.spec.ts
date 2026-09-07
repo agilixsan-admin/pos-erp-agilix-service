@@ -65,7 +65,7 @@ describe('Security & Hardening Tests (Phase 18)', () => {
       } as unknown as Repository<Table>;
 
       const mockAuditService = { record: jest.fn() } as any;
-      const service = new TableService(mockRepo, mockAuditService);
+      const service = new TableService(mockRepo, {} as any, mockAuditService);
 
       await expect(service.findById(tenantA, 'table-b')).rejects.toThrow(
         NotFoundException,

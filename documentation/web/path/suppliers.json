@@ -1,0 +1,248 @@
+{
+  "paths": {
+    "/suppliers": {
+      "get": {
+        "tags": ["Suppliers"],
+        "summary": "Get paginated list of suppliers",
+        "operationId": "getSuppliers",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "search", "in": "query", "type": "string", "description": "Search by name, code, contact person, phone, or email" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"], "description": "Filter by status" },
+          { "name": "page", "in": "query", "type": "integer", "default": 1, "description": "Page number" },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20, "description": "Items per page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of suppliers retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Suppliers retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "code": { "example": "SUP-001" },
+                      "name": { "example": "PT Sumber Makmur" },
+                      "contactPerson": { "example": "Budi Santoso" },
+                      "phone": { "example": "081234567890" },
+                      "email": { "example": "budi@sumbermakmur.com" },
+                      "address": { "example": "Jl. Industri No. 1" },
+                      "city": { "example": "Jakarta" },
+                      "province": { "example": "DKI Jakarta" },
+                      "postalCode": { "example": "10110" },
+                      "notes": { "example": "Supplier utama bahan kopi" },
+                      "status": { "example": "ACTIVE" },
+                      "createdAt": { "example": "2026-09-07T12:00:00.000Z" },
+                      "updatedAt": { "example": "2026-09-07T12:00:00.000Z" }
+                    }
+                  }
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "page": { "example": 1 },
+                    "limit": { "example": 20 },
+                    "total": { "example": 1 },
+                    "totalPages": { "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Suppliers"],
+        "summary": "Create a new supplier",
+        "operationId": "createSupplier",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "PT Sumber Makmur" },
+                "code": { "type": "string", "example": "SUP-001" },
+                "contactPerson": { "type": "string", "example": "Budi Santoso" },
+                "phone": { "type": "string", "example": "081234567890" },
+                "email": { "type": "string", "example": "budi@sumbermakmur.com" },
+                "address": { "type": "string", "example": "Jl. Industri Raya No. 45" },
+                "city": { "type": "string", "example": "Jakarta" },
+                "province": { "type": "string", "example": "DKI Jakarta" },
+                "postalCode": { "type": "string", "example": "10110" },
+                "notes": { "type": "string", "example": "Supplier utama bahan baku" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Supplier created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Supplier created successfully" },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "code": { "example": "SUP-001" },
+                    "name": { "example": "PT Sumber Makmur" },
+                    "contactPerson": { "example": "Budi Santoso" },
+                    "phone": { "example": "081234567890" },
+                    "email": { "example": "budi@sumbermakmur.com" },
+                    "status": { "example": "ACTIVE" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/suppliers/{id}": {
+      "get": {
+        "tags": ["Suppliers"],
+        "summary": "Get supplier detail by ID",
+        "operationId": "getSupplierById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Supplier UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier detail retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Supplier retrieved successfully" },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "code": { "example": "SUP-001" },
+                    "name": { "example": "PT Sumber Makmur" },
+                    "contactPerson": { "example": "Budi Santoso" },
+                    "phone": { "example": "081234567890" },
+                    "email": { "example": "budi@sumbermakmur.com" },
+                    "address": { "example": "Jl. Industri Raya No. 45" },
+                    "city": { "example": "Jakarta" },
+                    "province": { "example": "DKI Jakarta" },
+                    "postalCode": { "example": "10110" },
+                    "notes": { "example": "Supplier utama bahan baku" },
+                    "status": { "example": "ACTIVE" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Supplier not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Suppliers"],
+        "summary": "Update supplier",
+        "operationId": "updateSupplier",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Supplier UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "PT Sumber Makmur Sejahtera" },
+                "code": { "type": "string", "example": "SUP-001" },
+                "contactPerson": { "type": "string", "example": "Budi Santoso" },
+                "phone": { "type": "string", "example": "081234567890" },
+                "email": { "type": "string", "example": "budi.s@sumbermakmur.co.id" },
+                "address": { "type": "string", "example": "Jl. Industri Raya No. 45" },
+                "city": { "type": "string", "example": "Jakarta" },
+                "province": { "type": "string", "example": "DKI Jakarta" },
+                "postalCode": { "type": "string", "example": "10110" },
+                "notes": { "type": "string", "example": "Catatan update" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier updated successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Supplier updated successfully" },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                    "name": { "example": "PT Sumber Makmur Sejahtera" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Supplier not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Suppliers"],
+        "summary": "Soft delete supplier",
+        "operationId": "deleteSupplier",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Supplier UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier deleted successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Supplier deleted successfully" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Supplier not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

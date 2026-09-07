@@ -574,7 +574,7 @@ describe('PaymentService', () => {
         'user-1',
         expect.any(Date),
       );
-      expect(result.payment.status).toBe('SUCCESS');
+      expect(result.payment?.status).toBe('SUCCESS');
     });
   });
 

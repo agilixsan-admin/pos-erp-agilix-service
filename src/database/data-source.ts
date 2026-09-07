@@ -26,6 +26,7 @@ import { Printer } from '../modules/printer/entities/printer.entity';
 import { PosSettings } from '../modules/settings/entities/pos-settings.entity';
 import { PackagingCategory } from '../modules/packaging/entities/packaging-category.entity';
 import { Packaging } from '../modules/packaging/entities/packaging.entity';
+import { Supplier } from '../modules/supplier/entities/supplier.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
 export default new DataSource({
@@ -63,6 +64,7 @@ export default new DataSource({
     PosSettings,
     PackagingCategory,
     Packaging,
+    Supplier,
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,

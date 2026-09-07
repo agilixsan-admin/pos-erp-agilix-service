@@ -136,7 +136,7 @@ describe('OutletService', () => {
         (data: Partial<Outlet>) => data as Outlet,
       );
       mockRepo.save.mockImplementation((data: Outlet) =>
-        Promise.resolve({ id: 'new-id', ...data }),
+        Promise.resolve({ ...data, id: data.id ?? 'new-id' }),
       );
 
       const result = await service.create('tenant-1', 'user-1', {

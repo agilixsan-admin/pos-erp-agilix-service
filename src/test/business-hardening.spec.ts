@@ -236,7 +236,6 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         'order-1',
         {
           reason: 'Customer changed mind',
-          notes: 'Canceled before preparation',
         },
       );
 

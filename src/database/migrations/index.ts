@@ -14,6 +14,7 @@ import { RenameTableNameToTableNumber1700000000012 } from './1700000000012-Renam
 import { AddCategoryAndCostToPackaging1700000000013 } from './1700000000013-AddCategoryAndCostToPackaging';
 import { AddInventoryCategoryAndItemFields1700000000014 } from './1700000000014-AddInventoryCategoryAndItemFields';
 import { AddPackagingCategoryAndRelations1700000000015 } from './1700000000015-AddPackagingCategoryAndRelations';
+import { CreateSuppliersTable1700000000016 } from './1700000000016-CreateSuppliersTable';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -32,4 +33,5 @@ export const ALL_MIGRATIONS = [
   AddCategoryAndCostToPackaging1700000000013,
   AddInventoryCategoryAndItemFields1700000000014,
   AddPackagingCategoryAndRelations1700000000015,
+  CreateSuppliersTable1700000000016,
 ];
