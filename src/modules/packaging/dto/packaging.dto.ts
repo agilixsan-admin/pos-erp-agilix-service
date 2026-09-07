@@ -16,9 +16,17 @@ export class CreatePackagingDto {
   @IsNotEmpty()
   name!: string;
 
-  @IsString()
   @IsOptional()
-  category?: string;
+  @IsString()
+  sku?: string;
+
+  @IsUUID()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsUUID()
   @IsOptional()
@@ -27,22 +35,6 @@ export class CreatePackagingDto {
   @IsUUID()
   @IsOptional()
   inventoryItemId?: string;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  @Type(() => Number)
-  costPrice?: number = 0;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  @Type(() => Number)
-  extraPrice?: number = 0;
-
-  @IsOptional()
-  @IsIn(['TAKE_AWAY', 'ALL', 'CUSTOM'])
-  applyToOrderType?: 'TAKE_AWAY' | 'ALL' | 'CUSTOM' = 'TAKE_AWAY';
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
@@ -54,9 +46,17 @@ export class UpdatePackagingDto {
   @IsOptional()
   name?: string;
 
-  @IsString()
   @IsOptional()
-  category?: string;
+  @IsString()
+  sku?: string;
+
+  @IsUUID()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsUUID()
   @IsOptional()
@@ -65,22 +65,6 @@ export class UpdatePackagingDto {
   @IsUUID()
   @IsOptional()
   inventoryItemId?: string;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  @Type(() => Number)
-  costPrice?: number;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  @Type(() => Number)
-  extraPrice?: number;
-
-  @IsOptional()
-  @IsIn(['TAKE_AWAY', 'ALL', 'CUSTOM'])
-  applyToOrderType?: 'TAKE_AWAY' | 'ALL' | 'CUSTOM';
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
@@ -105,9 +89,9 @@ export class QueryPackagingDto {
   @IsOptional()
   outletId?: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
-  category?: string;
+  categoryId?: string;
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])

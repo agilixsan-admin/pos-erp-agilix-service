@@ -13,6 +13,7 @@ import { AddPhoneToOutlets1700000000011 } from './1700000000011-AddPhoneToOutlet
 import { RenameTableNameToTableNumber1700000000012 } from './1700000000012-RenameTableNameToTableNumber';
 import { AddCategoryAndCostToPackaging1700000000013 } from './1700000000013-AddCategoryAndCostToPackaging';
 import { AddInventoryCategoryAndItemFields1700000000014 } from './1700000000014-AddInventoryCategoryAndItemFields';
+import { AddPackagingCategoryAndRelations1700000000015 } from './1700000000015-AddPackagingCategoryAndRelations';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -30,4 +31,5 @@ export const ALL_MIGRATIONS = [
   RenameTableNameToTableNumber1700000000012,
   AddCategoryAndCostToPackaging1700000000013,
   AddInventoryCategoryAndItemFields1700000000014,
+  AddPackagingCategoryAndRelations1700000000015,
 ];

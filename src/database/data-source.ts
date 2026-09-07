@@ -10,6 +10,7 @@ import { AuditLog } from '../modules/audit/audit-log.entity';
 import { Category } from '../modules/product/entities/category.entity';
 import { Product } from '../modules/product/entities/product.entity';
 import { ProductVariant } from '../modules/product/entities/product-variant.entity';
+import { InventoryCategory } from '../modules/inventory/entities/inventory-category.entity';
 import { InventoryItem } from '../modules/inventory/entities/inventory-item.entity';
 import { InventoryStock } from '../modules/inventory/entities/inventory-stock.entity';
 import { ReasonCategory } from '../modules/inventory/entities/reason-category.entity';
@@ -23,6 +24,7 @@ import { Transaction } from '../modules/payment/entities/transaction.entity';
 import { Table } from '../modules/table/entities/table.entity';
 import { Printer } from '../modules/printer/entities/printer.entity';
 import { PosSettings } from '../modules/settings/entities/pos-settings.entity';
+import { PackagingCategory } from '../modules/packaging/entities/packaging-category.entity';
 import { Packaging } from '../modules/packaging/entities/packaging.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
@@ -45,6 +47,7 @@ export default new DataSource({
     Category,
     Product,
     ProductVariant,
+    InventoryCategory,
     InventoryItem,
     InventoryStock,
     ReasonCategory,
@@ -58,6 +61,7 @@ export default new DataSource({
     Table,
     Printer,
     PosSettings,
+    PackagingCategory,
     Packaging,
   ],
   migrations: ALL_MIGRATIONS,

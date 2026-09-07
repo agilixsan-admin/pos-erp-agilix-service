@@ -4,6 +4,7 @@ import { SelectQueryBuilder } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PackagingService } from './packaging.service';
 import { Packaging } from '../entities/packaging.entity';
+import { PackagingCategory } from '../entities/packaging-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 import { AuditService } from '../../audit/audit.service';
@@ -17,6 +18,14 @@ describe('PackagingService', () => {
     create: jest.fn(),
     save: jest.fn(),
     softDelete: jest.fn(),
+  };
+
+  const mockCategoryRepo = {
+    createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    softRemove: jest.fn(),
   };
 
   const mockOutletRepo = {
@@ -40,6 +49,10 @@ describe('PackagingService', () => {
         {
           provide: getRepositoryToken(Packaging),
           useValue: mockPackagingRepo,
+        },
+        {
+          provide: getRepositoryToken(PackagingCategory),
+          useValue: mockCategoryRepo,
         },
         {
           provide: getRepositoryToken(Outlet),
@@ -129,7 +142,11 @@ describe('PackagingService', () => {
       expect(result).toEqual(mockPkg);
       expect(mockPackagingRepo.findOne).toHaveBeenCalledWith({
         where: { id: 'pkg-1', tenantId: 'tenant-1' },
-        relations: { outlet: true, inventoryItem: { stocks: true } },
+        relations: {
+          outlet: true,
+          category: true,
+          inventoryItem: { stocks: true },
+        },
       });
     });
 
@@ -159,8 +176,6 @@ describe('PackagingService', () => {
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
         inventoryItemId: 'item-1',
-        extraPrice: 1500,
-        applyToOrderType: 'TAKE_AWAY',
         status: 'ACTIVE',
       };
 
@@ -172,8 +187,6 @@ describe('PackagingService', () => {
         name: 'Eco Box',
         outletId: 'outlet-1',
         inventoryItemId: 'item-1',
-        extraPrice: 1500,
-        applyToOrderType: 'TAKE_AWAY',
       });
 
       expect(result).toEqual(createdEntity);
@@ -215,24 +228,20 @@ describe('PackagingService', () => {
         id: 'pkg-1',
         tenantId: 'tenant-1',
         name: 'Old Box',
-        extraPrice: 1000,
       };
       mockPackagingRepo.findOne
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce({
           ...existing,
           name: 'New Box',
-          extraPrice: 2500,
         });
       mockPackagingRepo.save.mockResolvedValue({
         ...existing,
         name: 'New Box',
-        extraPrice: 2500,
       });
 
       const result = await service.update('tenant-1', 'pkg-1', 'user-1', {
         name: 'New Box',
-        extraPrice: 2500,
       });
 
       expect(result.name).toBe('New Box');

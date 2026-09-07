@@ -1,5 +1,136 @@
 {
   "paths": {
+    "/packagings/categories": {
+      "get": {
+        "tags": ["Packaging"],
+        "summary": "Get list kategori packaging",
+        "operationId": "getPackagingCategories",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "search", "in": "query", "type": "string" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of packaging categories",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "Cup" },
+                      "description": { "example": "Gelas dan cangkir" },
+                      "status": { "example": "ACTIVE" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Packaging"],
+        "summary": "Buat kategori packaging baru",
+        "operationId": "createPackagingCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Cup" },
+                "description": { "type": "string", "example": "Gelas dan cangkir" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Packaging category created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Packaging category created successfully" }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/packagings/categories/{id}": {
+      "get": {
+        "tags": ["Packaging"],
+        "summary": "Get detail kategori packaging by ID",
+        "operationId": "getPackagingCategoryById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Detail kategori packaging" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Packaging"],
+        "summary": "Update kategori packaging",
+        "operationId": "updatePackagingCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Cup & Containers" },
+                "description": { "type": "string", "example": "Gelas, cangkir dan wadah" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Kategori packaging berhasil diupdate" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Packaging"],
+        "summary": "Hapus kategori packaging",
+        "operationId": "deletePackagingCategory",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Kategori packaging berhasil dihapus" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
     "/packagings": {
       "get": {
         "tags": ["Packaging"],
@@ -8,9 +139,9 @@
         "produces": ["application/json"],
         "parameters": [
           { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
-          { "name": "category", "in": "query", "type": "string", "description": "Filter by packaging category (e.g. Cup, Box, Bag, Straw)" },
+          { "name": "categoryId", "in": "query", "type": "string", "description": "Filter by packaging category UUID" },
           { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"], "description": "Filter by status" },
-          { "name": "search", "in": "query", "type": "string", "description": "Search by packaging name or category" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by packaging name or SKU" },
           { "name": "page", "in": "query", "type": "integer", "default": 1, "description": "Page number" },
           { "name": "limit", "in": "query", "type": "integer", "default": 20, "description": "Items per page" }
         ],
@@ -28,10 +159,9 @@
                     "properties": {
                       "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
                       "name": { "example": "Cup 16 oz" },
-                      "category": { "example": "Cup" },
-                      "costPrice": { "example": 500 },
-                      "extraPrice": { "example": 2000 },
-                      "applyToOrderType": { "example": "TAKE_AWAY" },
+                      "sku": { "example": "PKG-CUP-16" },
+                      "categoryId": { "example": "123e4567-e89b-12d3-a456-426614174001" },
+                      "description": { "example": "Paper cup untuk minuman dingin" },
                       "status": { "example": "ACTIVE" },
                       "outletId": { "example": "123e4567-e89b-12d3-a456-426614174002" },
                       "inventoryItemId": { "example": "123e4567-e89b-12d3-a456-426614174050" }
@@ -71,12 +201,11 @@
               "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Cup 16 oz" },
-                "category": { "type": "string", "example": "Cup" },
+                "sku": { "type": "string", "example": "PKG-CUP-16" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174001" },
+                "description": { "type": "string", "example": "Paper cup untuk minuman dingin" },
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
                 "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
-                "costPrice": { "type": "number", "example": 500 },
-                "extraPrice": { "type": "number", "example": 2000 },
-                "applyToOrderType": { "type": "string", "enum": ["TAKE_AWAY", "ALL", "CUSTOM"], "example": "TAKE_AWAY" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
@@ -94,10 +223,9 @@
                   "properties": {
                     "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
                     "name": { "example": "Cup 16 oz" },
-                    "category": { "example": "Cup" },
-                    "costPrice": { "example": 500 },
-                    "extraPrice": { "example": 2000 },
-                    "applyToOrderType": { "example": "TAKE_AWAY" },
+                    "sku": { "example": "PKG-CUP-16" },
+                    "categoryId": { "example": "123e4567-e89b-12d3-a456-426614174001" },
+                    "description": { "example": "Paper cup untuk minuman dingin" },
                     "status": { "example": "ACTIVE" }
                   }
                 }
@@ -107,32 +235,6 @@
           "400": { "description": "Validation error or invalid foreign key" },
           "401": { "description": "Unauthorized" },
           "403": { "description": "Permission denied" }
-        },
-        "security": [{ "Bearer": [] }]
-      }
-    },
-    "/packagings/categories": {
-      "get": {
-        "tags": ["Packaging"],
-        "summary": "Get list of distinct packaging categories",
-        "operationId": "getPackagingCategories",
-        "produces": ["application/json"],
-        "responses": {
-          "200": {
-            "description": "List of packaging categories",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": { "example": true },
-                "message": { "example": "Packaging categories retrieved successfully" },
-                "data": {
-                  "type": "array",
-                  "items": { "type": "string", "example": "Cup" }
-                }
-              }
-            }
-          },
-          "401": { "description": "Unauthorized" }
         },
         "security": [{ "Bearer": [] }]
       }
@@ -158,10 +260,10 @@
                   "properties": {
                     "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
                     "name": { "example": "Paper Bag Medium" },
-                    "extraPrice": { "example": 2000 },
-                    "applyToOrderType": { "example": "TAKE_AWAY" },
+                    "sku": { "example": "PKG-BAG-01" },
                     "status": { "example": "ACTIVE" },
                     "outlet": { "type": "object" },
+                    "category": { "type": "object" },
                     "inventoryItem": { "type": "object" }
                   }
                 }
@@ -190,10 +292,11 @@
               "type": "object",
               "properties": {
                 "name": { "type": "string", "example": "Paper Bag Large" },
+                "sku": { "type": "string", "example": "PKG-BAG-02" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174001" },
+                "description": { "type": "string", "example": "Paper bag ukuran besar" },
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
                 "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
-                "extraPrice": { "type": "number", "example": 3000 },
-                "applyToOrderType": { "type": "string", "enum": ["TAKE_AWAY", "ALL", "CUSTOM"], "example": "TAKE_AWAY" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
@@ -211,7 +314,7 @@
                   "properties": {
                     "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
                     "name": { "example": "Paper Bag Large" },
-                    "extraPrice": { "example": 3000 }
+                    "sku": { "example": "PKG-BAG-02" }
                   }
                 }
               }

@@ -12,11 +12,12 @@ import {
 import { Tenant } from '../../tenant/tenant.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { PackagingCategory } from './packaging-category.entity';
 
 @Entity('packagings')
 @Index(['tenantId'])
 @Index(['outletId'])
-@Index(['category'])
+@Index(['categoryId'])
 @Index(['status'])
 export class Packaging {
   @PrimaryGeneratedColumn('uuid')
@@ -28,11 +29,17 @@ export class Packaging {
   @Column({ name: 'outlet_id', type: 'uuid', nullable: true })
   outletId!: string | null;
 
+  @Column({ name: 'category_id', type: 'uuid', nullable: true })
+  categoryId!: string | null;
+
   @Column({ type: 'varchar', length: 150 })
   name!: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  category!: string | null;
+  sku!: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  description!: string | null;
 
   @Column({ name: 'inventory_item_id', type: 'uuid', nullable: true })
   inventoryItemId!: string | null;
@@ -90,6 +97,13 @@ export class Packaging {
   @ManyToOne(() => Outlet, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'outlet_id' })
   outlet!: Outlet | null;
+
+  @ManyToOne(() => PackagingCategory, (category) => category.packagings, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'category_id' })
+  category!: PackagingCategory | null;
 
   @ManyToOne(() => InventoryItem, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'inventory_item_id' })

@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Packaging } from '../entities/packaging.entity';
+import { PackagingCategory } from '../entities/packaging-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 import { AuditService } from '../../audit/audit.service';
@@ -14,6 +15,11 @@ import {
   QueryPackagingDto,
   UpdatePackagingDto,
 } from '../dto/packaging.dto';
+import {
+  CreatePackagingCategoryDto,
+  QueryPackagingCategoryDto,
+  UpdatePackagingCategoryDto,
+} from '../dto/packaging-category.dto';
 
 export interface PaginatedPackagings {
   data: Packaging[];
@@ -30,12 +36,113 @@ export class PackagingService {
   constructor(
     @InjectRepository(Packaging)
     private readonly packagings: Repository<Packaging>,
+    @InjectRepository(PackagingCategory)
+    private readonly categoryRepository: Repository<PackagingCategory>,
     @InjectRepository(Outlet)
     private readonly outlets: Repository<Outlet>,
     @InjectRepository(InventoryItem)
     private readonly inventoryItems: Repository<InventoryItem>,
     private readonly audit: AuditService,
   ) {}
+
+  // ==========================================
+  // PACKAGING CATEGORY CRUD
+  // ==========================================
+
+  async findAllCategories(tenantId: string, query: QueryPackagingCategoryDto) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const qb = this.categoryRepository
+      .createQueryBuilder('cat')
+      .where('cat.tenantId = :tenantId', { tenantId });
+
+    if (query.status) {
+      qb.andWhere('cat.status = :status', { status: query.status });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(cat.name) LIKE LOWER(:search) OR LOWER(cat.description) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('cat.createdAt', 'DESC');
+    qb.skip(skip).take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findCategoryById(tenantId: string, id: string) {
+    const category = await this.categoryRepository.findOne({
+      where: { id, tenantId },
+    });
+
+    if (!category) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Packaging category not found',
+        code: 'PACKAGING_CATEGORY_NOT_FOUND',
+      });
+    }
+
+    return category;
+  }
+
+  async createCategory(tenantId: string, dto: CreatePackagingCategoryDto) {
+    const category = this.categoryRepository.create({
+      tenantId,
+      name: dto.name,
+      description: dto.description ?? null,
+      status: dto.status ?? 'ACTIVE',
+    });
+
+    return this.categoryRepository.save(category);
+  }
+
+  async updateCategory(
+    tenantId: string,
+    id: string,
+    dto: UpdatePackagingCategoryDto,
+  ) {
+    const category = await this.findCategoryById(tenantId, id);
+
+    category.name = dto.name;
+    if (dto.description !== undefined) {
+      category.description = dto.description ?? null;
+    }
+    if (dto.status !== undefined) {
+      category.status = dto.status;
+    }
+
+    return this.categoryRepository.save(category);
+  }
+
+  async deleteCategory(tenantId: string, id: string) {
+    const category = await this.findCategoryById(tenantId, id);
+    await this.categoryRepository.softRemove(category);
+    return {
+      success: true,
+      message: 'Packaging category deleted successfully',
+    };
+  }
+
+  // ==========================================
+  // PACKAGINGS
+  // ==========================================
 
   /**
    * Get list packaging scoped to tenant with pagination and optional filters
@@ -44,11 +151,19 @@ export class PackagingService {
     tenantId: string,
     query: QueryPackagingDto,
   ): Promise<PaginatedPackagings> {
-    const { page = 1, limit = 20, outletId, category, status, search } = query;
+    const {
+      page = 1,
+      limit = 20,
+      outletId,
+      categoryId,
+      status,
+      search,
+    } = query;
 
     const qb = this.packagings
       .createQueryBuilder('pkg')
       .leftJoinAndSelect('pkg.outlet', 'outlet')
+      .leftJoinAndSelect('pkg.category', 'category')
       .leftJoinAndSelect('pkg.inventoryItem', 'inventoryItem')
       .leftJoinAndSelect('inventoryItem.stocks', 'stock')
       .where('pkg.tenantId = :tenantId', { tenantId })
@@ -62,8 +177,8 @@ export class PackagingService {
       });
     }
 
-    if (category) {
-      qb.andWhere('pkg.category = :category', { category });
+    if (categoryId) {
+      qb.andWhere('pkg.categoryId = :categoryId', { categoryId });
     }
 
     if (status) {
@@ -72,7 +187,7 @@ export class PackagingService {
 
     if (search) {
       qb.andWhere(
-        '(LOWER(pkg.name) LIKE LOWER(:search) OR LOWER(pkg.category) LIKE LOWER(:search))',
+        '(LOWER(pkg.name) LIKE LOWER(:search) OR LOWER(pkg.sku) LIKE LOWER(:search) OR LOWER(category.name) LIKE LOWER(:search))',
         {
           search: `%${search}%`,
         },
@@ -93,21 +208,6 @@ export class PackagingService {
   }
 
   /**
-   * Get distinct packaging categories for a tenant
-   */
-  async getCategories(tenantId: string): Promise<string[]> {
-    const rows = await this.packagings
-      .createQueryBuilder('pkg')
-      .select('DISTINCT pkg.category', 'category')
-      .where('pkg.tenantId = :tenantId', { tenantId })
-      .andWhere('pkg.category IS NOT NULL')
-      .orderBy('pkg.category', 'ASC')
-      .getRawMany();
-
-    return rows.map((r) => r.category).filter(Boolean);
-  }
-
-  /**
    * Get detail packaging by ID
    */
   async findById(tenantId: string, id: string): Promise<Packaging> {
@@ -115,6 +215,7 @@ export class PackagingService {
       where: { id, tenantId },
       relations: {
         outlet: true,
+        category: true,
         inventoryItem: {
           stocks: true,
         },
@@ -153,6 +254,10 @@ export class PackagingService {
       }
     }
 
+    if (dto.categoryId) {
+      await this.findCategoryById(tenantId, dto.categoryId);
+    }
+
     if (dto.inventoryItemId) {
       const item = await this.inventoryItems.findOne({
         where: { id: dto.inventoryItemId, tenantId },
@@ -169,12 +274,14 @@ export class PackagingService {
     const packaging = this.packagings.create({
       tenantId,
       name: dto.name,
-      category: dto.category ?? null,
+      sku: dto.sku ?? null,
+      categoryId: dto.categoryId ?? null,
+      description: dto.description ?? null,
       outletId: dto.outletId ?? null,
       inventoryItemId: dto.inventoryItemId ?? null,
-      costPrice: dto.costPrice ?? 0,
-      extraPrice: dto.extraPrice ?? 0,
-      applyToOrderType: dto.applyToOrderType ?? 'TAKE_AWAY',
+      costPrice: 0,
+      extraPrice: 0,
+      applyToOrderType: 'TAKE_AWAY',
       status: dto.status ?? 'ACTIVE',
     });
 
@@ -188,9 +295,8 @@ export class PackagingService {
       metadata: {
         packagingId: saved.id,
         name: saved.name,
-        category: saved.category,
-        costPrice: saved.costPrice,
-        extraPrice: saved.extraPrice,
+        sku: saved.sku,
+        categoryId: saved.categoryId,
         inventoryItemId: saved.inventoryItemId,
       },
     });
@@ -237,6 +343,13 @@ export class PackagingService {
       }
     }
 
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId) {
+        await this.findCategoryById(tenantId, dto.categoryId);
+      }
+      packaging.categoryId = dto.categoryId ?? null;
+    }
+
     if (dto.inventoryItemId !== undefined) {
       if (dto.inventoryItemId) {
         const item = await this.inventoryItems.findOne({
@@ -260,20 +373,12 @@ export class PackagingService {
       packaging.name = dto.name;
     }
 
-    if (dto.category !== undefined) {
-      packaging.category = dto.category ?? null;
+    if (dto.sku !== undefined) {
+      packaging.sku = dto.sku ?? null;
     }
 
-    if (dto.costPrice !== undefined) {
-      packaging.costPrice = dto.costPrice;
-    }
-
-    if (dto.extraPrice !== undefined) {
-      packaging.extraPrice = dto.extraPrice;
-    }
-
-    if (dto.applyToOrderType !== undefined) {
-      packaging.applyToOrderType = dto.applyToOrderType;
+    if (dto.description !== undefined) {
+      packaging.description = dto.description ?? null;
     }
 
     if (dto.status !== undefined) {
