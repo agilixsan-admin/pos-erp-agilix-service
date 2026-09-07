@@ -27,6 +27,8 @@ import { PosSettings } from '../modules/settings/entities/pos-settings.entity';
 import { PackagingCategory } from '../modules/packaging/entities/packaging-category.entity';
 import { Packaging } from '../modules/packaging/entities/packaging.entity';
 import { Supplier } from '../modules/supplier/entities/supplier.entity';
+import { Purchase } from '../modules/purchase/entities/purchase.entity';
+import { PurchaseItem } from '../modules/purchase/entities/purchase-item.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
 export default new DataSource({
@@ -65,6 +67,8 @@ export default new DataSource({
     PackagingCategory,
     Packaging,
     Supplier,
+    Purchase,
+    PurchaseItem,
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,

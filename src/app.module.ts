@@ -25,6 +25,7 @@ import { PrinterModule } from './modules/printer/printer.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { PackagingModule } from './modules/packaging/packaging.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
+import { PurchaseModule } from './modules/purchase/purchase.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -54,6 +55,7 @@ const conditionalModules = isProductionOrDevDb
       SettingsModule,
       PackagingModule,
       SupplierModule,
+      PurchaseModule,
     ]
   : [];
 

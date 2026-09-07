@@ -15,6 +15,7 @@ import { AddCategoryAndCostToPackaging1700000000013 } from './1700000000013-AddC
 import { AddInventoryCategoryAndItemFields1700000000014 } from './1700000000014-AddInventoryCategoryAndItemFields';
 import { AddPackagingCategoryAndRelations1700000000015 } from './1700000000015-AddPackagingCategoryAndRelations';
 import { CreateSuppliersTable1700000000016 } from './1700000000016-CreateSuppliersTable';
+import { CreatePurchasesTables1700000000017 } from './1700000000017-CreatePurchasesTables';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -34,4 +35,5 @@ export const ALL_MIGRATIONS = [
   AddInventoryCategoryAndItemFields1700000000014,
   AddPackagingCategoryAndRelations1700000000015,
   CreateSuppliersTable1700000000016,
+  CreatePurchasesTables1700000000017,
 ];
