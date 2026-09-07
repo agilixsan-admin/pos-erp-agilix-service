@@ -51,7 +51,7 @@
               "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Non-Coffee" },
-                "description": { "type": "string", "example": "Non-coffee beverages" }
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
               }
             }
           }
@@ -68,7 +68,7 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174091",
                     "name": "Non-Coffee",
-                    "description": "Non-coffee beverages"
+                    "status": "ACTIVE"
                   }
                 }
               }
@@ -101,7 +101,7 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174090",
                     "name": "Coffee",
-                    "description": "Coffee beverages"
+                    "status": "ACTIVE"
                   }
                 }
               }
@@ -125,9 +125,10 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": ["name", "status"],
               "properties": {
                 "name": { "type": "string", "example": "Artisan Coffee" },
-                "description": { "type": "string", "example": "Specialty & artisan coffee" }
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
           }

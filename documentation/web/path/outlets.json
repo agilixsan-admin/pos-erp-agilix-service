@@ -51,6 +51,7 @@
               "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Outlet Cabang 2" },
+                "code": { "type": "string", "example": "CBG-02" },
                 "address": { "type": "string", "example": "Jl. Thamrin No. 10, Jakarta" },
                 "phone": { "type": "string", "example": "+628123456790" }
               }
@@ -69,6 +70,7 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174002",
                     "name": "Outlet Cabang 2",
+                    "code": "CBG-02",
                     "status": "ACTIVE"
                   }
                 }
@@ -101,6 +103,7 @@
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174002",
                     "name": "Outlet Utama",
+                    "code": "CBG-01",
                     "address": "Jl. Sudirman No. 1, Jakarta",
                     "phone": "+628123456789",
                     "status": "ACTIVE",
@@ -130,8 +133,10 @@
               "type": "object",
               "properties": {
                 "name": { "type": "string", "example": "Outlet Utama Updated" },
+                "code": { "type": "string", "example": "CBG-01" },
                 "address": { "type": "string", "example": "Jl. Sudirman No. 2, Jakarta" },
-                "phone": { "type": "string", "example": "+628123456791" }
+                "phone": { "type": "string", "example": "+628123456791" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
           }

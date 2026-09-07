@@ -66,7 +66,8 @@
               "properties": {
                 "name": { "type": "string", "example": "Americano" },
                 "description": { "type": "string", "example": "Espresso dengan air panas" },
-                "categoryId": { "type": "string", "example": "cat-1" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174090" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" },
                 "variants": {
                   "type": "array",
                   "items": {
@@ -158,11 +159,26 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": ["name", "status"],
               "properties": {
                 "name": { "type": "string", "example": "Americano Updated" },
-                "description": { "type": "string" },
-                "categoryId": { "type": "string" },
-                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+                "description": { "type": "string", "example": "Espresso dengan air panas" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174090" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name", "price"],
+                    "properties": {
+                      "id": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174011" },
+                      "name": { "type": "string", "example": "Regular" },
+                      "price": { "type": "number", "example": 25000 },
+                      "sku": { "type": "string", "example": "AMR-REG" },
+                      "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
+                    }
+                  }
+                }
               }
             }
           }

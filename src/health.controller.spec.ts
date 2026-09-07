@@ -57,4 +57,3 @@ describe('HealthController', () => {
     expect(result.data.database.status).toBe('UNKNOWN');
   });
 });
-

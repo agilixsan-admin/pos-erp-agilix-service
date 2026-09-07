@@ -61,12 +61,13 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "unit"],
+              "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Fresh Milk" },
-                "unit": { "type": "string", "example": "ml" },
-                "minimumStock": { "type": "number", "example": 1000 },
-                "description": { "type": "string", "example": "Fresh pasteurized milk" }
+                "sku": { "type": "string", "example": "ING-MILK-01" },
+                "unit": { "type": "string", "example": "ml", "default": "pcs" },
+                "minimumStock": { "type": "number", "example": 1000, "default": 0 },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
               }
             }
           }
@@ -144,10 +145,13 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": ["name", "unit", "minimumStock", "status"],
               "properties": {
                 "name": { "type": "string", "example": "Premium Arabica Beans" },
+                "sku": { "type": "string", "example": "ING-ESP-01" },
                 "unit": { "type": "string", "example": "gram" },
-                "minimumStock": { "type": "number", "example": 800 }
+                "minimumStock": { "type": "number", "example": 800 },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
           }
@@ -273,14 +277,15 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["outletId", "itemId", "type", "quantity"],
+              "required": ["type", "itemId", "quantity"],
               "properties": {
-                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
-                "itemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174020" },
                 "type": { "type": "string", "enum": ["IN", "OUT"], "example": "IN" },
+                "itemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174020" },
                 "quantity": { "type": "number", "example": 1000 },
-                "reasonCategoryId": { "type": "string", "example": "reason-1" },
-                "notes": { "type": "string", "example": "Pembelian bahan baru" }
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "reasonCategoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174099" },
+                "notes": { "type": "string", "example": "Pembelian bahan baru" },
+                "adjustmentDate": { "type": "string", "format": "date-time", "example": "2026-09-07T10:00:00.000Z" }
               }
             }
           }
@@ -346,11 +351,11 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "type"],
+              "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Barang Rusak / Basi" },
-                "type": { "type": "string", "enum": ["IN", "OUT"], "example": "OUT" },
-                "description": { "type": "string", "example": "Pengurangan akibat basi" }
+                "type": { "type": "string", "enum": ["IN", "OUT", "BOTH"], "default": "BOTH", "example": "OUT" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
               }
             }
           }
@@ -376,8 +381,11 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": ["name", "type", "status"],
               "properties": {
-                "name": { "type": "string", "example": "Barang Kadaluarsa" }
+                "name": { "type": "string", "example": "Barang Kadaluarsa" },
+                "type": { "type": "string", "enum": ["IN", "OUT", "BOTH"], "example": "OUT" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
           }

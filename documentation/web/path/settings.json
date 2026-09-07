@@ -22,11 +22,15 @@
                     "id": "123e4567-e89b-12d3-a456-426614174095",
                     "tenantId": "123e4567-e89b-12d3-a456-426614174001",
                     "outletId": "123e4567-e89b-12d3-a456-426614174002",
-                    "taxPercentage": 11,
-                    "discountPercentage": 0,
-                    "isCashEnabled": true,
-                    "isQrisEnabled": true,
-                    "billHeaderLogo": "https://storage.agilix.com/logos/cafe.png",
+                    "taxEnabled": true,
+                    "taxRate": 11,
+                    "taxName": "PB1",
+                    "discountEnabled": false,
+                    "discountType": "PERCENTAGE",
+                    "discountValue": 0,
+                    "cashEnabled": true,
+                    "qrisEnabled": true,
+                    "billLogoUrl": "https://storage.agilix.com/logos/cafe.png",
                     "billFooterText": "Terima kasih atas kunjungan Anda!"
                   }
                 }
@@ -53,11 +57,15 @@
               "type": "object",
               "properties": {
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002", "description": "Kosongkan untuk setting global tenant" },
-                "taxPercentage": { "type": "number", "example": 11 },
-                "discountPercentage": { "type": "number", "example": 5 },
-                "isCashEnabled": { "type": "boolean", "example": true },
-                "isQrisEnabled": { "type": "boolean", "example": true },
-                "billHeaderLogo": { "type": "string", "example": "https://storage.agilix.com/logos/cafe.png" },
+                "taxEnabled": { "type": "boolean", "example": true },
+                "taxRate": { "type": "number", "example": 11 },
+                "taxName": { "type": "string", "example": "PB1" },
+                "discountEnabled": { "type": "boolean", "example": true },
+                "discountType": { "type": "string", "enum": ["PERCENTAGE", "FIXED"], "example": "PERCENTAGE" },
+                "discountValue": { "type": "number", "example": 5 },
+                "cashEnabled": { "type": "boolean", "example": true },
+                "qrisEnabled": { "type": "boolean", "example": true },
+                "billLogoUrl": { "type": "string", "example": "https://storage.agilix.com/logos/cafe.png" },
                 "billFooterText": { "type": "string", "example": "Follow kami di @agilixcafe" }
               }
             }
@@ -73,10 +81,11 @@
                 "message": { "example": "Settings updated successfully" },
                 "data": {
                   "example": {
-                    "taxPercentage": 11,
-                    "discountPercentage": 5,
-                    "isCashEnabled": true,
-                    "isQrisEnabled": true,
+                    "taxEnabled": true,
+                    "taxRate": 11,
+                    "discountEnabled": true,
+                    "cashEnabled": true,
+                    "qrisEnabled": true,
                     "billFooterText": "Follow kami di @agilixcafe"
                   }
                 }

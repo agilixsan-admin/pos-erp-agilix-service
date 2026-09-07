@@ -68,7 +68,7 @@
                     "type": "object",
                     "required": ["variantId", "quantity"],
                     "properties": {
-                      "variantId": { "type": "string", "example": "var-1" },
+                      "variantId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174011" },
                       "quantity": { "type": "integer", "example": 2 },
                       "notes": { "type": "string" }
                     }
@@ -199,7 +199,7 @@
               "required": ["reason"],
               "properties": {
                 "reason": { "type": "string", "example": "Customer membatalkan pesanan" },
-                "reasonCategoryId": { "type": "string", "example": "reason-1" }
+                "reasonCategoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174099" }
               }
             }
           }
@@ -239,14 +239,12 @@
           {
             "in": "body",
             "name": "body",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "object",
-              "required": ["printerType"],
               "properties": {
-                "printerType": { "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"], "example": "RECEIPT" },
                 "printerId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174094" },
-                "paperWidth": { "type": "string", "enum": ["58MM", "80MM"], "example": "80MM" }
+                "type": { "type": "string", "enum": ["RECEIPT", "KITCHEN", "BAR"], "default": "RECEIPT", "example": "RECEIPT" }
               }
             }
           }

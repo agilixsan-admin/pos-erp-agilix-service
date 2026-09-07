@@ -56,12 +56,12 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["tableNumber", "capacity"],
+              "required": ["outletId", "tableNumber"],
               "properties": {
-                "tableNumber": { "type": "string", "example": "A1" },
-                "capacity": { "type": "integer", "example": 4 },
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
-                "status": { "type": "string", "enum": ["AVAILABLE", "OCCUPIED", "RESERVED"], "example": "AVAILABLE" }
+                "tableNumber": { "type": "string", "example": "A1" },
+                "capacity": { "type": "integer", "example": 4, "default": 4 },
+                "status": { "type": "string", "enum": ["AVAILABLE", "OCCUPIED", "RESERVED"], "default": "AVAILABLE", "example": "AVAILABLE" }
               }
             }
           }

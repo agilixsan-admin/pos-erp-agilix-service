@@ -53,7 +53,7 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "permissions"],
+              "required": ["name", "outletId", "permissions"],
               "properties": {
                 "name": { "type": "string", "example": "Inventory Staff" },
                 "permissions": {
@@ -62,7 +62,8 @@
                   "example": ["inventory.read", "inventory.adjust", "product.read"]
                 },
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
-                "description": { "type": "string", "example": "Staff managing inventory and stock" }
+                "description": { "type": "string", "example": "Staff managing inventory and stock" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
               }
             }
           }
@@ -81,6 +82,7 @@
                     "name": "Inventory Staff",
                     "description": "Staff managing inventory and stock",
                     "outletId": "123e4567-e89b-12d3-a456-426614174002",
+                    "status": "ACTIVE",
                     "menuAccess": ["inventory.read", "inventory.adjust", "product.read"]
                   }
                 }
@@ -115,6 +117,7 @@
                     "name": "CASHIER",
                     "description": "Cashier front staff",
                     "outletId": "123e4567-e89b-12d3-a456-426614174002",
+                    "status": "ACTIVE",
                     "menuAccess": ["order.read", "order.create", "payment.create", "transaction.read"],
                     "createdAt": "2026-09-01T10:00:00Z"
                   }
@@ -147,7 +150,8 @@
                   "items": { "type": "string" },
                   "example": ["order.read", "order.create", "order.void", "payment.create"]
                 },
-                "description": { "type": "string", "example": "Head cashier with void permission" }
+                "description": { "type": "string", "example": "Head cashier with void permission" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
               }
             }
           }

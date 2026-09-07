@@ -56,14 +56,14 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "email", "password", "roleId", "outletId"],
+              "required": ["name", "email", "password"],
               "properties": {
                 "name": { "type": "string", "example": "Siti Rahayu" },
                 "email": { "type": "string", "example": "siti@testcafe.com" },
                 "password": { "type": "string", "example": "Password123!" },
                 "roleId": { "type": "string", "example": "role-cashier" },
                 "outletId": { "type": "string", "example": "outlet-1" },
-                "phone": { "type": "string", "example": "+628123456792" }
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
               }
             }
           }
@@ -114,7 +114,6 @@
                     "id": "123e4567-e89b-12d3-a456-426614174060",
                     "name": "Ahmad Mubarok",
                     "email": "mubarok@testcafe.com",
-                    "phone": "+628123456789",
                     "outletId": "outlet-1",
                     "role": { "id": "role-1", "name": "CASHIER" },
                     "status": "ACTIVE",
@@ -144,7 +143,7 @@
               "type": "object",
               "properties": {
                 "name": { "type": "string", "example": "Ahmad Mubarok Updated" },
-                "phone": { "type": "string", "example": "+628123456793" },
+                "password": { "type": "string", "example": "NewPassword123!" },
                 "roleId": { "type": "string", "example": "role-manager" },
                 "outletId": { "type": "string", "example": "outlet-2" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
