@@ -15,4 +15,3 @@ export class AddPhoneToOutlets1700000000011 implements MigrationInterface {
     );
   }
 }
-
