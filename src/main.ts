@@ -43,7 +43,7 @@ async function bootstrap() {
     exposedHeaders: ['x-request-id'],
   });
 
-  // API versioning - allow /health to be probed directly by infrastructure/Docker/Kubernetes
+  // API versioning - allow /health to be probed directly at root path without version prefix
   app.setGlobalPrefix('api/v1', {
     exclude: ['health'],
   });

@@ -1,0 +1,153 @@
+name: Deploy Agilix POS Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Lint & Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint Code Style
+        run: npm run lint
+
+      - name: Run Unit & Hardening Test Suites (277 Tests)
+        run: npm test -- --no-watchman --maxWorkers=2
+
+      - name: Run End-to-End Test Suite
+        run: npm run test:e2e -- --no-watchman
+
+      - name: Compile TypeScript Build
+        run: npx nest build
+
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=ref,event=branch
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-swarm:
+    name: Deploy to Docker Swarm Cluster
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Copy docker-stack.yml to Server
+        if: env.DEPLOY_HOST != ''
+        uses: appleboy/scp-action@v0.1.7
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          source: 'docker-stack.yml'
+          target: '/opt/aglix-pos/'
+
+      - name: Execute Swarm Stack Deployment via SSH
+        if: env.DEPLOY_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          envs: REGISTRY,IMAGE_NAME,GITHUB_ACTOR,GITHUB_TOKEN
+          script: |
+            set -e
+            echo "==== Logging in to Container Registry ===="
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            echo "==== Deploying/Updating Docker Swarm Stack ===="
+            cd /opt/aglix-pos
+            export IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+            docker stack deploy -c docker-stack.yml --with-registry-auth aglix
+
+            echo "==== Waiting for Rolling Update Deployment ===="
+            sleep 10
+            docker stack services aglix
+            docker service ps aglix_pos-service
+
+            echo "==== Verifying Health Probe ===="
+            curl -s --fail http://localhost:4500/health || (docker service logs --tail 50 aglix_pos-service && exit 1)
+            echo "==== Deployment Successful! ===="

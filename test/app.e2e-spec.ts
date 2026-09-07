@@ -13,18 +13,22 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api/v1');
+    app.setGlobalPrefix('api/v1', {
+      exclude: ['health'],
+    });
     await app.init();
   });
 
-  it('/api/v1/health (GET)', () => {
+  it('/health (GET)', () => {
     return request(app.getHttpServer())
-      .get('/api/v1/health')
+      .get('/health')
       .expect(200)
-      .expect({
-        success: true,
-        message: 'Service is healthy',
-        data: { status: 'ok' },
+      .expect((res) => {
+        expect(res.body.success).toBe(true);
+        expect(res.body.message).toBe('Service is healthy');
+        expect(res.body.data.status).toBe('UP');
+        expect(res.body.data.database).toBeDefined();
+        expect(typeof res.body.data.uptimeSeconds).toBe('number');
       });
   });
 

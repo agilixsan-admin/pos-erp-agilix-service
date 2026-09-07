@@ -7,14 +7,14 @@ import {
 import { DataSource } from 'typeorm';
 import { Public } from './common/decorators/public.decorator';
 
-@Controller()
+@Controller('health')
 export class HealthController {
   constructor(
     @Optional()
     private readonly dataSource?: DataSource,
   ) {}
 
-  @Get(['health', 'api/v1/health'])
+  @Get()
   @Public()
   async getHealth() {
     let dbStatus = 'UNKNOWN';
