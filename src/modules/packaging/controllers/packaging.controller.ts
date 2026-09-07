@@ -38,6 +38,17 @@ export class PackagingController {
     };
   }
 
+  @Get('categories')
+  @Permissions('packaging.read')
+  async getCategories(@CurrentUser() user: User) {
+    const data = await this.packagingService.getCategories(user.tenantId);
+    return {
+      success: true,
+      message: 'Packaging categories retrieved successfully',
+      data,
+    };
+  }
+
   @Get(':id')
   @Permissions('packaging.read')
   async findById(

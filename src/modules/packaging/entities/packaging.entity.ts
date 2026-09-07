@@ -16,6 +16,7 @@ import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 @Entity('packagings')
 @Index(['tenantId'])
 @Index(['outletId'])
+@Index(['category'])
 @Index(['status'])
 export class Packaging {
   @PrimaryGeneratedColumn('uuid')
@@ -30,8 +31,24 @@ export class Packaging {
   @Column({ type: 'varchar', length: 150 })
   name!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  category!: string | null;
+
   @Column({ name: 'inventory_item_id', type: 'uuid', nullable: true })
   inventoryItemId!: string | null;
+
+  @Column({
+    name: 'cost_price',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => Number(value),
+    },
+  })
+  costPrice!: number;
 
   @Column({
     name: 'extra_price',

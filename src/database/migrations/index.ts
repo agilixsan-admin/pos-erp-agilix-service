@@ -11,6 +11,8 @@ import { PosSettings1700000000009 } from './1700000000009-PosSettings';
 import { PackagingManagement1700000000010 } from './1700000000010-PackagingManagement';
 import { AddPhoneToOutlets1700000000011 } from './1700000000011-AddPhoneToOutlets';
 import { RenameTableNameToTableNumber1700000000012 } from './1700000000012-RenameTableNameToTableNumber';
+import { AddCategoryAndCostToPackaging1700000000013 } from './1700000000013-AddCategoryAndCostToPackaging';
+import { AddInventoryCategoryAndItemFields1700000000014 } from './1700000000014-AddInventoryCategoryAndItemFields';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -26,4 +28,6 @@ export const ALL_MIGRATIONS = [
   PackagingManagement1700000000010,
   AddPhoneToOutlets1700000000011,
   RenameTableNameToTableNumber1700000000012,
+  AddCategoryAndCostToPackaging1700000000013,
+  AddInventoryCategoryAndItemFields1700000000014,
 ];

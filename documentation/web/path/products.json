@@ -62,9 +62,10 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": ["name", "variants"],
+              "required": ["name"],
               "properties": {
                 "name": { "type": "string", "example": "Americano" },
+                "sku": { "type": "string", "example": "AMR-01" },
                 "description": { "type": "string", "example": "Espresso dengan air panas" },
                 "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174090" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" },
@@ -72,11 +73,11 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "required": ["name", "price"],
+                    "required": ["name"],
                     "properties": {
                       "name": { "type": "string", "example": "Regular" },
-                      "price": { "type": "number", "example": 25000 },
-                      "sku": { "type": "string", "example": "AMR-REG" }
+                      "sku": { "type": "string", "example": "AMR-REG" },
+                      "price": { "type": "number", "example": 0 }
                     }
                   }
                 }

@@ -30,3 +30,14 @@ export class SetVariantRecipesDto {
   @Type(() => RecipeItemDto)
   items!: RecipeItemDto[];
 }
+
+export class CreateRecipeDto {
+  @IsUUID()
+  variantId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => RecipeItemDto)
+  items!: RecipeItemDto[];
+}

@@ -21,9 +21,10 @@ export class CreateVariantDto {
   @IsString()
   sku?: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price!: number;
+  price?: number;
 
   @IsOptional()
   @IsString()
@@ -35,6 +36,10 @@ export class CreateProductDto {
   @IsString()
   @MinLength(1)
   name!: string;
+
+  @IsOptional()
+  @IsString()
+  sku?: string;
 
   @IsOptional()
   @IsUUID()
@@ -70,9 +75,10 @@ export class UpdateVariantDto {
   @IsString()
   sku?: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price!: number;
+  price?: number;
 
   @IsOptional()
   @IsString()

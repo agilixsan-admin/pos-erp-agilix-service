@@ -8,8 +8,9 @@
         "produces": ["application/json"],
         "parameters": [
           { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "category", "in": "query", "type": "string", "description": "Filter by packaging category (e.g. Cup, Box, Bag, Straw)" },
           { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"], "description": "Filter by status" },
-          { "name": "search", "in": "query", "type": "string", "description": "Search by packaging name" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by packaging name or category" },
           { "name": "page", "in": "query", "type": "integer", "default": 1, "description": "Page number" },
           { "name": "limit", "in": "query", "type": "integer", "default": 20, "description": "Items per page" }
         ],
@@ -26,7 +27,9 @@
                     "type": "object",
                     "properties": {
                       "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
-                      "name": { "example": "Paper Bag Medium" },
+                      "name": { "example": "Cup 16 oz" },
+                      "category": { "example": "Cup" },
+                      "costPrice": { "example": 500 },
                       "extraPrice": { "example": 2000 },
                       "applyToOrderType": { "example": "TAKE_AWAY" },
                       "status": { "example": "ACTIVE" },
@@ -67,9 +70,11 @@
               "type": "object",
               "required": ["name"],
               "properties": {
-                "name": { "type": "string", "example": "Paper Bag Medium" },
+                "name": { "type": "string", "example": "Cup 16 oz" },
+                "category": { "type": "string", "example": "Cup" },
                 "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
                 "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
+                "costPrice": { "type": "number", "example": 500 },
                 "extraPrice": { "type": "number", "example": 2000 },
                 "applyToOrderType": { "type": "string", "enum": ["TAKE_AWAY", "ALL", "CUSTOM"], "example": "TAKE_AWAY" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" }
@@ -88,7 +93,9 @@
                   "type": "object",
                   "properties": {
                     "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
-                    "name": { "example": "Paper Bag Medium" },
+                    "name": { "example": "Cup 16 oz" },
+                    "category": { "example": "Cup" },
+                    "costPrice": { "example": 500 },
                     "extraPrice": { "example": 2000 },
                     "applyToOrderType": { "example": "TAKE_AWAY" },
                     "status": { "example": "ACTIVE" }
@@ -100,6 +107,32 @@
           "400": { "description": "Validation error or invalid foreign key" },
           "401": { "description": "Unauthorized" },
           "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/packagings/categories": {
+      "get": {
+        "tags": ["Packaging"],
+        "summary": "Get list of distinct packaging categories",
+        "operationId": "getPackagingCategories",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "List of packaging categories",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Packaging categories retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": { "type": "string", "example": "Cup" }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
         },
         "security": [{ "Bearer": [] }]
       }

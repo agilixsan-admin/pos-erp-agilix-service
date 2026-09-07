@@ -16,6 +16,10 @@ export class CreatePackagingDto {
   @IsNotEmpty()
   name!: string;
 
+  @IsString()
+  @IsOptional()
+  category?: string;
+
   @IsUUID()
   @IsOptional()
   outletId?: string;
@@ -23,6 +27,12 @@ export class CreatePackagingDto {
   @IsUUID()
   @IsOptional()
   inventoryItemId?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  costPrice?: number = 0;
 
   @IsNumber()
   @Min(0)
@@ -44,6 +54,10 @@ export class UpdatePackagingDto {
   @IsOptional()
   name?: string;
 
+  @IsString()
+  @IsOptional()
+  category?: string;
+
   @IsUUID()
   @IsOptional()
   outletId?: string;
@@ -51,6 +65,12 @@ export class UpdatePackagingDto {
   @IsUUID()
   @IsOptional()
   inventoryItemId?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  costPrice?: number;
 
   @IsNumber()
   @Min(0)
@@ -84,6 +104,10 @@ export class QueryPackagingDto {
   @IsUUID()
   @IsOptional()
   outletId?: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])

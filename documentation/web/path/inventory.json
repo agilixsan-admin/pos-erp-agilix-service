@@ -47,6 +47,136 @@
         "security": [{ "Bearer": [] }]
       }
     },
+    "/inventory/categories": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get list kategori bahan baku",
+        "operationId": "getInventoryCategories",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "search", "in": "query", "type": "string" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          { "name": "page", "in": "query", "type": "integer", "default": 1 },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20 }
+        ],
+        "responses": {
+          "200": {
+            "description": "List kategori bahan baku",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174099" },
+                      "name": { "example": "Dairy" },
+                      "description": { "example": "Susu dan olahan susu" },
+                      "status": { "example": "ACTIVE" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Buat kategori bahan baku baru",
+        "operationId": "createInventoryCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Dairy" },
+                "description": { "type": "string", "example": "Susu dan olahan susu" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Kategori bahan baku berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Inventory category created successfully" }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/inventory/categories/{id}": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get detail kategori bahan baku by ID",
+        "operationId": "getInventoryCategoryById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Detail kategori bahan baku" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Inventory"],
+        "summary": "Update kategori bahan baku",
+        "operationId": "updateInventoryCategory",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "example": "Dairy & Milk" },
+                "description": { "type": "string", "example": "Susu dan turunannya" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Kategori bahan baku berhasil diupdate" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "summary": "Hapus kategori bahan baku",
+        "operationId": "deleteInventoryCategory",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Kategori bahan baku berhasil dihapus" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
     "/inventory/items": {
       "post": {
         "tags": ["Inventory"],
@@ -65,6 +195,8 @@
               "properties": {
                 "name": { "type": "string", "example": "Fresh Milk" },
                 "sku": { "type": "string", "example": "ING-MILK-01" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174099" },
+                "description": { "type": "string", "example": "Susu segar pasteurisasi" },
                 "unit": { "type": "string", "example": "ml", "default": "pcs" },
                 "minimumStock": { "type": "number", "example": 1000, "default": 0 },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }

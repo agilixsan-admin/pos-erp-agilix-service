@@ -17,6 +17,11 @@ import {
   UpdateInventoryItemDto,
 } from '../dto/inventory-item.dto';
 import {
+  CreateInventoryCategoryDto,
+  QueryInventoryCategoryDto,
+  UpdateInventoryCategoryDto,
+} from '../dto/inventory-category.dto';
+import {
   CreateReasonCategoryDto,
   CreateStockAdjustmentDto,
   QueryMovementDto,
@@ -29,6 +34,94 @@ import { User } from '../../user/user.entity';
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  // ==========================================
+  // INVENTORY CATEGORIES
+  // ==========================================
+
+  @Get('categories')
+  @Permissions('inventory.read')
+  async findAllCategories(
+    @CurrentUser() user: User,
+    @Query() query: QueryInventoryCategoryDto,
+  ) {
+    const result = await this.inventoryService.findAllCategories(
+      user.tenantId,
+      query,
+    );
+    return {
+      success: true,
+      message: 'Inventory categories retrieved successfully',
+      ...result,
+    };
+  }
+
+  @Get('categories/:id')
+  @Permissions('inventory.read')
+  async findCategoryById(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.inventoryService.findCategoryById(
+      user.tenantId,
+      id,
+    );
+    return {
+      success: true,
+      message: 'Inventory category retrieved successfully',
+      data,
+    };
+  }
+
+  @Post('categories')
+  @Permissions('inventory.create')
+  async createCategory(
+    @CurrentUser() user: User,
+    @Body() dto: CreateInventoryCategoryDto,
+  ) {
+    const data = await this.inventoryService.createCategory(user.tenantId, dto);
+    return {
+      success: true,
+      message: 'Inventory category created successfully',
+      data,
+    };
+  }
+
+  @Put('categories/:id')
+  @Permissions('inventory.update')
+  async updateCategory(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateInventoryCategoryDto,
+  ) {
+    const data = await this.inventoryService.updateCategory(
+      user.tenantId,
+      id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Inventory category updated successfully',
+      data,
+    };
+  }
+
+  @Delete('categories/:id')
+  @Permissions('inventory.delete')
+  async deleteCategory(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const result = await this.inventoryService.deleteCategory(
+      user.tenantId,
+      id,
+    );
+    return result;
+  }
+
+  // ==========================================
+  // INVENTORY ITEMS & MOVEMENTS
+  // ==========================================
 
   @Get()
   @Permissions('inventory.read')

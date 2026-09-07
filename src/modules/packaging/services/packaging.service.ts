@@ -44,12 +44,13 @@ export class PackagingService {
     tenantId: string,
     query: QueryPackagingDto,
   ): Promise<PaginatedPackagings> {
-    const { page = 1, limit = 20, outletId, status, search } = query;
+    const { page = 1, limit = 20, outletId, category, status, search } = query;
 
     const qb = this.packagings
       .createQueryBuilder('pkg')
       .leftJoinAndSelect('pkg.outlet', 'outlet')
       .leftJoinAndSelect('pkg.inventoryItem', 'inventoryItem')
+      .leftJoinAndSelect('inventoryItem.stocks', 'stock')
       .where('pkg.tenantId = :tenantId', { tenantId })
       .orderBy('pkg.createdAt', 'DESC')
       .skip((page - 1) * limit)
@@ -61,14 +62,21 @@ export class PackagingService {
       });
     }
 
+    if (category) {
+      qb.andWhere('pkg.category = :category', { category });
+    }
+
     if (status) {
       qb.andWhere('pkg.status = :status', { status });
     }
 
     if (search) {
-      qb.andWhere('LOWER(pkg.name) LIKE LOWER(:search)', {
-        search: `%${search}%`,
-      });
+      qb.andWhere(
+        '(LOWER(pkg.name) LIKE LOWER(:search) OR LOWER(pkg.category) LIKE LOWER(:search))',
+        {
+          search: `%${search}%`,
+        },
+      );
     }
 
     const [data, total] = await qb.getManyAndCount();
@@ -85,12 +93,32 @@ export class PackagingService {
   }
 
   /**
+   * Get distinct packaging categories for a tenant
+   */
+  async getCategories(tenantId: string): Promise<string[]> {
+    const rows = await this.packagings
+      .createQueryBuilder('pkg')
+      .select('DISTINCT pkg.category', 'category')
+      .where('pkg.tenantId = :tenantId', { tenantId })
+      .andWhere('pkg.category IS NOT NULL')
+      .orderBy('pkg.category', 'ASC')
+      .getRawMany();
+
+    return rows.map((r) => r.category).filter(Boolean);
+  }
+
+  /**
    * Get detail packaging by ID
    */
   async findById(tenantId: string, id: string): Promise<Packaging> {
     const packaging = await this.packagings.findOne({
       where: { id, tenantId },
-      relations: { outlet: true, inventoryItem: true },
+      relations: {
+        outlet: true,
+        inventoryItem: {
+          stocks: true,
+        },
+      },
     });
 
     if (!packaging) {
@@ -141,8 +169,10 @@ export class PackagingService {
     const packaging = this.packagings.create({
       tenantId,
       name: dto.name,
+      category: dto.category ?? null,
       outletId: dto.outletId ?? null,
       inventoryItemId: dto.inventoryItemId ?? null,
+      costPrice: dto.costPrice ?? 0,
       extraPrice: dto.extraPrice ?? 0,
       applyToOrderType: dto.applyToOrderType ?? 'TAKE_AWAY',
       status: dto.status ?? 'ACTIVE',
@@ -158,6 +188,8 @@ export class PackagingService {
       metadata: {
         packagingId: saved.id,
         name: saved.name,
+        category: saved.category,
+        costPrice: saved.costPrice,
         extraPrice: saved.extraPrice,
         inventoryItemId: saved.inventoryItemId,
       },
@@ -226,6 +258,14 @@ export class PackagingService {
 
     if (dto.name !== undefined) {
       packaging.name = dto.name;
+    }
+
+    if (dto.category !== undefined) {
+      packaging.category = dto.category ?? null;
+    }
+
+    if (dto.costPrice !== undefined) {
+      packaging.costPrice = dto.costPrice;
     }
 
     if (dto.extraPrice !== undefined) {

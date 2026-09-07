@@ -5,10 +5,11 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Post,
   Put,
 } from '@nestjs/common';
 import { RecipeService } from '../services/recipe.service';
-import { SetVariantRecipesDto } from '../dto/recipe.dto';
+import { CreateRecipeDto, SetVariantRecipesDto } from '../dto/recipe.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
@@ -30,6 +31,40 @@ export class RecipeController {
     return {
       success: true,
       message: 'Variant recipe retrieved successfully',
+      data,
+    };
+  }
+
+  @Post()
+  @Permissions('product.create')
+  async createRecipe(@CurrentUser() user: User, @Body() dto: CreateRecipeDto) {
+    const data = await this.recipeService.setVariantRecipes(
+      user.tenantId,
+      dto.variantId,
+      { items: dto.items },
+    );
+    return {
+      success: true,
+      message: 'Variant recipe saved successfully',
+      data,
+    };
+  }
+
+  @Post('variants/:variantId')
+  @Permissions('product.create')
+  async createVariantRecipes(
+    @CurrentUser() user: User,
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+    @Body() dto: SetVariantRecipesDto,
+  ) {
+    const data = await this.recipeService.setVariantRecipes(
+      user.tenantId,
+      variantId,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Variant recipe saved successfully',
       data,
     };
   }

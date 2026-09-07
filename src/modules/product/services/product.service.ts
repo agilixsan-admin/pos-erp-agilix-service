@@ -129,7 +129,7 @@ export class ProductService {
 
       const variantDtos = dto.variants?.length
         ? dto.variants
-        : [{ name: 'Default', price: 0, status: 'ACTIVE' }];
+        : [{ name: 'Default', sku: dto.sku, price: 0, status: 'ACTIVE' }];
 
       const variants = variantDtos.map((v) =>
         variantRepo.create({
@@ -137,7 +137,7 @@ export class ProductService {
           productId: savedProduct.id,
           name: v.name,
           sku: v.sku ?? null,
-          price: v.price,
+          price: v.price ?? 0,
           status: v.status ?? 'ACTIVE',
         }),
       );
@@ -222,7 +222,7 @@ export class ProductService {
               {
                 name: variantDto.name,
                 sku: variantDto.sku ?? null,
-                price: variantDto.price,
+                price: variantDto.price ?? 0,
                 status: variantDto.status ?? 'ACTIVE',
               },
             );
@@ -232,7 +232,7 @@ export class ProductService {
               productId: id,
               name: variantDto.name,
               sku: variantDto.sku ?? null,
-              price: variantDto.price,
+              price: variantDto.price ?? 0,
               status: variantDto.status ?? 'ACTIVE',
             });
             await variantRepo.save(newVariant);

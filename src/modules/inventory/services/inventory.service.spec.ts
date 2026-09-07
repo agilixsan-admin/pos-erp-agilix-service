@@ -4,6 +4,7 @@ import { DataSource, SelectQueryBuilder } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { InventoryItem } from '../entities/inventory-item.entity';
+import { InventoryCategory } from '../entities/inventory-category.entity';
 import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
@@ -14,6 +15,14 @@ describe('InventoryService', () => {
   let service: InventoryService;
 
   const mockItemRepo = {
+    createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    softRemove: jest.fn(),
+  };
+
+  const mockCategoryRepo = {
     createQueryBuilder: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
@@ -62,6 +71,10 @@ describe('InventoryService', () => {
         {
           provide: getRepositoryToken(InventoryItem),
           useValue: mockItemRepo,
+        },
+        {
+          provide: getRepositoryToken(InventoryCategory),
+          useValue: mockCategoryRepo,
         },
         {
           provide: getRepositoryToken(InventoryStock),

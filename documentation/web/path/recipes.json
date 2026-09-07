@@ -1,6 +1,102 @@
 {
   "paths": {
+    "/recipes": {
+      "post": {
+        "tags": ["Recipes"],
+        "summary": "Simpan resep bahan baku untuk variant",
+        "operationId": "createRecipe",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["variantId", "items"],
+              "properties": {
+                "variantId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174011" },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["inventoryItemId", "quantity", "unit"],
+                    "properties": {
+                      "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174020" },
+                      "quantity": { "type": "number", "example": 18 },
+                      "unit": { "type": "string", "example": "gram" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe berhasil disimpan",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Variant recipe saved successfully" }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "404": { "description": "Variant or inventory item not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
     "/recipes/variants/{variantId}": {
+      "post": {
+        "tags": ["Recipes"],
+        "summary": "Simpan resep bahan baku untuk variant (POST)",
+        "operationId": "createVariantRecipes",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "variantId", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["items"],
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["inventoryItemId", "quantity", "unit"],
+                    "properties": {
+                      "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174020" },
+                      "quantity": { "type": "number", "example": 18 },
+                      "unit": { "type": "string", "example": "gram" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe berhasil disimpan",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Variant recipe saved successfully" }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      },
       "get": {
         "tags": ["Recipes"],
         "summary": "Get komposisi resep bahan baku untuk variant produk",

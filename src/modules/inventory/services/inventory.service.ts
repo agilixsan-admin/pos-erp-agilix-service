@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { InventoryItem } from '../entities/inventory-item.entity';
+import { InventoryCategory } from '../entities/inventory-category.entity';
 import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
@@ -19,6 +20,11 @@ import {
   UpdateInventoryItemDto,
 } from '../dto/inventory-item.dto';
 import {
+  CreateInventoryCategoryDto,
+  QueryInventoryCategoryDto,
+  UpdateInventoryCategoryDto,
+} from '../dto/inventory-category.dto';
+import {
   CreateReasonCategoryDto,
   CreateStockAdjustmentDto,
   QueryMovementDto,
@@ -30,6 +36,8 @@ export class InventoryService {
   constructor(
     @InjectRepository(InventoryItem)
     private readonly itemRepository: Repository<InventoryItem>,
+    @InjectRepository(InventoryCategory)
+    private readonly categoryRepository: Repository<InventoryCategory>,
     @InjectRepository(InventoryStock)
     private readonly stockRepository: Repository<InventoryStock>,
     @InjectRepository(InventoryMovement)
@@ -42,6 +50,105 @@ export class InventoryService {
     private readonly audit: AuditService,
   ) {}
 
+  // ==========================================
+  // INVENTORY CATEGORY CRUD
+  // ==========================================
+
+  async findAllCategories(tenantId: string, query: QueryInventoryCategoryDto) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const qb = this.categoryRepository
+      .createQueryBuilder('cat')
+      .where('cat.tenantId = :tenantId', { tenantId });
+
+    if (query.status) {
+      qb.andWhere('cat.status = :status', { status: query.status });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(cat.name) LIKE LOWER(:search) OR LOWER(cat.description) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('cat.createdAt', 'DESC');
+    qb.skip(skip).take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findCategoryById(tenantId: string, id: string) {
+    const category = await this.categoryRepository.findOne({
+      where: { id, tenantId },
+    });
+
+    if (!category) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Inventory category not found',
+        code: 'INVENTORY_CATEGORY_NOT_FOUND',
+      });
+    }
+
+    return category;
+  }
+
+  async createCategory(tenantId: string, dto: CreateInventoryCategoryDto) {
+    const category = this.categoryRepository.create({
+      tenantId,
+      name: dto.name,
+      description: dto.description ?? null,
+      status: dto.status ?? 'ACTIVE',
+    });
+
+    return this.categoryRepository.save(category);
+  }
+
+  async updateCategory(
+    tenantId: string,
+    id: string,
+    dto: UpdateInventoryCategoryDto,
+  ) {
+    const category = await this.findCategoryById(tenantId, id);
+
+    category.name = dto.name;
+    if (dto.description !== undefined) {
+      category.description = dto.description ?? null;
+    }
+    if (dto.status !== undefined) {
+      category.status = dto.status;
+    }
+
+    return this.categoryRepository.save(category);
+  }
+
+  async deleteCategory(tenantId: string, id: string) {
+    const category = await this.findCategoryById(tenantId, id);
+    await this.categoryRepository.softRemove(category);
+    return {
+      success: true,
+      message: 'Inventory category deleted successfully',
+    };
+  }
+
+  // ==========================================
+  // INVENTORY ITEMS
+  // ==========================================
+
   async findAll(tenantId: string, query: QueryInventoryDto) {
     const page = query.page && query.page > 0 ? query.page : 1;
     const limit =
@@ -50,6 +157,7 @@ export class InventoryService {
 
     const qb = this.itemRepository
       .createQueryBuilder('item')
+      .leftJoinAndSelect('item.category', 'category')
       .where('item.tenantId = :tenantId', { tenantId });
 
     if (query.outletId) {
@@ -63,13 +171,19 @@ export class InventoryService {
       qb.leftJoinAndSelect('item.stocks', 'stock');
     }
 
+    if (query.categoryId) {
+      qb.andWhere('item.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
+    }
+
     if (query.status) {
       qb.andWhere('item.status = :status', { status: query.status });
     }
 
     if (query.search) {
       qb.andWhere(
-        '(LOWER(item.name) LIKE LOWER(:search) OR LOWER(item.sku) LIKE LOWER(:search))',
+        '(LOWER(item.name) LIKE LOWER(:search) OR LOWER(item.sku) LIKE LOWER(:search) OR LOWER(item.description) LIKE LOWER(:search))',
         { search: `%${query.search}%` },
       );
     }
@@ -96,6 +210,7 @@ export class InventoryService {
   async findById(tenantId: string, id: string, outletId?: string) {
     const qb = this.itemRepository
       .createQueryBuilder('item')
+      .leftJoinAndSelect('item.category', 'category')
       .where('item.id = :id AND item.tenantId = :tenantId', { id, tenantId });
 
     if (outletId) {
@@ -123,28 +238,46 @@ export class InventoryService {
   }
 
   async create(tenantId: string, dto: CreateInventoryItemDto) {
+    if (dto.categoryId) {
+      await this.findCategoryById(tenantId, dto.categoryId);
+    }
+
     const item = this.itemRepository.create({
       tenantId,
       name: dto.name,
       sku: dto.sku ?? null,
+      categoryId: dto.categoryId ?? null,
+      description: dto.description ?? null,
       unit: dto.unit ?? 'pcs',
       minimumStock: dto.minimumStock ?? 0,
       status: dto.status ?? 'ACTIVE',
     });
 
-    return this.itemRepository.save(item);
+    const saved = await this.itemRepository.save(item);
+    return this.findById(tenantId, saved.id);
   }
 
   async update(tenantId: string, id: string, dto: UpdateInventoryItemDto) {
     const item = await this.findById(tenantId, id);
 
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId) {
+        await this.findCategoryById(tenantId, dto.categoryId);
+      }
+      item.categoryId = dto.categoryId ?? null;
+    }
+
     item.name = dto.name;
     item.sku = dto.sku ?? null;
+    if (dto.description !== undefined) {
+      item.description = dto.description ?? null;
+    }
     item.unit = dto.unit;
     item.minimumStock = dto.minimumStock;
     item.status = dto.status;
 
-    return this.itemRepository.save(item);
+    await this.itemRepository.save(item);
+    return this.findById(tenantId, id);
   }
 
   async delete(tenantId: string, id: string) {

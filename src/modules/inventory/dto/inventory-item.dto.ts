@@ -19,6 +19,14 @@ export class CreateInventoryItemDto {
   sku?: string;
 
   @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
   @IsString()
   unit?: string = 'pcs';
 
@@ -41,6 +49,14 @@ export class UpdateInventoryItemDto {
   @IsOptional()
   @IsString()
   sku?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsString()
   unit!: string;
@@ -70,6 +86,10 @@ export class QueryInventoryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsUUID()

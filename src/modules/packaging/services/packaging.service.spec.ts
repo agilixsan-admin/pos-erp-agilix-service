@@ -129,7 +129,7 @@ describe('PackagingService', () => {
       expect(result).toEqual(mockPkg);
       expect(mockPackagingRepo.findOne).toHaveBeenCalledWith({
         where: { id: 'pkg-1', tenantId: 'tenant-1' },
-        relations: { outlet: true, inventoryItem: true },
+        relations: { outlet: true, inventoryItem: { stocks: true } },
       });
     });
 
