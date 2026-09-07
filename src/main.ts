@@ -43,8 +43,10 @@ async function bootstrap() {
     exposedHeaders: ['x-request-id'],
   });
 
-  // API versioning
-  app.setGlobalPrefix('api/v1');
+  // API versioning - allow /health to be probed directly by infrastructure/Docker/Kubernetes
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health'],
+  });
 
   // Access log
   app.useGlobalInterceptors(new AccessLogInterceptor());
