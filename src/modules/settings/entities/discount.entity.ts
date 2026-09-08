@@ -17,9 +17,7 @@ import { Product } from '../../product/entities/product.entity';
 
 export type DiscountCalculationType = 'PERCENTAGE' | 'FIXED';
 export type DiscountValidityType =
-  | 'ALWAYS_ACTIVE'
-  | 'RECURRING_WEEKLY'
-  | 'DATE_RANGE';
+  'ALWAYS_ACTIVE' | 'RECURRING_WEEKLY' | 'DATE_RANGE';
 export type DiscountScope = 'ALL_PRODUCTS' | 'SPECIFIC_PRODUCTS';
 export type DiscountStatus = 'ACTIVE' | 'INACTIVE';
 

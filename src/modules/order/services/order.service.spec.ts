@@ -283,7 +283,9 @@ describe('OrderService', () => {
         id: 'disc-promo-1',
         name: 'Promo 10rb',
       });
-      mockDiscountService.isDiscountActive.mockReturnValueOnce({ isValid: true });
+      mockDiscountService.isDiscountActive.mockReturnValueOnce({
+        isValid: true,
+      });
       mockDiscountService.calculateDiscount.mockReturnValueOnce(10000);
 
       let createdOrder: Record<string, unknown> | null = null;
@@ -297,7 +299,9 @@ describe('OrderService', () => {
                     createdOrder = o;
                     return { ...o, id: 'ord-disc' };
                   }),
-                  save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+                  save: jest.fn((o: Record<string, unknown>) =>
+                    Promise.resolve(o),
+                  ),
                   findOne: jest.fn().mockResolvedValue({ id: 'ord-disc' }),
                 };
               }

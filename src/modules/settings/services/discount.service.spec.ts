@@ -242,9 +242,34 @@ describe('DiscountService', () => {
     });
   });
 
+  describe('findById', () => {
+    it('returns discount when found', async () => {
+      const mockDiscount = {
+        id: 'd-1',
+        tenantId: mockTenantId,
+        name: 'Promo 1',
+      };
+      discountRepo.findOne.mockResolvedValue(mockDiscount);
+
+      const result = await service.findById(mockTenantId, 'd-1');
+      expect(result).toEqual(mockDiscount);
+    });
+
+    it('throws NotFoundException when discount is not found', async () => {
+      discountRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findById(mockTenantId, 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('create', () => {
-    it('creates ALWAYS_ACTIVE discount successfully', async () => {
+    it('creates ALWAYS_ACTIVE discount successfully with outletId', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
+
       const dto = {
+        outletId: mockOutletId,
         name: 'Member 5%',
         type: 'PERCENTAGE' as const,
         value: 5,
@@ -267,9 +292,9 @@ describe('DiscountService', () => {
         validityType: 'ALWAYS_ACTIVE' as const,
       };
 
-      await expect(service.create(mockTenantId, dto, mockUserId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.create(mockTenantId, dto, mockUserId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if RECURRING_WEEKLY has no recurringDays', async () => {
@@ -281,9 +306,9 @@ describe('DiscountService', () => {
         recurringDays: [],
       };
 
-      await expect(service.create(mockTenantId, dto, mockUserId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.create(mockTenantId, dto, mockUserId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if DATE_RANGE has missing start/end date', async () => {
@@ -294,9 +319,9 @@ describe('DiscountService', () => {
         validityType: 'DATE_RANGE' as const,
       };
 
-      await expect(service.create(mockTenantId, dto, mockUserId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.create(mockTenantId, dto, mockUserId),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -336,9 +361,7 @@ describe('DiscountService', () => {
       const result = await service.findAll(mockTenantId, {});
 
       expect(result).toHaveLength(2);
-      expect(result[0].validityDescription).toBe(
-        'Always Active (No end date)',
-      );
+      expect(result[0].validityDescription).toBe('Always Active (No end date)');
       expect(result[1].validityDescription).toBe('SATURDAY, SUNDAY');
     });
   });

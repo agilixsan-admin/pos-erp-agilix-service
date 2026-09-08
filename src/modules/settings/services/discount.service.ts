@@ -144,7 +144,9 @@ export class DiscountService {
 
     let calculated = 0;
     if (discount.type === 'PERCENTAGE') {
-      calculated = Math.round((eligibleSubtotal * Number(discount.value)) / 100);
+      calculated = Math.round(
+        (eligibleSubtotal * Number(discount.value)) / 100,
+      );
     } else {
       calculated = Math.min(eligibleSubtotal, Number(discount.value));
     }
@@ -270,7 +272,9 @@ export class DiscountService {
           applicableScope: d.applicableScope,
           productCount: d.products?.length || 0,
           minOrderAmount: Number(d.minOrderAmount),
-          maxDiscountAmount: d.maxDiscountAmount ? Number(d.maxDiscountAmount) : null,
+          maxDiscountAmount: d.maxDiscountAmount
+            ? Number(d.maxDiscountAmount)
+            : null,
           calculatedDiscountAmount: calculatedPreview,
         });
       }
@@ -316,10 +320,7 @@ export class DiscountService {
       });
     }
 
-    if (
-      dto.validityType === 'DATE_RANGE' &&
-      (!dto.startDate || !dto.endDate)
-    ) {
+    if (dto.validityType === 'DATE_RANGE' && (!dto.startDate || !dto.endDate)) {
       throw new BadRequestException({
         success: false,
         message: 'startDate and endDate are required for DATE_RANGE discount',
