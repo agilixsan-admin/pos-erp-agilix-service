@@ -12,4 +12,3 @@ import { AuditModule } from '../audit/audit.module';
   exports: [SupplierService],
 })
 export class SupplierModule {}
-

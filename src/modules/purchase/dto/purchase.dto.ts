@@ -147,4 +147,3 @@ export class QueryPurchaseDto {
   @IsString()
   search?: string;
 }
-

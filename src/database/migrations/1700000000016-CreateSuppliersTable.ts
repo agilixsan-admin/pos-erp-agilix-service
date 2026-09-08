@@ -52,4 +52,3 @@ export class CreateSuppliersTable1700000000016 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "suppliers"`);
   }
 }
-

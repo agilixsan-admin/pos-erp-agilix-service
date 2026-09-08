@@ -77,15 +77,22 @@ export class CreatePurchasesTables1700000000017 implements MigrationInterface {
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchase_items_tenant_inventory"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchase_items_tenant_purchase"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_purchase_items_tenant_inventory"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_purchase_items_tenant_purchase"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "purchase_items"`);
 
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchases_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchases_tenant_number"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchases_tenant_outlet"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_purchases_tenant_number"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_purchases_tenant_outlet"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_purchases_tenant_id"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "purchases"`);
   }
 }
-

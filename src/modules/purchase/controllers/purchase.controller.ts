@@ -117,9 +117,9 @@ export class PurchaseController {
     );
     return {
       success: true,
-      message: 'Purchase goods received, stock incremented, and unit cost updated successfully',
+      message:
+        'Purchase goods received, stock incremented, and unit cost updated successfully',
       data,
     };
   }
 }
-

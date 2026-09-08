@@ -91,7 +91,11 @@ describe('PurchaseService', () => {
     outletRepo = { findOne: jest.fn() } as any;
     supplierRepo = { findOne: jest.fn() } as any;
     inventoryItemRepo = { findOne: jest.fn(), update: jest.fn() } as any;
-    stockRepo = { findOne: jest.fn(), create: jest.fn(), save: jest.fn() } as any;
+    stockRepo = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    } as any;
     movementRepo = { create: jest.fn(), save: jest.fn() } as any;
     packagingRepo = { update: jest.fn() } as any;
     auditService = { record: jest.fn().mockResolvedValue(undefined) } as any;
@@ -117,12 +121,21 @@ describe('PurchaseService', () => {
       providers: [
         PurchaseService,
         { provide: getRepositoryToken(Purchase), useValue: purchaseRepo },
-        { provide: getRepositoryToken(PurchaseItem), useValue: purchaseItemRepo },
+        {
+          provide: getRepositoryToken(PurchaseItem),
+          useValue: purchaseItemRepo,
+        },
         { provide: getRepositoryToken(Outlet), useValue: outletRepo },
         { provide: getRepositoryToken(Supplier), useValue: supplierRepo },
-        { provide: getRepositoryToken(InventoryItem), useValue: inventoryItemRepo },
+        {
+          provide: getRepositoryToken(InventoryItem),
+          useValue: inventoryItemRepo,
+        },
         { provide: getRepositoryToken(InventoryStock), useValue: stockRepo },
-        { provide: getRepositoryToken(InventoryMovement), useValue: movementRepo },
+        {
+          provide: getRepositoryToken(InventoryMovement),
+          useValue: movementRepo,
+        },
         { provide: getRepositoryToken(Packaging), useValue: packagingRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: AuditService, useValue: auditService },
@@ -180,9 +193,18 @@ describe('PurchaseService', () => {
 
   describe('create', () => {
     it('creates a new purchase with status DRAFT without changing stock', async () => {
-      outletRepo.findOne.mockResolvedValue({ id: 'outlet-1', tenantId: 'tenant-1' } as any);
-      supplierRepo.findOne.mockResolvedValue({ id: 'supp-1', tenantId: 'tenant-1' } as any);
-      inventoryItemRepo.findOne.mockResolvedValue({ id: 'inv-susu', tenantId: 'tenant-1' } as any);
+      outletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      } as any);
+      supplierRepo.findOne.mockResolvedValue({
+        id: 'supp-1',
+        tenantId: 'tenant-1',
+      } as any);
+      inventoryItemRepo.findOne.mockResolvedValue({
+        id: 'inv-susu',
+        tenantId: 'tenant-1',
+      } as any);
 
       const qbNum = {
         where: jest.fn().mockReturnThis(),
@@ -237,11 +259,13 @@ describe('PurchaseService', () => {
         addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getRawOne: jest.fn().mockResolvedValue({ totalCost: 13000, totalQty: 1000 }),
+        getRawOne: jest
+          .fn()
+          .mockResolvedValue({ totalCost: 13000, totalQty: 1000 }),
       } as any;
       purchaseItemRepo.createQueryBuilder.mockReturnValue(qbAgg);
 
-      const result = await service.receive('tenant-1', 'pur-1', 'user-1');
+      await service.receive('tenant-1', 'pur-1', 'user-1');
 
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(stockRepo.save).toHaveBeenCalled();
@@ -261,10 +285,9 @@ describe('PurchaseService', () => {
         status: 'RECEIVED',
       });
 
-      await expect(service.receive('tenant-1', 'pur-1', 'user-1')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.receive('tenant-1', 'pur-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
-

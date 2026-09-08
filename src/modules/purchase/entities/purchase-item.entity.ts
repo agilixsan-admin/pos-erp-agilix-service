@@ -97,4 +97,3 @@ export class PurchaseItem {
   @JoinColumn({ name: 'inventory_item_id' })
   inventoryItem!: InventoryItem;
 }
-

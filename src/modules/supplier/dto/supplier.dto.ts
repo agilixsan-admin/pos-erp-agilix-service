@@ -141,4 +141,3 @@ export class QuerySupplierDto {
   @IsString()
   search?: string;
 }
-

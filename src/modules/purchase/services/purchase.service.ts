@@ -524,13 +524,17 @@ export class PurchaseService {
             inventoryItemId,
           })
           .andWhere('p.status = :status', { status: 'RECEIVED' })
-          .getRawOne();
+          .getRawOne<{
+            totalCost?: string | number;
+            totalQty?: string | number;
+          }>();
 
         const totalCost = Number(aggregateResult?.totalCost || 0);
         const totalQty = Number(aggregateResult?.totalQty || 0);
 
         if (totalQty > 0) {
-          const cumulativeUnitCost = Math.round((totalCost / totalQty) * 100) / 100;
+          const cumulativeUnitCost =
+            Math.round((totalCost / totalQty) * 100) / 100;
 
           await itemRepo.update(
             { id: inventoryItemId, tenantId },
@@ -562,4 +566,3 @@ export class PurchaseService {
     return this.findById(tenantId, purchase.id);
   }
 }
-

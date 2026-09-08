@@ -29,7 +29,12 @@ export class Supplier {
   @Column({ type: 'varchar', length: 200 })
   name!: string;
 
-  @Column({ name: 'contact_person', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'contact_person',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
   contactPerson!: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
@@ -69,4 +74,3 @@ export class Supplier {
   @JoinColumn({ name: 'tenant_id' })
   tenant!: Tenant;
 }
-

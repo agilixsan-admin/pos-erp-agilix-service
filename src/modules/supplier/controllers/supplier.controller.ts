@@ -51,11 +51,7 @@ export class SupplierController {
   @Post()
   @Permissions('inventory.create', 'supplier.create')
   async create(@CurrentUser() user: User, @Body() dto: CreateSupplierDto) {
-    const data = await this.supplierService.create(
-      user.tenantId,
-      user.id,
-      dto,
-    );
+    const data = await this.supplierService.create(user.tenantId, user.id, dto);
     return {
       success: true,
       message: 'Supplier created successfully',
@@ -97,4 +93,3 @@ export class SupplierController {
     return result;
   }
 }
-

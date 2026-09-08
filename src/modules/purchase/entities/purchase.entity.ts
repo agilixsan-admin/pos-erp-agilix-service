@@ -120,4 +120,3 @@ export class Purchase {
   @OneToMany(() => PurchaseItem, (item) => item.purchase, { cascade: true })
   items!: PurchaseItem[];
 }
-

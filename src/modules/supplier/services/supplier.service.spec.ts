@@ -149,7 +149,10 @@ describe('SupplierService', () => {
   describe('update', () => {
     it('updates supplier fields and records audit', async () => {
       supplierRepo.findOne.mockResolvedValue(mockSupplier);
-      const updatedSupplier = { ...mockSupplier, name: 'PT Sumber Makmur Sejahtera' };
+      const updatedSupplier = {
+        ...mockSupplier,
+        name: 'PT Sumber Makmur Sejahtera',
+      };
       supplierRepo.save.mockResolvedValue(updatedSupplier);
 
       const result = await service.update('tenant-1', 'supp-1', 'user-1', {
@@ -187,4 +190,3 @@ describe('SupplierService', () => {
     });
   });
 });
-
