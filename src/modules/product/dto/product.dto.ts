@@ -50,6 +50,11 @@ export class CreateProductDto {
   sku?: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
 
@@ -61,6 +66,12 @@ export class CreateProductDto {
   @IsString()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecipeItemDto)
+  recipes?: RecipeItemDto[];
 
   @IsOptional()
   @IsArray()
@@ -106,6 +117,15 @@ export class UpdateProductDto {
   name!: string;
 
   @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
 
@@ -116,6 +136,12 @@ export class UpdateProductDto {
   @IsString()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecipeItemDto)
+  recipes?: RecipeItemDto[];
 
   @IsOptional()
   @IsArray()

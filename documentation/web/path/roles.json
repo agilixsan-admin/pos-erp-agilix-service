@@ -1,5 +1,62 @@
 {
   "paths": {
+    "/roles/permissions": {
+      "get": {
+        "tags": ["Roles"],
+        "summary": "Get katalog seluruh hak akses (permissions) terkelompok per modul",
+        "description": "Mengembalikan daftar lengkap permission yang dikelompokkan ke dalam 5 grup modul (transaksi, produk, inventori, laporan, pengaturan) untuk form checkbox pembuatan/pengubahan role di frontend",
+        "operationId": "getPermissionsCatalog",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Katalog permission berhasil diambil",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Permissions catalog retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "groupKey": { "type": "string", "example": "transaksi" },
+                      "groupTitle": { "type": "string", "example": "Modul Transaksi" },
+                      "description": { "type": "string", "example": "Akses operasional kasir POS, pesanan, pembayaran, dan riwayat transaksi" },
+                      "subGroups": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "key": { "type": "string", "example": "pos_order" },
+                            "title": { "type": "string", "example": "POS & Pesanan" },
+                            "permissions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": { "type": "string", "example": "order.create" },
+                                  "name": { "type": "string", "example": "Buat Pesanan Baru" },
+                                  "description": { "type": "string", "example": "Membuat pesanan baru di kasir POS" },
+                                  "action": { "type": "string", "example": "create" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
     "/roles": {
       "get": {
         "tags": ["Roles"],

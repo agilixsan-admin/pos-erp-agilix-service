@@ -196,7 +196,15 @@ export class ProductService {
 
       const variantDtos = dto.variants?.length
         ? dto.variants
-        : [{ name: 'Default', sku: dto.sku, price: 0, status: 'ACTIVE' }];
+        : [
+            {
+              name: 'Default',
+              sku: dto.sku,
+              price: dto.price ?? 0,
+              status: 'ACTIVE',
+              recipes: dto.recipes,
+            },
+          ];
 
       for (const v of variantDtos) {
         const variant = variantRepo.create({
@@ -332,6 +340,38 @@ export class ProductService {
               );
               await recipeRepo.save(newRecipes);
             }
+          }
+        }
+      } else if (
+        (dto.price !== undefined ||
+          dto.sku !== undefined ||
+          dto.recipes !== undefined) &&
+        product.variants.length > 0
+      ) {
+        const primaryVariant = product.variants[0];
+        const updateData: { price?: number; sku?: string | null } = {};
+        if (dto.price !== undefined) updateData.price = dto.price;
+        if (dto.sku !== undefined) updateData.sku = dto.sku ?? null;
+        if (Object.keys(updateData).length > 0) {
+          await variantRepo.update(
+            { id: primaryVariant.id, tenantId, productId: id },
+            updateData,
+          );
+        }
+
+        if (dto.recipes !== undefined) {
+          await recipeRepo.delete({ tenantId, variantId: primaryVariant.id });
+          if (dto.recipes.length > 0) {
+            const newRecipes = dto.recipes.map((r) =>
+              recipeRepo.create({
+                tenantId,
+                variantId: primaryVariant.id,
+                inventoryItemId: r.inventoryItemId,
+                quantity: r.quantity,
+                unit: r.unit,
+              }),
+            );
+            await recipeRepo.save(newRecipes);
           }
         }
       }
