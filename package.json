@@ -1,8 +1,8 @@
 {
   "name": "aglix-pos-service",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "Agilix POS Backend Service - Multi-tenant Point of Sale & ERP Operational Engine",
+  "author": "Agilix Recovery Tech",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
