@@ -8,7 +8,10 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InventoryService } from '../services/inventory.service';
 import {
   CreateInventoryItemDto,
@@ -25,6 +28,7 @@ import {
   CreateReasonCategoryDto,
   CreateStockAdjustmentDto,
   QueryMovementDto,
+  QueryStockAdjustmentDto,
   UpdateReasonCategoryDto,
 } from '../dto/stock-adjustment.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -226,6 +230,48 @@ export class InventoryController {
     };
   }
 
+  // ==========================================
+  // STOCK ADJUSTMENTS
+  // ==========================================
+
+  @Get('adjustments')
+  @Permissions('inventory.read', 'inventory.adjust')
+  async findAllAdjustments(
+    @CurrentUser() user: User,
+    @Query() query: QueryStockAdjustmentDto,
+  ) {
+    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const result = await this.inventoryService.findAllAdjustments(
+      user.tenantId,
+      {
+        ...query,
+        outletId: effectiveOutletId,
+      },
+    );
+    return {
+      success: true,
+      message: 'Stock adjustments retrieved successfully',
+      ...result,
+    };
+  }
+
+  @Get('adjustments/:id')
+  @Permissions('inventory.read', 'inventory.adjust')
+  async findAdjustmentById(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.inventoryService.findAdjustmentById(
+      user.tenantId,
+      id,
+    );
+    return {
+      success: true,
+      message: 'Stock adjustment retrieved successfully',
+      data,
+    };
+  }
+
   @Post('adjustments')
   @Permissions('inventory.adjust')
   async createAdjustment(
@@ -242,6 +288,24 @@ export class InventoryController {
     return {
       success: true,
       message: 'Stock adjustment completed successfully',
+      data,
+    };
+  }
+
+  @Post('adjustments/upload-proof')
+  @Permissions('inventory.adjust')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAdjustmentProof(
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const data = await this.inventoryService.uploadAdjustmentProof(
+      user.tenantId,
+      file,
+    );
+    return {
+      success: true,
+      message: 'Adjustment proof image uploaded successfully',
       data,
     };
   }

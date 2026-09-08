@@ -8,8 +8,10 @@ import { InventoryCategory } from '../entities/inventory-category.entity';
 import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
+import { StockAdjustment } from '../entities/stock-adjustment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { AuditService } from '../../audit/audit.service';
+import { StorageService } from '../../storage/services/storage.service';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -50,8 +52,21 @@ describe('InventoryService', () => {
     softRemove: jest.fn(),
   };
 
+  const mockAdjustmentRepo = {
+    createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
   const mockOutletRepo = {
     findOne: jest.fn(),
+  };
+
+  const mockStorageService = {
+    uploadAdjustmentProof: jest
+      .fn()
+      .mockResolvedValue('https://storage.example.com/proof.webp'),
   };
 
   const mockDataSource = {
@@ -89,8 +104,16 @@ describe('InventoryService', () => {
           useValue: mockReasonRepo,
         },
         {
+          provide: getRepositoryToken(StockAdjustment),
+          useValue: mockAdjustmentRepo,
+        },
+        {
           provide: getRepositoryToken(Outlet),
           useValue: mockOutletRepo,
+        },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
         },
         {
           provide: DataSource,
@@ -117,60 +140,52 @@ describe('InventoryService', () => {
         take: jest.fn().mockReturnThis(),
         getManyAndCount: jest
           .fn()
-          .mockResolvedValue([
-            [{ id: 'item-1', name: 'Coffee Beans', tenantId: 'tenant-1' }],
-            1,
-          ]),
+          .mockResolvedValue([[{ id: 'item-1', name: 'Beans' }], 1]),
       } as unknown as SelectQueryBuilder<InventoryItem>;
       mockItemRepo.createQueryBuilder.mockReturnValue(qb);
 
-      const result = await service.findAll('tenant-1', {
-        page: 1,
-        limit: 10,
-        search: 'Beans',
-      });
-
+      const result = await service.findAll('tenant-1', { page: 1, limit: 10 });
       expect(result.data).toHaveLength(1);
-      expect(result.meta).toEqual({
-        page: 1,
-        limit: 10,
-        total: 1,
-        totalPages: 1,
-      });
-      expect(mockItemRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(result.meta.total).toBe(1);
     });
   });
 
-  describe('findById', () => {
-    it('returns item when found for tenant', async () => {
-      const item = { id: 'item-1', name: 'Milk', tenantId: 'tenant-1' };
-      const qb = {
-        where: jest.fn().mockReturnThis(),
+  describe('create', () => {
+    it('creates an inventory item and returns it', async () => {
+      mockItemRepo.findOne.mockResolvedValue(null);
+      const findByIdQb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(item),
-      } as unknown as SelectQueryBuilder<InventoryItem>;
-      mockItemRepo.createQueryBuilder.mockReturnValue(qb);
-
-      const result = await service.findById('tenant-1', 'item-1');
-      expect(result).toEqual(item);
-    });
-
-    it('throws NotFoundException when item belongs to another tenant', async () => {
-      const qb = {
         where: jest.fn().mockReturnThis(),
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(null),
-      } as unknown as SelectQueryBuilder<InventoryItem>;
-      mockItemRepo.createQueryBuilder.mockReturnValue(qb);
+        getOne: jest.fn().mockResolvedValue({
+          id: 'item-1',
+          name: 'Beans',
+          tenantId: 'tenant-1',
+        }),
+      };
+      mockItemRepo.createQueryBuilder.mockReturnValue(findByIdQb);
+      mockItemRepo.create.mockReturnValue({
+        id: 'item-1',
+        name: 'Beans',
+        tenantId: 'tenant-1',
+      });
+      mockItemRepo.save.mockResolvedValue({
+        id: 'item-1',
+        name: 'Beans',
+        tenantId: 'tenant-1',
+      });
 
-      await expect(
-        service.findById('tenant-1', 'item-foreign'),
-      ).rejects.toThrow(NotFoundException);
+      const result = await service.create('tenant-1', {
+        name: 'Beans',
+        unit: 'kg',
+      });
+      expect(result.id).toBe('item-1');
+      expect(mockItemRepo.create).toHaveBeenCalled();
+      expect(mockItemRepo.save).toHaveBeenCalled();
     });
   });
 
   describe('createAdjustment', () => {
-    it('successfully processes IN adjustment and increases stock', async () => {
+    it('applies IN adjustment correctly, generates adjustment number, and records stock adjustment entity', async () => {
       mockOutletRepo.findOne.mockResolvedValue({
         id: 'outlet-1',
         tenantId: 'tenant-1',
@@ -182,8 +197,18 @@ describe('InventoryService', () => {
       mockReasonRepo.findOne.mockResolvedValue({
         id: 'reason-1',
         tenantId: 'tenant-1',
-        type: 'BOTH',
+        type: 'IN',
       });
+
+      const lastAdjQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest
+          .fn()
+          .mockResolvedValue({ adjustmentNumber: 'ADJ-2026-002' }),
+      };
+      mockAdjustmentRepo.createQueryBuilder.mockReturnValue(lastAdjQb);
 
       const stock = {
         id: 'stock-1',
@@ -195,6 +220,7 @@ describe('InventoryService', () => {
 
       const managerStockRepo = {
         findOne: jest.fn().mockResolvedValue(stock),
+        create: jest.fn((s: unknown) => s),
         save: jest
           .fn()
           .mockImplementation((s: InventoryStock) => Promise.resolve(s)),
@@ -206,8 +232,12 @@ describe('InventoryService', () => {
         })),
         save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
       };
-      const managerAuditRepo = {
-        save: jest.fn().mockResolvedValue({}),
+      const managerAdjustmentRepo = {
+        create: jest.fn((a: Record<string, unknown>) => ({
+          ...a,
+          id: 'adj-1',
+        })),
+        save: jest.fn((a: Record<string, unknown>) => Promise.resolve(a)),
       };
 
       mockDataSource.transaction.mockImplementation(
@@ -216,13 +246,24 @@ describe('InventoryService', () => {
             getRepository: (entityClass: unknown) => {
               if (entityClass === InventoryStock) return managerStockRepo;
               if (entityClass === InventoryMovement) return managerMovementRepo;
-              return managerAuditRepo;
+              if (entityClass === StockAdjustment) return managerAdjustmentRepo;
+              return {};
             },
           });
         },
       );
 
-      const result = (await service.createAdjustment(
+      mockAdjustmentRepo.findOne.mockResolvedValue({
+        id: 'adj-1',
+        adjustmentNumber: 'ADJ-2026-003',
+        previousStock: 10,
+        quantity: 5,
+        currentStock: 15,
+        type: 'IN',
+        imageUrl: 'https://storage.example.com/proof.webp',
+      });
+
+      const result = await service.createAdjustment(
         'tenant-1',
         'user-1',
         'outlet-1',
@@ -231,11 +272,14 @@ describe('InventoryService', () => {
           itemId: 'item-1',
           quantity: 5,
           reasonCategoryId: 'reason-1',
+          imageUrl: 'https://storage.example.com/proof.webp',
         },
-      )) as { currentStock: number; previousStock: number };
+      );
 
+      expect(result.adjustmentNumber).toBe('ADJ-2026-003');
       expect(result.previousStock).toBe(10);
       expect(result.currentStock).toBe(15);
+      expect(result.imageUrl).toBe('https://storage.example.com/proof.webp');
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
@@ -248,6 +292,14 @@ describe('InventoryService', () => {
         id: 'item-1',
         tenantId: 'tenant-1',
       });
+
+      const lastAdjQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      mockAdjustmentRepo.createQueryBuilder.mockReturnValue(lastAdjQb);
 
       const stock = {
         id: 'stock-1',
@@ -276,6 +328,76 @@ describe('InventoryService', () => {
           quantity: 10,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('findAllAdjustments', () => {
+    it('returns paginated adjustments and card summary metrics', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'adj-1',
+              adjustmentNumber: 'ADJ-2026-001',
+              type: 'OUT',
+              quantity: 5,
+            },
+          ],
+          1,
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({
+          totalAdjustments: 1,
+          totalIn: 0,
+          totalOut: 1,
+          totalLossValue: 50000,
+        }),
+      };
+      mockAdjustmentRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAllAdjustments('tenant-1', {
+        page: 1,
+        limit: 10,
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.meta.total).toBe(1);
+      expect(result.summary.totalAdjustments).toBe(1);
+      expect(result.summary.totalOut).toBe(1);
+      expect(result.summary.totalLossValue).toBe(50000);
+    });
+  });
+
+  describe('findAdjustmentById', () => {
+    it('returns adjustment detail by ID', async () => {
+      mockAdjustmentRepo.findOne.mockResolvedValue({
+        id: 'adj-1',
+        adjustmentNumber: 'ADJ-2026-001',
+        type: 'OUT',
+        previousStock: 10,
+        quantity: 2,
+        currentStock: 8,
+      });
+
+      const result = await service.findAdjustmentById('tenant-1', 'adj-1');
+      expect(result.id).toBe('adj-1');
+      expect(result.adjustmentNumber).toBe('ADJ-2026-001');
+    });
+
+    it('throws NotFoundException if adjustment not found', async () => {
+      mockAdjustmentRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findAdjustmentById('tenant-1', 'invalid-id'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

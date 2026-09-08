@@ -2,10 +2,12 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   MinLength,
 } from 'class-validator';
@@ -19,11 +21,17 @@ export class CreateStockAdjustmentDto {
   @IsIn(['IN', 'OUT'])
   type!: 'IN' | 'OUT';
 
+  @IsOptional()
   @IsUUID()
-  itemId!: string;
+  itemId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  inventoryItemId?: string;
 
   @IsNumber()
   @Min(0.001)
+  @Type(() => Number)
   quantity!: number;
 
   @IsOptional()
@@ -35,8 +43,59 @@ export class CreateStockAdjustmentDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsIn(['MANUAL', 'STOCK_OPNAME'])
+  source?: 'MANUAL' | 'STOCK_OPNAME' = 'MANUAL';
+
+  @IsOptional()
   @IsUUID()
   outletId?: string;
+}
+
+export class QueryStockAdjustmentDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsUUID()
+  outletId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  inventoryItemId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  reasonCategoryId?: string;
+
+  @IsOptional()
+  @IsIn(['IN', 'OUT'])
+  type?: 'IN' | 'OUT';
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class CreateReasonCategoryDto {
@@ -72,14 +131,15 @@ export class UpdateReasonCategoryDto {
 export class QueryMovementDto {
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
   page?: number = 1;
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number = 20;
 
   @IsOptional()

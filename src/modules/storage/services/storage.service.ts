@@ -32,6 +32,23 @@ export class StorageService {
     );
   }
 
+  async uploadAdjustmentProof(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    this.imageProcessor.validateImage(file);
+    const processed = await this.imageProcessor.convertToWebp(file.buffer);
+
+    const filename = `proof_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${processed.extension}`;
+    const filePath = `uploads/${tenantId}/adjustments/${filename}`;
+
+    return this.driver.uploadFile(
+      filePath,
+      processed.buffer,
+      processed.contentType,
+    );
+  }
+
   async deleteProductImage(
     tenantId: string,
     imageUrl: string | null | undefined,

@@ -11,8 +11,10 @@ import { InventoryCategory } from '../entities/inventory-category.entity';
 import { InventoryStock } from '../entities/inventory-stock.entity';
 import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
+import { StockAdjustment } from '../entities/stock-adjustment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { AuditService } from '../../audit/audit.service';
+import { StorageService } from '../../storage/services/storage.service';
 import {
   CreateInventoryItemDto,
   QueryInventoryDto,
@@ -28,6 +30,7 @@ import {
   CreateReasonCategoryDto,
   CreateStockAdjustmentDto,
   QueryMovementDto,
+  QueryStockAdjustmentDto,
   UpdateReasonCategoryDto,
 } from '../dto/stock-adjustment.dto';
 
@@ -44,8 +47,11 @@ export class InventoryService {
     private readonly movementRepository: Repository<InventoryMovement>,
     @InjectRepository(ReasonCategory)
     private readonly reasonRepository: Repository<ReasonCategory>,
+    @InjectRepository(StockAdjustment)
+    private readonly adjustmentRepository: Repository<StockAdjustment>,
     @InjectRepository(Outlet)
     private readonly outletRepository: Repository<Outlet>,
+    private readonly storageService: StorageService,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
   ) {}
@@ -325,6 +331,29 @@ export class InventoryService {
     return this.stockRepository.save(stock);
   }
 
+  private async generateAdjustmentNumber(tenantId: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `ADJ-${year}-`;
+
+    const lastAdj = await this.adjustmentRepository
+      .createQueryBuilder('a')
+      .where('a.tenantId = :tenantId', { tenantId })
+      .andWhere('a.adjustmentNumber LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
+
+    let seq = 1;
+    if (lastAdj?.adjustmentNumber) {
+      const parts = lastAdj.adjustmentNumber.split('-');
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) {
+        seq = lastSeq + 1;
+      }
+    }
+
+    return `${prefix}${String(seq).padStart(3, '0')}`;
+  }
+
   async createAdjustment(
     tenantId: string,
     userId: string,
@@ -351,8 +380,17 @@ export class InventoryService {
       });
     }
 
+    const inventoryItemId = dto.inventoryItemId || dto.itemId;
+    if (!inventoryItemId) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Inventory item ID is required',
+        code: 'ITEM_REQUIRED',
+      });
+    }
+
     const item = await this.itemRepository.findOne({
-      where: { id: dto.itemId, tenantId },
+      where: { id: inventoryItemId, tenantId },
     });
     if (!item) {
       throw new NotFoundException({
@@ -382,15 +420,18 @@ export class InventoryService {
       }
     }
 
+    const adjustmentNumber = await this.generateAdjustmentNumber(tenantId);
+
     return this.dataSource.transaction(async (manager) => {
       const stockRepo = manager.getRepository(InventoryStock);
       const movementRepo = manager.getRepository(InventoryMovement);
+      const adjustmentRepo = manager.getRepository(StockAdjustment);
 
       let stock = await stockRepo.findOne({
         where: {
           tenantId,
           outletId: targetOutletId,
-          inventoryItemId: dto.itemId,
+          inventoryItemId,
         },
       });
 
@@ -414,7 +455,7 @@ export class InventoryService {
         stock = stockRepo.create({
           tenantId,
           outletId: targetOutletId,
-          inventoryItemId: dto.itemId,
+          inventoryItemId,
           quantity: newQty,
         });
       } else {
@@ -422,13 +463,35 @@ export class InventoryService {
       }
       await stockRepo.save(stock);
 
+      const adjustment = adjustmentRepo.create({
+        tenantId,
+        outletId: targetOutletId,
+        adjustmentNumber,
+        adjustmentDate: dto.adjustmentDate
+          ? new Date(dto.adjustmentDate)
+          : new Date(),
+        type: dto.type,
+        inventoryItemId,
+        previousStock: currentQty,
+        quantity: dto.quantity,
+        currentStock: newQty,
+        reasonCategoryId: dto.reasonCategoryId ?? null,
+        notes: dto.notes ?? null,
+        imageUrl: dto.imageUrl ?? null,
+        source: dto.source ?? 'MANUAL',
+        status: 'COMPLETED',
+        createdBy: userId,
+      });
+      const savedAdjustment = await adjustmentRepo.save(adjustment);
+
       const movement = movementRepo.create({
         tenantId,
         outletId: targetOutletId,
-        inventoryItemId: dto.itemId,
+        inventoryItemId,
         movementType: dto.type,
         quantity: dto.quantity,
-        referenceType: 'ADJUSTMENT',
+        referenceType: 'STOCK_ADJUSTMENT',
+        referenceId: adjustmentNumber,
         reasonCategoryId: dto.reasonCategoryId ?? null,
         notes: dto.notes ?? null,
         movementDate: dto.adjustmentDate
@@ -436,7 +499,7 @@ export class InventoryService {
           : new Date(),
         createdBy: userId,
       });
-      const savedMovement = await movementRepo.save(movement);
+      await movementRepo.save(movement);
 
       await this.audit.record(
         {
@@ -445,8 +508,9 @@ export class InventoryService {
           actorType: 'USER',
           actorId: userId,
           metadata: {
-            movementId: savedMovement.id,
-            itemId: dto.itemId,
+            adjustmentId: savedAdjustment.id,
+            adjustmentNumber: savedAdjustment.adjustmentNumber,
+            itemId: inventoryItemId,
             type: dto.type,
             quantity: dto.quantity,
             previousStock: currentQty,
@@ -456,12 +520,162 @@ export class InventoryService {
         manager,
       );
 
-      return {
-        movement: savedMovement,
-        previousStock: currentQty,
-        currentStock: newQty,
-      };
+      return this.findAdjustmentById(tenantId, savedAdjustment.id);
     });
+  }
+
+  async findAllAdjustments(tenantId: string, query: QueryStockAdjustmentDto) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    const qb = this.adjustmentRepository
+      .createQueryBuilder('adj')
+      .leftJoinAndSelect('adj.outlet', 'outlet')
+      .leftJoinAndSelect('adj.inventoryItem', 'inventoryItem')
+      .leftJoinAndSelect('inventoryItem.category', 'itemCategory')
+      .leftJoinAndSelect('adj.reasonCategory', 'reasonCategory')
+      .leftJoinAndSelect('adj.creator', 'creator')
+      .where('adj.tenantId = :tenantId', { tenantId });
+
+    if (query.outletId) {
+      qb.andWhere('adj.outletId = :outletId', { outletId: query.outletId });
+    }
+
+    if (query.inventoryItemId) {
+      qb.andWhere('adj.inventoryItemId = :inventoryItemId', {
+        inventoryItemId: query.inventoryItemId,
+      });
+    }
+
+    if (query.reasonCategoryId) {
+      qb.andWhere('adj.reasonCategoryId = :reasonCategoryId', {
+        reasonCategoryId: query.reasonCategoryId,
+      });
+    }
+
+    if (query.type) {
+      qb.andWhere('adj.type = :type', { type: query.type });
+    }
+
+    if (query.startDate) {
+      qb.andWhere('adj.adjustmentDate >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
+    }
+
+    if (query.endDate) {
+      qb.andWhere('adj.adjustmentDate <= :endDate', {
+        endDate: new Date(query.endDate),
+      });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(adj.adjustmentNumber) LIKE LOWER(:search) OR LOWER(inventoryItem.name) LIKE LOWER(:search) OR LOWER(reasonCategory.name) LIKE LOWER(:search) OR LOWER(adj.notes) LIKE LOWER(:search))',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    qb.orderBy('adj.adjustmentDate', 'DESC');
+    qb.skip(skip).take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    // Summary Metrics Cards
+    const summaryQb = this.adjustmentRepository
+      .createQueryBuilder('adj')
+      .innerJoin('adj.inventoryItem', 'inventoryItem')
+      .where('adj.tenantId = :tenantId', { tenantId });
+
+    if (query.outletId) {
+      summaryQb.andWhere('adj.outletId = :outletId', {
+        outletId: query.outletId,
+      });
+    }
+
+    if (query.startDate) {
+      summaryQb.andWhere('adj.adjustmentDate >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
+    }
+
+    if (query.endDate) {
+      summaryQb.andWhere('adj.adjustmentDate <= :endDate', {
+        endDate: new Date(query.endDate),
+      });
+    }
+
+    const summaryResult = await summaryQb
+      .select('COUNT(adj.id)', 'totalAdjustments')
+      .addSelect("COUNT(CASE WHEN adj.type = 'IN' THEN 1 END)", 'totalIn')
+      .addSelect("COUNT(CASE WHEN adj.type = 'OUT' THEN 1 END)", 'totalOut')
+      .addSelect(
+        "SUM(CASE WHEN adj.type = 'OUT' THEN adj.quantity * COALESCE(inventoryItem.unitCost, 0) ELSE 0 END)",
+        'totalLossValue',
+      )
+      .getRawOne<{
+        totalAdjustments?: string | number;
+        totalIn?: string | number;
+        totalOut?: string | number;
+        totalLossValue?: string | number;
+      }>();
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      summary: {
+        totalAdjustments: Number(summaryResult?.totalAdjustments || 0),
+        totalIn: Number(summaryResult?.totalIn || 0),
+        totalOut: Number(summaryResult?.totalOut || 0),
+        totalLossValue:
+          Math.round(Number(summaryResult?.totalLossValue || 0) * 100) / 100,
+      },
+    };
+  }
+
+  async findAdjustmentById(
+    tenantId: string,
+    id: string,
+  ): Promise<StockAdjustment> {
+    const adjustment = await this.adjustmentRepository.findOne({
+      where: { id, tenantId },
+      relations: {
+        outlet: true,
+        inventoryItem: {
+          category: true,
+        },
+        reasonCategory: true,
+        creator: true,
+      },
+    });
+
+    if (!adjustment) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Stock adjustment not found',
+        code: 'STOCK_ADJUSTMENT_NOT_FOUND',
+      });
+    }
+
+    return adjustment;
+  }
+
+  async uploadAdjustmentProof(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<{ imageUrl: string }> {
+    const imageUrl = await this.storageService.uploadAdjustmentProof(
+      tenantId,
+      file,
+    );
+    return { imageUrl };
   }
 
   async findMovements(tenantId: string, query: QueryMovementDto) {
