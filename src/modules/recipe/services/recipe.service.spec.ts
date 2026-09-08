@@ -133,4 +133,35 @@ describe('RecipeService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('getVariantCogsSummary', () => {
+    it('returns calculated COGS and profit margin for variant', async () => {
+      mockVariantRepo.findOne.mockResolvedValue({
+        id: 'var-1',
+        name: 'Regular',
+        price: 25000,
+        tenantId: 'tenant-1',
+      });
+      mockRecipeRepo.find.mockResolvedValue([
+        {
+          id: 'rec-1',
+          quantity: 150,
+          inventoryItem: { unitCost: 12, itemType: 'RAW_MATERIAL' },
+        },
+        {
+          id: 'rec-2',
+          quantity: 1,
+          inventoryItem: { unitCost: 500, itemType: 'PACKAGING' },
+        },
+      ]);
+
+      const result = await service.getVariantCogsSummary('tenant-1', 'var-1');
+      expect(result.variantId).toBe('var-1');
+      expect(result.cogsRawMaterial).toBe(1800);
+      expect(result.cogsPackaging).toBe(500);
+      expect(result.totalCogs).toBe(2300);
+      expect(result.profitMargin).toBe(22700);
+      expect(result.profitMarginPercentage).toBe(90.8);
+    });
+  });
 });

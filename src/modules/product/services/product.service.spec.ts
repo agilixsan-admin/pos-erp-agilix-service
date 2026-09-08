@@ -110,25 +110,54 @@ describe('ProductService', () => {
   });
 
   describe('findById', () => {
-    it('returns product when found for the tenant', async () => {
+    it('returns product with calculated metrics when found for the tenant', async () => {
       const product = {
         id: 'prod-1',
         name: 'Espresso',
         tenantId: 'tenant-1',
-        variants: [],
+        variants: [
+          {
+            id: 'var-1',
+            name: 'Regular',
+            price: 20000,
+            recipes: [
+              {
+                quantity: 18,
+                inventoryItem: { unitCost: 10, itemType: 'RAW_MATERIAL' },
+              },
+              {
+                quantity: 1,
+                inventoryItem: { unitCost: 500, itemType: 'PACKAGING' },
+              },
+            ],
+          },
+        ],
       };
-      mockProductRepo.findOne.mockResolvedValue(product);
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(product),
+      };
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.findById('tenant-1', 'prod-1');
-      expect(result).toEqual(product);
-      expect(mockProductRepo.findOne).toHaveBeenCalledWith({
-        where: { id: 'prod-1', tenantId: 'tenant-1' },
-        relations: { category: true, variants: true },
-      });
+      expect(result.id).toBe('prod-1');
+      expect(result.variants[0].cogsRawMaterial).toBe(180);
+      expect(result.variants[0].cogsPackaging).toBe(500);
+      expect(result.variants[0].totalCogs).toBe(680);
+      expect(result.variants[0].profitMargin).toBe(19320);
+      expect(result.variants[0].profitMarginPercentage).toBe(96.6);
+      expect(result.minPrice).toBe(20000);
+      expect(result.maxPrice).toBe(20000);
     });
 
     it('throws NotFoundException when product is from another tenant', async () => {
-      mockProductRepo.findOne.mockResolvedValue(null);
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
 
       await expect(service.findById('tenant-1', 'prod-2')).rejects.toThrow(
         NotFoundException,
@@ -137,7 +166,7 @@ describe('ProductService', () => {
   });
 
   describe('create', () => {
-    it('creates product with variants within a database transaction', async () => {
+    it('creates product with variants and recipes within a database transaction', async () => {
       const product = {
         id: 'prod-1',
         tenantId: 'tenant-1',
@@ -150,20 +179,20 @@ describe('ProductService', () => {
         tenantId: 'tenant-1',
         name: 'Regular',
         price: 25000,
+        recipes: [],
       };
 
       const managerRepo = {
-        create: jest.fn((entity: Record<string, unknown>) => entity),
+        create: jest.fn((entity: Record<string, unknown>) => ({
+          ...entity,
+          id: 'gen-id',
+        })),
         save: jest.fn().mockImplementation((entity: unknown) => {
           if (Array.isArray(entity)) return Promise.resolve(entity);
           return Promise.resolve({
             ...(entity as Record<string, unknown>),
             id: 'prod-1',
           });
-        }),
-        findOne: jest.fn().mockResolvedValue({
-          ...product,
-          variants: [variant],
         }),
       };
 
@@ -175,9 +204,25 @@ describe('ProductService', () => {
         },
       );
 
+      const findByIdQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          ...product,
+          variants: [variant],
+        }),
+      };
+      mockProductRepo.createQueryBuilder.mockReturnValue(findByIdQb);
+
       const result = await service.create('tenant-1', 'user-1', {
         name: 'Latte',
-        variants: [{ name: 'Regular', price: 25000 }],
+        variants: [
+          {
+            name: 'Regular',
+            price: 25000,
+            recipes: [{ inventoryItemId: 'item-1', quantity: 150, unit: 'ml' }],
+          },
+        ],
       });
 
       expect(result?.name).toBe('Latte');
@@ -201,9 +246,14 @@ describe('ProductService', () => {
       const product = {
         id: 'prod-1',
         tenantId: 'tenant-1',
-        variants: [{ id: 'var-1' }],
+        variants: [{ id: 'var-1', price: 0, recipes: [] }],
       };
-      mockProductRepo.findOne.mockResolvedValue(product);
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(product),
+      };
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
 
       const managerProductRepo = {
         softRemove: jest.fn().mockResolvedValue(product),
@@ -226,9 +276,11 @@ describe('ProductService', () => {
         success: true,
         message: 'Product deleted successfully',
       });
-      expect(managerProductRepo.softRemove).toHaveBeenCalledWith(product);
+      expect(managerProductRepo.softRemove).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'prod-1' }),
+      );
       expect(managerVariantRepo.softRemove).toHaveBeenCalledWith(
-        product.variants,
+        expect.arrayContaining([expect.objectContaining({ id: 'var-1' })]),
       );
     });
   });

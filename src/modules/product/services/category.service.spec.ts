@@ -12,6 +12,7 @@ describe('CategoryService', () => {
     create: jest.fn(),
     save: jest.fn(),
     softRemove: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -30,18 +31,25 @@ describe('CategoryService', () => {
   });
 
   describe('findAll', () => {
-    it('returns categories scoped to tenantId', async () => {
-      const categories = [
-        { id: 'cat-1', name: 'Drinks', tenantId: 'tenant-1' },
-      ];
-      mockRepo.find.mockResolvedValue(categories);
+    it('returns categories with productCount scoped to tenantId', async () => {
+      const qb = {
+        loadRelationCountAndMap: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cat-1',
+            name: 'Drinks',
+            tenantId: 'tenant-1',
+            productCount: 5,
+          },
+        ]),
+      };
+      mockRepo.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.findAll('tenant-1');
-      expect(result).toEqual(categories);
-      expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-1' },
-        order: { name: 'ASC' },
-      });
+      expect(result).toHaveLength(1);
+      expect(result[0].productCount).toBe(5);
     });
   });
 

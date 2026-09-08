@@ -22,7 +22,8 @@
                     "properties": {
                       "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
                       "name": { "example": "Coffee" },
-                      "description": { "example": "Coffee beverages" },
+                      "productCount": { "type": "integer", "example": 12 },
+                      "status": { "example": "ACTIVE" },
                       "createdAt": { "example": "2026-09-01T10:00:00Z" }
                     }
                   }

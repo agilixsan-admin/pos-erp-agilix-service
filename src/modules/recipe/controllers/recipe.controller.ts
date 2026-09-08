@@ -35,6 +35,23 @@ export class RecipeController {
     };
   }
 
+  @Get('variants/:variantId/cogs')
+  @Permissions('product.read')
+  async getVariantCogsSummary(
+    @CurrentUser() user: User,
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+  ) {
+    const data = await this.recipeService.getVariantCogsSummary(
+      user.tenantId,
+      variantId,
+    );
+    return {
+      success: true,
+      message: 'Variant COGS and margin summary retrieved successfully',
+      data,
+    };
+  }
+
   @Post()
   @Permissions('product.create')
   async createRecipe(@CurrentUser() user: User, @Body() dto: CreateRecipeDto) {

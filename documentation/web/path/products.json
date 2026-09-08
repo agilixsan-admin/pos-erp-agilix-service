@@ -26,14 +26,26 @@
                     "type": "object",
                     "properties": {
                       "id": { "example": "123e4567-e89b-12d3-a456-426614174010" },
-                      "name": { "example": "Americano" },
+                      "name": { "example": "Kopi Susu Gula Aren" },
                       "category": { "example": { "id": "cat-1", "name": "Coffee" } },
                       "status": { "example": "ACTIVE" },
+                      "minPrice": { "example": 22000 },
+                      "maxPrice": { "example": 28000 },
+                      "totalCogs": { "example": 5500 },
+                      "profitMarginPercentage": { "example": 75 },
                       "variants": {
                         "type": "array",
                         "example": [
-                          { "id": "var-1", "name": "Regular", "price": 25000 },
-                          { "id": "var-2", "name": "Large", "price": 30000 }
+                          {
+                            "id": "var-1",
+                            "name": "Ice - Regular",
+                            "price": 22000,
+                            "cogsRawMaterial": 4500,
+                            "cogsPackaging": 1000,
+                            "totalCogs": 5500,
+                            "profitMargin": 16500,
+                            "profitMarginPercentage": 75
+                          }
                         ]
                       }
                     }
@@ -51,7 +63,7 @@
       },
       "post": {
         "tags": ["Products"],
-        "summary": "Buat produk baru beserta varian",
+        "summary": "Buat produk baru beserta varian & resep (Atomic Wizard Publish)",
         "operationId": "createProduct",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -64,9 +76,9 @@
               "type": "object",
               "required": ["name"],
               "properties": {
-                "name": { "type": "string", "example": "Americano" },
-                "sku": { "type": "string", "example": "AMR-01" },
-                "description": { "type": "string", "example": "Espresso dengan air panas" },
+                "name": { "type": "string", "example": "Kopi Susu Gula Aren" },
+                "sku": { "type": "string", "example": "KOP-001" },
+                "description": { "type": "string", "example": "Kopi susu signature gula aren" },
                 "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174090" },
                 "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" },
                 "variants": {
@@ -75,9 +87,21 @@
                     "type": "object",
                     "required": ["name"],
                     "properties": {
-                      "name": { "type": "string", "example": "Regular" },
-                      "sku": { "type": "string", "example": "AMR-REG" },
-                      "price": { "type": "number", "example": 0 }
+                      "name": { "type": "string", "example": "Ice - Regular" },
+                      "sku": { "type": "string", "example": "KOP-REG" },
+                      "price": { "type": "number", "example": 22000 },
+                      "recipes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["inventoryItemId", "quantity", "unit"],
+                          "properties": {
+                            "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174099" },
+                            "quantity": { "type": "number", "example": 150 },
+                            "unit": { "type": "string", "example": "ml" }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -96,9 +120,24 @@
                 "data": {
                   "example": {
                     "id": "123e4567-e89b-12d3-a456-426614174010",
-                    "name": "Americano",
+                    "name": "Kopi Susu Gula Aren",
                     "status": "ACTIVE",
-                    "variants": [{ "id": "var-1", "name": "Regular", "price": 25000 }]
+                    "minPrice": 22000,
+                    "maxPrice": 22000,
+                    "totalCogs": 5500,
+                    "profitMarginPercentage": 75,
+                    "variants": [
+                      {
+                        "id": "var-1",
+                        "name": "Ice - Regular",
+                        "price": 22000,
+                        "cogsRawMaterial": 4500,
+                        "cogsPackaging": 1000,
+                        "totalCogs": 5500,
+                        "profitMargin": 16500,
+                        "profitMarginPercentage": 75
+                      }
+                    ]
                   }
                 }
               }

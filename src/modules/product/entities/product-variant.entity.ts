@@ -6,11 +6,13 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Tenant } from '../../tenant/tenant.entity';
 import { Product } from './product.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 
 @Entity('product_variants')
 @Index(['tenantId', 'sku'])
@@ -55,4 +57,9 @@ export class ProductVariant {
   })
   @JoinColumn({ name: 'product_id' })
   product!: Product;
+
+  @OneToMany(() => Recipe, (recipe) => recipe.variant, {
+    cascade: true,
+  })
+  recipes!: Recipe[];
 }

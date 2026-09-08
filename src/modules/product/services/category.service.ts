@@ -16,10 +16,24 @@ export class CategoryService {
   ) {}
 
   async findAll(tenantId: string) {
-    return this.categoryRepository.find({
-      where: { tenantId },
-      order: { name: 'ASC' },
-    });
+    const categories = await this.categoryRepository
+      .createQueryBuilder('category')
+      .loadRelationCountAndMap(
+        'category.productCount',
+        'category.products',
+        'product',
+        (qb) => qb.where('product.deletedAt IS NULL'),
+      )
+      .where('category.tenantId = :tenantId', { tenantId })
+      .orderBy('category.name', 'ASC')
+      .getMany();
+
+    return categories.map((cat) => ({
+      ...cat,
+      productCount: Number(
+        (cat as unknown as { productCount?: number }).productCount || 0,
+      ),
+    }));
   }
 
   async findById(tenantId: string, id: string) {

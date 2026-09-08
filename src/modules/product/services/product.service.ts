@@ -8,6 +8,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 import {
@@ -30,6 +31,63 @@ export class ProductService {
     private readonly storageService: StorageService,
   ) {}
 
+  private mapProductWithMetrics(product: Product) {
+    const variants = (product.variants || []).map((variant) => {
+      let cogsRawMaterial = 0;
+      let cogsPackaging = 0;
+
+      if (variant.recipes && variant.recipes.length > 0) {
+        for (const recipe of variant.recipes) {
+          const unitCost = Number(recipe.inventoryItem?.unitCost || 0);
+          const quantity = Number(recipe.quantity || 0);
+          const itemCost = Math.round(unitCost * quantity * 100) / 100;
+
+          if (recipe.inventoryItem?.itemType === 'PACKAGING') {
+            cogsPackaging += itemCost;
+          } else {
+            cogsRawMaterial += itemCost;
+          }
+        }
+      }
+
+      cogsRawMaterial = Math.round(cogsRawMaterial * 100) / 100;
+      cogsPackaging = Math.round(cogsPackaging * 100) / 100;
+      const totalCogs =
+        Math.round((cogsRawMaterial + cogsPackaging) * 100) / 100;
+      const price = Number(variant.price || 0);
+      const profitMargin =
+        Math.round(Math.max(0, price - totalCogs) * 100) / 100;
+      const profitMarginPercentage =
+        price > 0
+          ? Math.round(((price - totalCogs) / price) * 100 * 100) / 100
+          : 0;
+
+      return {
+        ...variant,
+        price,
+        cogsRawMaterial,
+        cogsPackaging,
+        totalCogs,
+        profitMargin,
+        profitMarginPercentage,
+      };
+    });
+
+    const prices = variants.map((v) => v.price);
+    const minPrice = prices.length ? Math.min(...prices) : 0;
+    const maxPrice = prices.length ? Math.max(...prices) : 0;
+    const primaryVariant = variants[0];
+
+    return {
+      ...product,
+      variants,
+      minPrice,
+      maxPrice,
+      totalCogs: primaryVariant?.totalCogs || 0,
+      profitMarginPercentage: primaryVariant?.profitMarginPercentage || 0,
+    };
+  }
+
   async findAll(tenantId: string, query: QueryProductsDto) {
     const page = query.page && query.page > 0 ? query.page : 1;
     const limit =
@@ -40,6 +98,8 @@ export class ProductService {
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.variants', 'variant')
+      .leftJoinAndSelect('variant.recipes', 'recipe')
+      .leftJoinAndSelect('recipe.inventoryItem', 'inventoryItem')
       .where('product.tenantId = :tenantId', { tenantId });
 
     if (query.status) {
@@ -68,8 +128,10 @@ export class ProductService {
 
     const [items, total] = await qb.getManyAndCount();
 
+    const data = items.map((product) => this.mapProductWithMetrics(product));
+
     return {
-      data: items,
+      data,
       meta: {
         page,
         limit,
@@ -80,13 +142,17 @@ export class ProductService {
   }
 
   async findById(tenantId: string, id: string) {
-    const product = await this.productRepository.findOne({
-      where: { id, tenantId },
-      relations: {
-        category: true,
-        variants: true,
-      },
-    });
+    const product = await this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.variants', 'variant')
+      .leftJoinAndSelect('variant.recipes', 'recipe')
+      .leftJoinAndSelect('recipe.inventoryItem', 'inventoryItem')
+      .where('product.id = :id AND product.tenantId = :tenantId', {
+        id,
+        tenantId,
+      })
+      .getOne();
 
     if (!product) {
       throw new NotFoundException({
@@ -96,7 +162,7 @@ export class ProductService {
       });
     }
 
-    return product;
+    return this.mapProductWithMetrics(product);
   }
 
   async create(tenantId: string, userId: string, dto: CreateProductDto) {
@@ -116,6 +182,7 @@ export class ProductService {
     return this.dataSource.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
       const variantRepo = manager.getRepository(ProductVariant);
+      const recipeRepo = manager.getRepository(Recipe);
 
       const product = productRepo.create({
         tenantId,
@@ -131,18 +198,31 @@ export class ProductService {
         ? dto.variants
         : [{ name: 'Default', sku: dto.sku, price: 0, status: 'ACTIVE' }];
 
-      const variants = variantDtos.map((v) =>
-        variantRepo.create({
+      for (const v of variantDtos) {
+        const variant = variantRepo.create({
           tenantId,
           productId: savedProduct.id,
           name: v.name,
           sku: v.sku ?? null,
           price: v.price ?? 0,
           status: v.status ?? 'ACTIVE',
-        }),
-      );
+        });
 
-      await variantRepo.save(variants);
+        const savedVariant = await variantRepo.save(variant);
+
+        if (v.recipes && v.recipes.length > 0) {
+          const recipes = v.recipes.map((r) =>
+            recipeRepo.create({
+              tenantId,
+              variantId: savedVariant.id,
+              inventoryItemId: r.inventoryItemId,
+              quantity: r.quantity,
+              unit: r.unit,
+            }),
+          );
+          await recipeRepo.save(recipes);
+        }
+      }
 
       await this.audit.record(
         {
@@ -158,10 +238,7 @@ export class ProductService {
         manager,
       );
 
-      return productRepo.findOne({
-        where: { id: savedProduct.id, tenantId },
-        relations: { category: true, variants: true },
-      });
+      return this.findById(tenantId, savedProduct.id);
     });
   }
 
@@ -189,6 +266,7 @@ export class ProductService {
     return this.dataSource.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
       const variantRepo = manager.getRepository(ProductVariant);
+      const recipeRepo = manager.getRepository(Recipe);
 
       const product = await productRepo.findOneOrFail({
         where: { id, tenantId },
@@ -216,6 +294,7 @@ export class ProductService {
         }
 
         for (const variantDto of dto.variants) {
+          let savedVariantId = variantDto.id;
           if (variantDto.id && existingVariantIds.has(variantDto.id)) {
             await variantRepo.update(
               { id: variantDto.id, tenantId, productId: id },
@@ -235,7 +314,24 @@ export class ProductService {
               price: variantDto.price ?? 0,
               status: variantDto.status ?? 'ACTIVE',
             });
-            await variantRepo.save(newVariant);
+            const saved = await variantRepo.save(newVariant);
+            savedVariantId = saved.id;
+          }
+
+          if (variantDto.recipes !== undefined && savedVariantId) {
+            await recipeRepo.delete({ tenantId, variantId: savedVariantId });
+            if (variantDto.recipes.length > 0) {
+              const newRecipes = variantDto.recipes.map((r) =>
+                recipeRepo.create({
+                  tenantId,
+                  variantId: savedVariantId,
+                  inventoryItemId: r.inventoryItemId,
+                  quantity: r.quantity,
+                  unit: r.unit,
+                }),
+              );
+              await recipeRepo.save(newRecipes);
+            }
           }
         }
       }
@@ -251,10 +347,7 @@ export class ProductService {
         manager,
       );
 
-      return productRepo.findOne({
-        where: { id, tenantId },
-        relations: { category: true, variants: true },
-      });
+      return this.findById(tenantId, id);
     });
   }
 

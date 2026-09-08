@@ -12,6 +12,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { RecipeItemDto } from '../../recipe/dto/recipe.dto';
+
 export class CreateVariantDto {
   @IsString()
   @MinLength(1)
@@ -30,6 +32,12 @@ export class CreateVariantDto {
   @IsString()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecipeItemDto)
+  recipes?: RecipeItemDto[];
 }
 
 export class CreateProductDto {
@@ -84,6 +92,12 @@ export class UpdateVariantDto {
   @IsString()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecipeItemDto)
+  recipes?: RecipeItemDto[];
 }
 
 export class UpdateProductDto {
