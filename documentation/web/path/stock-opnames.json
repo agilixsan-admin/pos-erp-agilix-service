@@ -1,0 +1,273 @@
+{
+  "paths": {
+    "/stock-opnames": {
+      "get": {
+        "tags": ["Stock Opname"],
+        "summary": "Get paginated list of stock opname sessions",
+        "operationId": "getStockOpnames",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "categoryId", "in": "query", "type": "string", "description": "Filter by category UUID" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"], "description": "Filter by session status" },
+          { "name": "scope", "in": "query", "type": "string", "enum": ["ALL", "CATEGORY"], "description": "Filter by scope" },
+          { "name": "startDate", "in": "query", "type": "string", "description": "Filter start date (YYYY-MM-DD)" },
+          { "name": "endDate", "in": "query", "type": "string", "description": "Filter end date (YYYY-MM-DD)" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by opname number or notes" },
+          { "name": "page", "in": "query", "type": "integer", "default": 1, "description": "Page number" },
+          { "name": "limit", "in": "query", "type": "integer", "default": 20, "description": "Items per page" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of stock opname sessions retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname sessions retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "opnameNumber": { "example": "SO-2024-001" },
+                      "opnameDate": { "example": "2026-09-07T12:00:00.000Z" },
+                      "status": { "example": "IN_PROGRESS" },
+                      "scope": { "example": "ALL" },
+                      "totalItems": { "example": 24 },
+                      "countedItems": { "example": 18 },
+                      "matchedItems": { "example": 15 },
+                      "deficitItems": { "example": 2 },
+                      "surplusItems": { "example": 1 },
+                      "totalDifferenceValue": { "example": -15000 },
+                      "notes": { "example": "Audit stok harian outlet utama" }
+                    }
+                  }
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "page": { "example": 1 },
+                    "limit": { "example": 20 },
+                    "total": { "example": 1 },
+                    "totalPages": { "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Stock Opname"],
+        "summary": "Create and start a new stock opname session (snapshots system stock)",
+        "operationId": "createStockOpname",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["outletId"],
+              "properties": {
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "scope": { "type": "string", "enum": ["ALL", "CATEGORY"], "example": "ALL" },
+                "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174004" },
+                "opnameDate": { "type": "string", "example": "2026-09-07T00:00:00.000Z" },
+                "notes": { "type": "string", "example": "Audit SOP stok bahan baku akhir shift" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Stock opname session created successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname session created successfully" },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Validation error or invalid foreign key" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/stock-opnames/{id}": {
+      "get": {
+        "tags": ["Stock Opname"],
+        "summary": "Get stock opname session detail by ID with all item counts",
+        "operationId": "getStockOpnameById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Stock Opname UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stock opname session detail retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname session retrieved successfully" },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Stock opname session not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/stock-opnames/{id}/counts": {
+      "put": {
+        "tags": ["Stock Opname"],
+        "summary": "Input or update physical stock counts for items in session",
+        "operationId": "updateStockOpnameCounts",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Stock Opname UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["items"],
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["inventoryItemId", "actualStock"],
+                    "properties": {
+                      "inventoryItemId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174050" },
+                      "actualStock": { "type": "number", "example": 850 },
+                      "notes": { "type": "string", "example": "Tumpah 50ml saat persiapan" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stock opname counts updated successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname counts updated successfully" },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Session is completed/cancelled or item not found in session" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Stock opname session not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/stock-opnames/{id}/finalize": {
+      "post": {
+        "tags": ["Stock Opname"],
+        "summary": "Finalize and complete stock opname audit (Audit only; DOES NOT modify system stock)",
+        "operationId": "finalizeStockOpname",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Stock Opname UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "notes": { "type": "string", "example": "Audit selesai disetujui manajer outlet" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stock opname session finalized successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname session finalized successfully" },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Session is already completed or cancelled" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Stock opname session not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/stock-opnames/{id}/cancel": {
+      "post": {
+        "tags": ["Stock Opname"],
+        "summary": "Cancel an active stock opname session",
+        "operationId": "cancelStockOpname",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Stock Opname UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "notes": { "type": "string", "example": "Dibatalkan karena gangguan teknis" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stock opname session cancelled successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Stock opname session cancelled successfully" },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Session is already completed or cancelled" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" },
+          "404": { "description": "Stock opname session not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+
