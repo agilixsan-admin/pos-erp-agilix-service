@@ -41,6 +41,17 @@ export class RoleController {
     };
   }
 
+  @Get('permissions')
+  @Permissions('role.read')
+  getPermissions() {
+    const data = this.roleService.getAvailablePermissions();
+    return {
+      success: true,
+      message: 'Permissions catalog retrieved successfully',
+      data,
+    };
+  }
+
   @Get(':id')
   @Permissions('role.read')
   async findById(

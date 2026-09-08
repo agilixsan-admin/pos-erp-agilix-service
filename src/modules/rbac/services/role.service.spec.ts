@@ -329,4 +329,19 @@ describe('RoleService', () => {
       expect(mockRoleRepo.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe('getAvailablePermissions', () => {
+    it('returns the structured permission groups catalog', () => {
+      const groups = service.getAvailablePermissions();
+      expect(Array.isArray(groups)).toBe(true);
+      expect(groups.length).toBeGreaterThanOrEqual(5);
+
+      const groupKeys = groups.map((g) => g.groupKey);
+      expect(groupKeys).toContain('transaksi');
+      expect(groupKeys).toContain('produk');
+      expect(groupKeys).toContain('inventori');
+      expect(groupKeys).toContain('laporan');
+      expect(groupKeys).toContain('pengaturan');
+    });
+  });
 });

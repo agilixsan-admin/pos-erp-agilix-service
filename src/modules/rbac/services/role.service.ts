@@ -11,6 +11,10 @@ import { User } from '../../user/user.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { AuditService } from '../../audit/audit.service';
 import { CreateRoleDto, QueryRoleDto, UpdateRoleDto } from '../dto/role.dto';
+import {
+  SYSTEM_PERMISSIONS_GROUPS,
+  PermissionGroup,
+} from '../constants/permissions.constant';
 
 @Injectable()
 export class RoleService {
@@ -23,6 +27,10 @@ export class RoleService {
     private readonly outletRepository: Repository<Outlet>,
     private readonly auditService: AuditService,
   ) {}
+
+  getAvailablePermissions(): PermissionGroup[] {
+    return SYSTEM_PERMISSIONS_GROUPS;
+  }
 
   async findAll(tenantId: string, query?: QueryRoleDto): Promise<Role[]> {
     const qb = this.roleRepository
