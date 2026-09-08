@@ -24,6 +24,7 @@ import { Transaction } from '../modules/payment/entities/transaction.entity';
 import { Table } from '../modules/table/entities/table.entity';
 import { Printer } from '../modules/printer/entities/printer.entity';
 import { PosSettings } from '../modules/settings/entities/pos-settings.entity';
+import { Tax } from '../modules/settings/entities/tax.entity';
 import { PackagingCategory } from '../modules/packaging/entities/packaging-category.entity';
 import { Packaging } from '../modules/packaging/entities/packaging.entity';
 import { Supplier } from '../modules/supplier/entities/supplier.entity';
@@ -67,6 +68,7 @@ export default new DataSource({
     Table,
     Printer,
     PosSettings,
+    Tax,
     PackagingCategory,
     Packaging,
     Supplier,

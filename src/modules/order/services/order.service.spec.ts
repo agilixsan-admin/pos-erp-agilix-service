@@ -247,6 +247,74 @@ describe('OrderService', () => {
       expect(createdOrder?.['totalAmount']).toBe(99000);
     });
 
+    it('calculates INCLUSIVE tax correctly without adding on top of total amount', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        taxEnabled: true,
+        discountEnabled: false,
+        defaultGlobalTax: {
+          id: 'tax-inc',
+          name: 'PPN 11%',
+          rate: 11,
+          type: 'INCLUSIVE',
+        },
+      });
+
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 111000,
+          tenantId: 'tenant-1',
+          product: { name: 'Americano' },
+        },
+      ]);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => {
+          createdOrder = o;
+          return { ...o, id: 'ord-inc-tax' };
+        }),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+        findOne: jest.fn().mockResolvedValue({ id: 'ord-inc-tax' }),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => i),
+        save: jest.fn().mockResolvedValue([]),
+      };
+      const managerAuditRepo = {
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(111000);
+      // Tax is included inside: 111000 - (111000 / 1.11) = 11000
+      expect(createdOrder?.['taxAmount']).toBe(11000);
+      // Total amount remains 111000 because tax is inclusive
+      expect(createdOrder?.['totalAmount']).toBe(111000);
+    });
+
     it('creates TAKE_AWAY order with automatically calculated packaging fee', async () => {
       mockOutletRepo.findOne.mockResolvedValue({
         id: 'outlet-1',

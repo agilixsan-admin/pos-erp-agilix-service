@@ -163,13 +163,28 @@ export class OrderService {
     }
 
     let taxAmount = 0;
+    let isInclusiveTax = false;
     if (settings.taxEnabled) {
       const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
-      taxAmount = Math.round((taxableBase * Number(settings.taxRate)) / 100);
+      const activeTax = settings.defaultGlobalTax;
+      const rate = activeTax
+        ? Number(activeTax.rate)
+        : Number(settings.taxRate || 0);
+      const taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+
+      if (taxType === 'INCLUSIVE' && rate > 0) {
+        isInclusiveTax = true;
+        taxAmount = Math.round(taxableBase - taxableBase / (1 + rate / 100));
+      } else if (rate > 0) {
+        taxAmount = Math.round((taxableBase * rate) / 100);
+      }
     }
 
     const totalAmount = Math.max(
-      calculatedSubtotal - discountAmount + packagingFee + taxAmount,
+      calculatedSubtotal -
+        discountAmount +
+        packagingFee +
+        (isInclusiveTax ? 0 : taxAmount),
       0,
     );
 

@@ -23,6 +23,7 @@ export class SettingsService {
     if (outletId) {
       const outletSettings = await this.settingsRepository.findOne({
         where: { tenantId, outletId },
+        relations: ['defaultGlobalTax'],
       });
       if (outletSettings) {
         return outletSettings;
@@ -31,6 +32,7 @@ export class SettingsService {
 
     const tenantSettings = await this.settingsRepository.findOne({
       where: { tenantId, outletId: IsNull() },
+      relations: ['defaultGlobalTax'],
     });
 
     if (tenantSettings) {

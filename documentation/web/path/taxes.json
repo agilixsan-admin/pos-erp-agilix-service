@@ -1,0 +1,290 @@
+{
+  "paths": {
+    "/settings/taxes": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get daftar master pajak (Tax Master List)",
+        "operationId": "getTaxes",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          { "name": "type", "in": "query", "type": "string", "enum": ["INCLUSIVE", "EXCLUSIVE"] },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by tax name or description" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List master pajak",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "PPN 11%" },
+                      "description": { "example": "Standard Value Added Tax" },
+                      "rate": { "example": 11.00 },
+                      "type": { "example": "INCLUSIVE" },
+                      "status": { "example": "ACTIVE" },
+                      "isGlobal": { "example": true },
+                      "outletId": { "example": null },
+                      "createdAt": { "example": "2026-09-08T10:00:00Z" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Tambah master pajak baru (+ Add Tax)",
+        "operationId": "createTax",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "rate", "type"],
+              "properties": {
+                "name": { "type": "string", "example": "PPN 11%" },
+                "description": { "type": "string", "example": "Standard Value Added Tax" },
+                "rate": { "type": "number", "example": 11.00 },
+                "type": { "type": "string", "enum": ["INCLUSIVE", "EXCLUSIVE"], "example": "INCLUSIVE" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" },
+                "isGlobal": { "type": "boolean", "default": false },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Master pajak berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Tax created successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174090",
+                    "name": "PPN 11%",
+                    "rate": 11.00,
+                    "type": "INCLUSIVE",
+                    "status": "ACTIVE",
+                    "isGlobal": true
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "409": { "description": "Tax name already exists" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/settings/taxes/global-config": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get konfigurasi global pajak (Global Configuration)",
+        "operationId": "getGlobalTaxConfig",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Optional outlet UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konfigurasi global pajak",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "example": {
+                    "enableTaxCalculation": true,
+                    "defaultGlobalTaxId": "123e4567-e89b-12d3-a456-426614174090",
+                    "defaultGlobalTax": {
+                      "id": "123e4567-e89b-12d3-a456-426614174090",
+                      "name": "PPN 11%",
+                      "rate": 11.00,
+                      "type": "INCLUSIVE",
+                      "status": "ACTIVE"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Update konfigurasi global pajak (Toggle ON/OFF & Default Tax)",
+        "operationId": "updateGlobalTaxConfig",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["enableTaxCalculation"],
+              "properties": {
+                "enableTaxCalculation": { "type": "boolean", "example": true },
+                "defaultGlobalTaxId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174090" },
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konfigurasi global pajak berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Global tax configuration updated successfully" },
+                "data": {
+                  "example": {
+                    "enableTaxCalculation": true,
+                    "defaultGlobalTaxId": "123e4567-e89b-12d3-a456-426614174090",
+                    "defaultGlobalTax": {
+                      "id": "123e4567-e89b-12d3-a456-426614174090",
+                      "name": "PPN 11%",
+                      "rate": 11.00
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/settings/taxes/{id}": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get detail master pajak by ID",
+        "operationId": "getTaxById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail master pajak",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174090",
+                    "name": "Pajak Daerah 10%",
+                    "description": "Local Regional Tax",
+                    "rate": 10.00,
+                    "type": "EXCLUSIVE",
+                    "status": "INACTIVE"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Tax not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Update master pajak (Edit Tax)",
+        "operationId": "updateTax",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Pajak Daerah 10%" },
+                "description": { "type": "string", "example": "Local Regional Tax PB1" },
+                "rate": { "type": "number", "example": 10.00 },
+                "type": { "type": "string", "enum": ["INCLUSIVE", "EXCLUSIVE"], "example": "EXCLUSIVE" },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "example": "ACTIVE" },
+                "isGlobal": { "type": "boolean", "example": false }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Master pajak berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Tax updated successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174090",
+                    "name": "Pajak Daerah 10%",
+                    "rate": 10.00,
+                    "status": "ACTIVE"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Tax not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Settings"],
+        "summary": "Hapus master pajak",
+        "operationId": "deleteTax",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Master pajak berhasil dihapus",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Tax deleted successfully" }
+              }
+            }
+          },
+          "404": { "description": "Tax not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}
+

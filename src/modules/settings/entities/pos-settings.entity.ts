@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Tenant } from '../../tenant/tenant.entity';
 import { Outlet } from '../../outlet/outlet.entity';
+import { Tax } from './tax.entity';
 
 export type DiscountType = 'PERCENTAGE' | 'FIXED';
 
@@ -28,6 +29,9 @@ export class PosSettings {
 
   @Column({ name: 'tax_enabled', default: false })
   taxEnabled!: boolean;
+
+  @Column({ name: 'default_global_tax_id', type: 'uuid', nullable: true })
+  defaultGlobalTaxId!: string | null;
 
   @Column({
     name: 'tax_rate',
@@ -96,4 +100,8 @@ export class PosSettings {
   @ManyToOne(() => Outlet, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'outlet_id' })
   outlet!: Outlet | null;
+
+  @ManyToOne(() => Tax, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'default_global_tax_id' })
+  defaultGlobalTax!: Tax | null;
 }
