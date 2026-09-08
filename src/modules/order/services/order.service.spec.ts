@@ -11,6 +11,7 @@ import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
+import { DiscountService } from '../../settings/services/discount.service';
 import { PackagingService } from '../../packaging/services/packaging.service';
 
 describe('OrderService', () => {
@@ -69,6 +70,12 @@ describe('OrderService', () => {
     findApplicableForOrder: jest.fn().mockResolvedValue([]),
   };
 
+  const mockDiscountService = {
+    findById: jest.fn(),
+    isDiscountActive: jest.fn().mockReturnValue({ isValid: true }),
+    calculateDiscount: jest.fn().mockReturnValue(5000),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -110,6 +117,10 @@ describe('OrderService', () => {
         {
           provide: SettingsService,
           useValue: mockSettingsService,
+        },
+        {
+          provide: DiscountService,
+          useValue: mockDiscountService,
         },
         {
           provide: PackagingService,
@@ -245,6 +256,73 @@ describe('OrderService', () => {
       expect(createdOrder?.['discountAmount']).toBe(10000);
       expect(createdOrder?.['taxAmount']).toBe(9000);
       expect(createdOrder?.['totalAmount']).toBe(99000);
+    });
+
+    it('applies promo discountId successfully and calculates total', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        taxEnabled: false,
+        discountEnabled: false,
+      });
+
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 50000,
+          tenantId: 'tenant-1',
+          product: { name: 'Latte' },
+        },
+      ]);
+
+      mockDiscountService.findById.mockResolvedValueOnce({
+        id: 'disc-promo-1',
+        name: 'Promo 10rb',
+      });
+      mockDiscountService.isDiscountActive.mockReturnValueOnce({ isValid: true });
+      mockDiscountService.calculateDiscount.mockReturnValueOnce(10000);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      mockDataSource.transaction.mockImplementationOnce(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entity: unknown) => {
+              if (entity === Order) {
+                return {
+                  create: jest.fn((o: Record<string, unknown>) => {
+                    createdOrder = o;
+                    return { ...o, id: 'ord-disc' };
+                  }),
+                  save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+                  findOne: jest.fn().mockResolvedValue({ id: 'ord-disc' }),
+                };
+              }
+              if (entity === OrderItem) {
+                return {
+                  create: jest.fn((i: Record<string, unknown>) => i),
+                  save: jest.fn().mockResolvedValue([]),
+                };
+              }
+              return {};
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        discountId: 'disc-promo-1',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(50000);
+      expect(createdOrder?.['discountId']).toBe('disc-promo-1');
+      expect(createdOrder?.['discountAmount']).toBe(10000);
+      expect(createdOrder?.['totalAmount']).toBe(40000);
     });
 
     it('calculates INCLUSIVE tax correctly without adding on top of total amount', async () => {

@@ -50,6 +50,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockDataSource as any,
         mockAuditService as any,
         mockSettingsService as any,
+        {} as any,
         mockPackagingService as any,
       );
     });
@@ -180,6 +181,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockTableRepo as any,
         mockDataSource as any,
         mockAuditService as any,
+        {} as any,
         {} as any,
         {} as any,
       );

@@ -1,0 +1,198 @@
+{
+  "paths": {
+    "/settings/discounts": {
+      "get": {
+        "tags": ["Discounts"],
+        "summary": "Get master list diskon dan promo",
+        "operationId": "getDiscounts",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Filter by outlet UUID" },
+          { "name": "status", "in": "query", "type": "string", "enum": ["ACTIVE", "INACTIVE"], "description": "Filter by status" },
+          { "name": "validityType", "in": "query", "type": "string", "enum": ["ALWAYS_ACTIVE", "RECURRING_WEEKLY", "DATE_RANGE"], "description": "Filter by validity" },
+          { "name": "search", "in": "query", "type": "string", "description": "Search by promo name" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List data master diskon",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Discounts retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "Weekend 10%" },
+                      "type": { "example": "PERCENTAGE" },
+                      "value": { "example": 10 },
+                      "validityType": { "example": "RECURRING_WEEKLY" },
+                      "validityDescription": { "example": "SATURDAY, SUNDAY" },
+                      "applicableScope": { "example": "ALL_PRODUCTS" },
+                      "productCount": { "example": 0 },
+                      "status": { "example": "ACTIVE" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Permission denied" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "post": {
+        "tags": ["Discounts"],
+        "summary": "Tambah master promo / diskon baru",
+        "operationId": "createDiscount",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["name", "type", "value", "validityType"],
+              "properties": {
+                "name": { "type": "string", "example": "Weekend Kopi 20%" },
+                "type": { "type": "string", "enum": ["PERCENTAGE", "FIXED"], "example": "PERCENTAGE" },
+                "value": { "type": "number", "example": 20 },
+                "validityType": { "type": "string", "enum": ["ALWAYS_ACTIVE", "RECURRING_WEEKLY", "DATE_RANGE"], "example": "RECURRING_WEEKLY" },
+                "recurringDays": {
+                  "type": "array",
+                  "items": { "type": "string", "enum": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] },
+                  "example": ["SATURDAY", "SUNDAY"]
+                },
+                "startDate": { "type": "string", "format": "date-time" },
+                "endDate": { "type": "string", "format": "date-time" },
+                "minOrderAmount": { "type": "number", "example": 50000 },
+                "maxDiscountAmount": { "type": "number", "example": 15000 },
+                "applicableScope": { "type": "string", "enum": ["ALL_PRODUCTS", "SPECIFIC_PRODUCTS"], "example": "SPECIFIC_PRODUCTS" },
+                "productIds": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "example": ["123e4567-e89b-12d3-a456-426614174011"]
+                },
+                "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Diskon berhasil dibuat",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Discount created successfully" }
+              }
+            }
+          },
+          "400": { "description": "Validation error" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/settings/discounts/applicable": {
+      "get": {
+        "tags": ["Discounts"],
+        "summary": "Get promo yang sedang aktif dan valid untuk transaksi checkout kasir",
+        "operationId": "getApplicableDiscounts",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Outlet UUID" },
+          { "name": "orderAmount", "in": "query", "type": "number", "description": "Estimasi subtotal order untuk hitung preview potongan" },
+          { "name": "checkDate", "in": "query", "type": "string", "description": "Waktu pengecekan promo (default: waktu sekarang)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar diskon yang valid hari ini",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Applicable discounts retrieved successfully" },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "example": "123e4567-e89b-12d3-a456-426614174090" },
+                      "name": { "example": "Member 5%" },
+                      "type": { "example": "PERCENTAGE" },
+                      "value": { "example": 5 },
+                      "calculatedDiscountAmount": { "example": 2500 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/settings/discounts/{id}": {
+      "get": {
+        "tags": ["Discounts"],
+        "summary": "Get detail promo diskon beserta daftar produk terkait",
+        "operationId": "getDiscountById",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail diskon",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "data": { "type": "object" }
+              }
+            }
+          },
+          "404": { "description": "Discount not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Discounts"],
+        "summary": "Update konfigurasi promo diskon",
+        "operationId": "updateDiscount",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          { "in": "body", "name": "body", "required": true, "schema": { "type": "object" } }
+        ],
+        "responses": {
+          "200": { "description": "Diskon berhasil diupdate" },
+          "404": { "description": "Discount not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "delete": {
+        "tags": ["Discounts"],
+        "summary": "Hapus master promo diskon (soft delete)",
+        "operationId": "deleteDiscount",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Diskon berhasil dihapus" },
+          "404": { "description": "Discount not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    }
+  }
+}

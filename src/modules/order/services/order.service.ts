@@ -13,6 +13,7 @@ import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
+import { DiscountService } from '../../settings/services/discount.service';
 import { PackagingService } from '../../packaging/services/packaging.service';
 import {
   CreateOrderDto,
@@ -39,6 +40,7 @@ export class OrderService {
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly settingsService: SettingsService,
+    private readonly discountService: DiscountService,
     private readonly packagingService: PackagingService,
   ) {}
 
@@ -124,8 +126,37 @@ export class OrderService {
       targetOutletId,
     );
 
+    let appliedDiscountId: string | null = null;
     let discountAmount = Number(dto.discountAmount ?? 0);
-    if (settings.discountEnabled && discountAmount === 0) {
+
+    if (dto.discountId) {
+      const discount = await this.discountService.findById(
+        tenantId,
+        dto.discountId,
+      );
+      const activeCheck = this.discountService.isDiscountActive(
+        discount,
+        new Date(),
+        calculatedSubtotal,
+      );
+      if (!activeCheck.isValid) {
+        throw new BadRequestException({
+          success: false,
+          message: `Discount "${discount.name}" is not applicable: ${activeCheck.reason}`,
+          code: 'DISCOUNT_NOT_APPLICABLE',
+        });
+      }
+      discountAmount = this.discountService.calculateDiscount(
+        discount,
+        orderItemsToCreate.map((item) => ({
+          productId: item.productId as string,
+          unitPrice: Number(item.unitPrice),
+          quantity: Number(item.quantity),
+        })),
+        calculatedSubtotal,
+      );
+      appliedDiscountId = discount.id;
+    } else if (settings.discountEnabled && discountAmount === 0) {
       if (settings.discountType === 'PERCENTAGE') {
         discountAmount = Math.round(
           (calculatedSubtotal * Number(settings.discountValue)) / 100,
@@ -235,6 +266,7 @@ export class OrderService {
         customerName: dto.customerName ?? null,
         subtotal: calculatedSubtotal,
         discountAmount,
+        discountId: appliedDiscountId,
         taxAmount,
         packagingFee,
         totalAmount,

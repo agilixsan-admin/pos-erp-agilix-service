@@ -21,6 +21,7 @@ import { CreateStockAdjustmentsTable1700000000019 } from './1700000000019-Create
 import { AddInventoryItemType1700000000020 } from './1700000000020-AddInventoryItemType';
 import { CreateTaxesTable1700000000021 } from './1700000000021-CreateTaxesTable';
 import { CreatePrinterCategoryRoutingTable1700000000022 } from './1700000000022-CreatePrinterCategoryRoutingTable';
+import { CreateDiscountsTable1700000000023 } from './1700000000023-CreateDiscountsTable';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -46,4 +47,5 @@ export const ALL_MIGRATIONS = [
   AddInventoryItemType1700000000020,
   CreateTaxesTable1700000000021,
   CreatePrinterCategoryRoutingTable1700000000022,
+  CreateDiscountsTable1700000000023,
 ];

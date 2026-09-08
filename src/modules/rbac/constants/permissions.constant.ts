@@ -489,6 +489,37 @@ export const SYSTEM_PERMISSIONS_GROUPS: PermissionGroup[] = [
         ],
       },
       {
+        key: 'discount',
+        title: 'Diskon & Promo',
+        permissions: [
+          {
+            code: 'discount.read',
+            name: 'Lihat Diskon & Promo',
+            description: 'Melihat daftar master data diskon dan promosi',
+            action: 'read',
+          },
+          {
+            code: 'discount.create',
+            name: 'Tambah Diskon & Promo',
+            description: 'Menambahkan promo baru (persentase / nominal tetap)',
+            action: 'create',
+          },
+          {
+            code: 'discount.update',
+            name: 'Ubah Diskon & Promo',
+            description:
+              'Mengubah nominal, jadwal hari, tanggal, atau menu promo',
+            action: 'update',
+          },
+          {
+            code: 'discount.delete',
+            name: 'Hapus Diskon & Promo',
+            description: 'Menghapus data diskon dan promosi',
+            action: 'delete',
+          },
+        ],
+      },
+      {
         key: 'settings',
         title: 'Pengaturan Sistem',
         permissions: [

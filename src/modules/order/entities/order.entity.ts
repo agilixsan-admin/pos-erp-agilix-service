@@ -13,6 +13,7 @@ import { Tenant } from '../../tenant/tenant.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { User } from '../../user/user.entity';
 import { Table } from '../../table/entities/table.entity';
+import { Discount } from '../../settings/entities/discount.entity';
 import { OrderItem } from './order-item.entity';
 
 @Entity('orders')
@@ -58,6 +59,9 @@ export class Order {
     default: 0,
   })
   discountAmount!: number;
+
+  @Column({ name: 'discount_id', type: 'uuid', nullable: true })
+  discountId!: string | null;
 
   @Column({
     name: 'tax_amount',
@@ -112,6 +116,10 @@ export class Order {
   @ManyToOne(() => Table, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'table_id' })
   table!: Table | null;
+
+  @ManyToOne(() => Discount, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'discount_id' })
+  discount!: Discount | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'created_by' })

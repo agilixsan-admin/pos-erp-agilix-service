@@ -54,6 +54,10 @@ export class CreateOrderDto {
   customerName?: string;
 
   @IsOptional()
+  @IsUUID()
+  discountId?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   discountAmount?: number = 0;
