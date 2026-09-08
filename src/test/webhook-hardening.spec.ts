@@ -79,7 +79,7 @@ describe('Webhook Resilience & Hardening Tests (Phase 18)', () => {
       );
 
       const payload: ConsoleWebhookDto = {
-        event: 'unsupported.random.event' as any,
+        event: 'unsupported.random.event',
         eventId: 'evt-sec-3',
         timestamp: new Date().toISOString(),
         data: { tenantId: 'tenant-1' },

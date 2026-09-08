@@ -29,6 +29,9 @@ import { Packaging } from '../modules/packaging/entities/packaging.entity';
 import { Supplier } from '../modules/supplier/entities/supplier.entity';
 import { Purchase } from '../modules/purchase/entities/purchase.entity';
 import { PurchaseItem } from '../modules/purchase/entities/purchase-item.entity';
+import { StockOpname } from '../modules/stock-opname/entities/stock-opname.entity';
+import { StockOpnameItem } from '../modules/stock-opname/entities/stock-opname-item.entity';
+import { StockAdjustment } from '../modules/inventory/entities/stock-adjustment.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
 export default new DataSource({
@@ -69,6 +72,9 @@ export default new DataSource({
     Supplier,
     Purchase,
     PurchaseItem,
+    StockOpname,
+    StockOpnameItem,
+    StockAdjustment,
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,

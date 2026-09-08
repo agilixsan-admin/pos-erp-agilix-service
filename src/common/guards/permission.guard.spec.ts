@@ -5,7 +5,6 @@ import { PermissionGuard } from './permission.guard';
 describe('PermissionGuard', () => {
   const getAllAndOverride = jest.fn();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockReflector = { getAllAndOverride } as any as Reflector;
 
   let guard: PermissionGuard;

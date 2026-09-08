@@ -8,9 +8,8 @@ describe('TenantStatusGuard', () => {
   const getAllAndOverride = jest.fn();
   const findById = jest.fn();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockReflector = { getAllAndOverride } as any as Reflector;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const mockTenantService = { findById } as any as TenantService;
 
   let guard: TenantStatusGuard;

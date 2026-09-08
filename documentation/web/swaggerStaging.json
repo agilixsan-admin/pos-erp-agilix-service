@@ -26,6 +26,9 @@
     { "name": "Printers", "description": "Printer configuration & bill printing" },
     { "name": "Settings", "description": "POS operational settings & configuration" },
     { "name": "Packaging", "description": "Packaging & takeaway inventory management" },
+    { "name": "Suppliers", "description": "Supplier & vendor management" },
+    { "name": "Purchases", "description": "Purchase order & stock procurement" },
+    { "name": "Stock Opname", "description": "Stock opname physical audit & SOP control" },
     { "name": "Reports", "description": "Operational reporting" },
     { "name": "Audit Logs", "description": "System audit logs" }
   ],
