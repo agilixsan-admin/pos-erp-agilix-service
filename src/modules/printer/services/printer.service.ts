@@ -5,10 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Printer } from '../entities/printer.entity';
+import { PrinterCategoryRouting } from '../entities/printer-category-routing.entity';
+import { Category } from '../../product/entities/category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { Order } from '../../order/entities/order.entity';
+import { OrderItem } from '../../order/entities/order-item.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
@@ -16,16 +19,36 @@ import { EscPosBuilderService, EscPosResult } from './escpos-builder.service';
 import { NetworkPrinterDriver } from './network-printer.driver';
 import {
   CreatePrinterDto,
+  DispatchOrderDto,
   PrintOrderDto,
   QueryPrinterDto,
   UpdatePrinterDto,
+  UpdatePrinterRoutingDto,
 } from '../dto/printer.dto';
+
+export interface PrintJobResult {
+  printerId: string;
+  printerName: string;
+  station: string;
+  connectionType: string;
+  paperSize: string;
+  bluetoothMac: string | null;
+  ipAddress: string | null;
+  status: string;
+  itemCount: number;
+  escposPayload: string;
+  rawText: string;
+}
 
 @Injectable()
 export class PrinterService {
   constructor(
     @InjectRepository(Printer)
     private readonly printerRepository: Repository<Printer>,
+    @InjectRepository(PrinterCategoryRouting)
+    private readonly routingRepository: Repository<PrinterCategoryRouting>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
     @InjectRepository(Outlet)
     private readonly outletRepository: Repository<Outlet>,
     @InjectRepository(Order)
@@ -267,6 +290,216 @@ export class PrinterService {
     return { success: true };
   }
 
+  async testPrint(tenantId: string, id: string, userId: string) {
+    const printer = await this.findById(tenantId, id);
+
+    const result = this.escposBuilder.buildTestSlip({
+      outletName: printer.outlet?.name || 'AGILIX POS',
+      printerName: printer.name,
+      stationType: printer.type,
+      connectionType: printer.connectionType,
+      paperSize: printer.paperSize,
+      ipAddress: printer.ipAddress
+        ? `${printer.ipAddress}:${printer.port || 9100}`
+        : null,
+      bluetoothMac: printer.bluetoothMac,
+    });
+
+    let status = 'READY_TO_PRINT';
+
+    if (printer.connectionType === 'NETWORK') {
+      if (!printer.ipAddress) {
+        throw new BadGatewayException({
+          success: false,
+          message: 'Printer IP address not configured',
+          code: 'PRINTER_UNREACHABLE',
+        });
+      }
+
+      try {
+        await this.networkPrinterDriver.send({
+          ipAddress: printer.ipAddress,
+          port: printer.port ?? 9100,
+          data: result.buffer,
+        });
+        status = 'SENT';
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : 'Connection failed';
+        throw new BadGatewayException({
+          success: false,
+          message: `Printer communication failed: ${errMsg}`,
+          code: 'PRINTER_UNREACHABLE',
+        });
+      }
+    }
+
+    await this.audit.record({
+      action: 'PRINTER_TEST_PRINTED',
+      tenantId,
+      actorType: 'USER',
+      actorId: userId,
+      metadata: {
+        printerId: printer.id,
+        name: printer.name,
+        type: printer.type,
+        connectionType: printer.connectionType,
+        status,
+      },
+    });
+
+    return {
+      printerId: printer.id,
+      name: printer.name,
+      type: printer.type,
+      connectionType: printer.connectionType,
+      paperSize: printer.paperSize,
+      bluetoothMac: printer.bluetoothMac,
+      ipAddress: printer.ipAddress,
+      status,
+      escposPayload: result.base64,
+      rawText: result.rawText,
+    };
+  }
+
+  async getRoutingRules(tenantId: string, outletId: string) {
+    const outlet = await this.outletRepository.findOne({
+      where: { id: outletId, tenantId },
+    });
+
+    if (!outlet) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Outlet not found',
+        code: 'OUTLET_NOT_FOUND',
+      });
+    }
+
+    const [categories, printers, routings] = await Promise.all([
+      this.categoryRepository.find({
+        where: { tenantId, status: 'ACTIVE' },
+        order: { name: 'ASC' },
+      }),
+      this.printerRepository.find({
+        where: { tenantId, outletId, status: 'ACTIVE' },
+        order: { name: 'ASC' },
+      }),
+      this.routingRepository.find({
+        where: { tenantId, outletId },
+        relations: ['printer', 'category'],
+      }),
+    ]);
+
+    const routingMap = new Map<string, PrinterCategoryRouting>();
+    for (const r of routings) {
+      routingMap.set(r.categoryId, r);
+    }
+
+    const rules = categories.map((cat) => {
+      const routing = routingMap.get(cat.id);
+      return {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        printerId: routing?.printerId ?? null,
+        printerName: routing?.printer?.name ?? null,
+        stationType: routing?.printer?.type ?? null,
+      };
+    });
+
+    return {
+      outletId,
+      printers: printers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        connectionType: p.connectionType,
+        isDefault: p.isDefault,
+      })),
+      rules,
+    };
+  }
+
+  async setRoutingRules(
+    tenantId: string,
+    dto: UpdatePrinterRoutingDto,
+    userId: string,
+  ) {
+    const outlet = await this.outletRepository.findOne({
+      where: { id: dto.outletId, tenantId },
+    });
+
+    if (!outlet) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Outlet not found',
+        code: 'OUTLET_NOT_FOUND',
+      });
+    }
+
+    if (dto.routings.length > 0) {
+      const printerIds = [...new Set(dto.routings.map((r) => r.printerId))];
+      const categoryIds = [...new Set(dto.routings.map((r) => r.categoryId))];
+
+      const [validPrinters, validCategories] = await Promise.all([
+        this.printerRepository.find({
+          where: { id: In(printerIds), tenantId, outletId: dto.outletId },
+        }),
+        this.categoryRepository.find({
+          where: { id: In(categoryIds), tenantId },
+        }),
+      ]);
+
+      if (validPrinters.length !== printerIds.length) {
+        throw new BadRequestException({
+          success: false,
+          message:
+            'One or more specified printers do not belong to this outlet',
+          code: 'INVALID_PRINTER_SELECTION',
+        });
+      }
+
+      if (validCategories.length !== categoryIds.length) {
+        throw new BadRequestException({
+          success: false,
+          message: 'One or more specified categories are invalid',
+          code: 'INVALID_CATEGORY_SELECTION',
+        });
+      }
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const routingRepo = manager.getRepository(PrinterCategoryRouting);
+
+      // Remove existing routings for outlet
+      await routingRepo.delete({ tenantId, outletId: dto.outletId });
+
+      // Insert new routings
+      if (dto.routings.length > 0) {
+        const entities = dto.routings.map((r) =>
+          routingRepo.create({
+            tenantId,
+            outletId: dto.outletId,
+            printerId: r.printerId,
+            categoryId: r.categoryId,
+          }),
+        );
+        await routingRepo.save(entities);
+      }
+
+      await this.audit.record({
+        action: 'PRINTER_ROUTING_UPDATED',
+        tenantId,
+        actorType: 'USER',
+        actorId: userId,
+        metadata: {
+          outletId: dto.outletId,
+          routingCount: dto.routings.length,
+        },
+      });
+
+      return this.getRoutingRules(tenantId, dto.outletId);
+    });
+  }
+
   async printOrder(
     tenantId: string,
     orderId: string,
@@ -428,6 +661,338 @@ export class PrinterService {
       status,
       escposPayload: result.base64,
       rawText: result.rawText,
+    };
+  }
+
+  async dispatchOrder(
+    tenantId: string,
+    orderId: string,
+    dto: DispatchOrderDto,
+    userId: string,
+    cashierName?: string,
+  ) {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, tenantId },
+      relations: ['items', 'items.product', 'tenant', 'outlet', 'table'],
+    });
+
+    if (!order) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Order not found',
+        code: 'ORDER_NOT_FOUND',
+      });
+    }
+
+    const activePrinters = await this.printerRepository.find({
+      where: { tenantId, outletId: order.outletId, status: 'ACTIVE' },
+    });
+
+    if (activePrinters.length === 0) {
+      throw new NotFoundException({
+        success: false,
+        message: 'No active printers configured for this outlet',
+        code: 'NO_ACTIVE_PRINTERS_FOUND',
+      });
+    }
+
+    const mode = dto.mode || 'AUTO';
+    const printJobs: PrintJobResult[] = [];
+
+    // Specific mode override
+    if (mode === 'RECEIPT') {
+      const receiptJob = await this.printOrder(
+        tenantId,
+        orderId,
+        { type: 'RECEIPT' },
+        userId,
+        cashierName,
+      );
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        isSinglePrinterMode: activePrinters.length === 1,
+        printJobs: [
+          {
+            printerId: receiptJob.printerId,
+            printerName: receiptJob.printerName,
+            station: receiptJob.type,
+            connectionType: receiptJob.connectionType,
+            paperSize: receiptJob.paperSize,
+            bluetoothMac: null,
+            ipAddress: null,
+            status: receiptJob.status,
+            itemCount: order.items?.length || 0,
+            escposPayload: receiptJob.escposPayload,
+            rawText: receiptJob.rawText,
+          },
+        ],
+      };
+    }
+
+    // SCENARIO 1: Single Active Printer (UMKM / 1-Printer Setup)
+    if (activePrinters.length === 1) {
+      const singlePrinter = activePrinters[0];
+      const payments = await this.paymentRepository.find({
+        where: { orderId: order.id, tenantId },
+      });
+      const settings = await this.settingsService.getSettings(
+        tenantId,
+        order.outletId,
+      );
+
+      let result: EscPosResult;
+      let stationTitle = 'RECEIPT';
+      if (order.status === 'COMPLETED' || payments.length > 0) {
+        result = this.escposBuilder.buildReceipt({
+          order,
+          payments,
+          cashierName: cashierName ?? 'Kasir',
+          paperSize: singlePrinter.paperSize,
+          footerNote: settings.billFooterText || undefined,
+          taxName: settings.taxName || undefined,
+        });
+      } else {
+        result = this.escposBuilder.buildStationTicket({
+          order,
+          title: '*** TIKET PESANAN ***',
+          paperSize: singlePrinter.paperSize,
+        });
+        stationTitle = singlePrinter.type;
+      }
+
+      let status = 'READY_TO_PRINT';
+      if (
+        singlePrinter.connectionType === 'NETWORK' &&
+        singlePrinter.ipAddress
+      ) {
+        try {
+          await this.networkPrinterDriver.send({
+            ipAddress: singlePrinter.ipAddress,
+            port: singlePrinter.port ?? 9100,
+            data: result.buffer,
+          });
+          status = 'SENT';
+        } catch {
+          status = 'NETWORK_ERROR';
+        }
+      }
+
+      printJobs.push({
+        printerId: singlePrinter.id,
+        printerName: singlePrinter.name,
+        station: stationTitle,
+        connectionType: singlePrinter.connectionType,
+        paperSize: singlePrinter.paperSize,
+        bluetoothMac: singlePrinter.bluetoothMac,
+        ipAddress: singlePrinter.ipAddress,
+        status,
+        itemCount: order.items?.length || 0,
+        escposPayload: result.base64,
+        rawText: result.rawText,
+      });
+
+      await this.audit.record({
+        action: 'ORDER_DISPATCH_PRINTED',
+        tenantId,
+        actorType: 'USER',
+        actorId: userId,
+        metadata: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          isSinglePrinterMode: true,
+          jobCount: 1,
+        },
+      });
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        isSinglePrinterMode: true,
+        printJobs,
+      };
+    }
+
+    // SCENARIO 2: Multi-Printer Setup (Station & Category Routing)
+    const [routings, settings, payments] = await Promise.all([
+      this.routingRepository.find({
+        where: { tenantId, outletId: order.outletId },
+        relations: ['printer'],
+      }),
+      this.settingsService.getSettings(tenantId, order.outletId),
+      this.paymentRepository.find({ where: { orderId: order.id, tenantId } }),
+    ]);
+
+    const routingMap = new Map<string, Printer>();
+    for (const r of routings) {
+      if (r.printer && r.printer.status === 'ACTIVE') {
+        routingMap.set(r.categoryId, r.printer);
+      }
+    }
+
+    const defaultKitchenPrinter =
+      activePrinters.find((p) => p.type === 'KITCHEN' && p.isDefault) ||
+      activePrinters.find((p) => p.type === 'KITCHEN');
+    const defaultBarPrinter =
+      activePrinters.find((p) => p.type === 'BAR' && p.isDefault) ||
+      activePrinters.find((p) => p.type === 'BAR');
+    const defaultReceiptPrinter =
+      activePrinters.find((p) => p.type === 'RECEIPT' && p.isDefault) ||
+      activePrinters.find((p) => p.type === 'RECEIPT');
+    const fallbackPrinter =
+      defaultKitchenPrinter ||
+      defaultReceiptPrinter ||
+      defaultBarPrinter ||
+      activePrinters[0];
+
+    // Group order items by assigned printer
+    const itemsByPrinterId = new Map<
+      string,
+      { printer: Printer; items: OrderItem[] }
+    >();
+
+    const orderItems = order.items || [];
+    for (const item of orderItems) {
+      const categoryId = item.product?.categoryId;
+      let targetPrinter: Printer | undefined;
+
+      if (categoryId && routingMap.has(categoryId)) {
+        targetPrinter = routingMap.get(categoryId);
+      } else {
+        // Fallback heuristic if not routed
+        targetPrinter = defaultKitchenPrinter || fallbackPrinter;
+      }
+
+      if (targetPrinter) {
+        if (!itemsByPrinterId.has(targetPrinter.id)) {
+          itemsByPrinterId.set(targetPrinter.id, {
+            printer: targetPrinter,
+            items: [],
+          });
+        }
+        itemsByPrinterId.get(targetPrinter.id)!.items.push(item);
+      }
+    }
+
+    // Generate station tickets for each station printer with items
+    for (const [, group] of itemsByPrinterId.entries()) {
+      let result: EscPosResult;
+      const targetStation = group.printer.type;
+
+      if (targetStation === 'KITCHEN') {
+        result = this.escposBuilder.buildKitchenTicket({
+          order,
+          items: group.items,
+          paperSize: group.printer.paperSize,
+        });
+      } else if (targetStation === 'BAR') {
+        result = this.escposBuilder.buildBarTicket({
+          order,
+          items: group.items,
+          paperSize: group.printer.paperSize,
+        });
+      } else {
+        result = this.escposBuilder.buildStationTicket({
+          order,
+          items: group.items,
+          title: `*** TIKET ${group.printer.name.toUpperCase()} ***`,
+          paperSize: group.printer.paperSize,
+        });
+      }
+
+      let status = 'READY_TO_PRINT';
+      if (
+        group.printer.connectionType === 'NETWORK' &&
+        group.printer.ipAddress
+      ) {
+        try {
+          await this.networkPrinterDriver.send({
+            ipAddress: group.printer.ipAddress,
+            port: group.printer.port ?? 9100,
+            data: result.buffer,
+          });
+          status = 'SENT';
+        } catch {
+          status = 'NETWORK_ERROR';
+        }
+      }
+
+      printJobs.push({
+        printerId: group.printer.id,
+        printerName: group.printer.name,
+        station: targetStation,
+        connectionType: group.printer.connectionType,
+        paperSize: group.printer.paperSize,
+        bluetoothMac: group.printer.bluetoothMac,
+        ipAddress: group.printer.ipAddress,
+        status,
+        itemCount: group.items.length,
+        escposPayload: result.base64,
+        rawText: result.rawText,
+      });
+    }
+
+    // Generate Customer Receipt if order is completed and receipt printer is configured
+    if (order.status === 'COMPLETED' && defaultReceiptPrinter) {
+      const receiptResult = this.escposBuilder.buildReceipt({
+        order,
+        payments,
+        cashierName: cashierName ?? 'Kasir',
+        paperSize: defaultReceiptPrinter.paperSize,
+        footerNote: settings.billFooterText || undefined,
+        taxName: settings.taxName || undefined,
+      });
+
+      let status = 'READY_TO_PRINT';
+      if (
+        defaultReceiptPrinter.connectionType === 'NETWORK' &&
+        defaultReceiptPrinter.ipAddress
+      ) {
+        try {
+          await this.networkPrinterDriver.send({
+            ipAddress: defaultReceiptPrinter.ipAddress,
+            port: defaultReceiptPrinter.port ?? 9100,
+            data: receiptResult.buffer,
+          });
+          status = 'SENT';
+        } catch {
+          status = 'NETWORK_ERROR';
+        }
+      }
+
+      printJobs.push({
+        printerId: defaultReceiptPrinter.id,
+        printerName: defaultReceiptPrinter.name,
+        station: 'RECEIPT',
+        connectionType: defaultReceiptPrinter.connectionType,
+        paperSize: defaultReceiptPrinter.paperSize,
+        bluetoothMac: defaultReceiptPrinter.bluetoothMac,
+        ipAddress: defaultReceiptPrinter.ipAddress,
+        status,
+        itemCount: orderItems.length,
+        escposPayload: receiptResult.base64,
+        rawText: receiptResult.rawText,
+      });
+    }
+
+    await this.audit.record({
+      action: 'ORDER_DISPATCH_PRINTED',
+      tenantId,
+      actorType: 'USER',
+      actorId: userId,
+      metadata: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        isSinglePrinterMode: false,
+        jobCount: printJobs.length,
+      },
+    });
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      isSinglePrinterMode: false,
+      printJobs,
     };
   }
 }

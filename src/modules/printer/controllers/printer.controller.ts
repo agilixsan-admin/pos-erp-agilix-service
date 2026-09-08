@@ -15,6 +15,7 @@ import {
   CreatePrinterDto,
   QueryPrinterDto,
   UpdatePrinterDto,
+  UpdatePrinterRoutingDto,
 } from '../dto/printer.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -23,6 +24,61 @@ import { User } from '../../user/user.entity';
 @Controller('printers')
 export class PrinterController {
   constructor(private readonly printerService: PrinterService) {}
+
+  @Get('routing-rules')
+  @Permissions('printer.read')
+  async getRoutingRules(
+    @CurrentUser() user: User,
+    @Query('outletId') outletId?: string,
+  ) {
+    const effectiveOutletId = outletId || user.outletId;
+    if (!effectiveOutletId) {
+      throw new BadRequestException({
+        success: false,
+        message: 'outletId is required',
+        code: 'OUTLET_ID_REQUIRED',
+      });
+    }
+
+    const data = await this.printerService.getRoutingRules(
+      user.tenantId,
+      effectiveOutletId,
+    );
+
+    return {
+      success: true,
+      message: 'Printer routing rules retrieved successfully',
+      data,
+    };
+  }
+
+  @Put('routing-rules')
+  @Permissions('printer.update')
+  async setRoutingRules(
+    @CurrentUser() user: User,
+    @Body() dto: UpdatePrinterRoutingDto,
+  ) {
+    const effectiveOutletId = dto.outletId || user.outletId;
+    if (!effectiveOutletId) {
+      throw new BadRequestException({
+        success: false,
+        message: 'outletId is required',
+        code: 'OUTLET_ID_REQUIRED',
+      });
+    }
+
+    const data = await this.printerService.setRoutingRules(
+      user.tenantId,
+      { ...dto, outletId: effectiveOutletId },
+      user.id,
+    );
+
+    return {
+      success: true,
+      message: 'Printer routing rules updated successfully',
+      data,
+    };
+  }
 
   @Get()
   @Permissions('printer.read')
@@ -106,6 +162,24 @@ export class PrinterController {
     return {
       message: 'Printer deleted successfully',
       ...data,
+    };
+  }
+
+  @Post(':id/test-print')
+  @Permissions('printer.read')
+  async testPrint(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.printerService.testPrint(
+      user.tenantId,
+      id,
+      user.id,
+    );
+    return {
+      success: true,
+      message: 'Test print executed successfully',
+      data,
     };
   }
 }

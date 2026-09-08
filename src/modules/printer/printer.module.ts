@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Printer } from './entities/printer.entity';
+import { PrinterCategoryRouting } from './entities/printer-category-routing.entity';
+import { Category } from '../product/entities/category.entity';
 import { Outlet } from '../outlet/outlet.entity';
 import { Order } from '../order/entities/order.entity';
 import { Payment } from '../payment/entities/payment.entity';
@@ -14,7 +16,14 @@ import { OrderPrintController } from './controllers/order-print.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Printer, Outlet, Order, Payment]),
+    TypeOrmModule.forFeature([
+      Printer,
+      PrinterCategoryRouting,
+      Category,
+      Outlet,
+      Order,
+      Payment,
+    ]),
     AuditModule,
     SettingsModule,
   ],

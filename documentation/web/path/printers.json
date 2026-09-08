@@ -208,6 +208,123 @@
         },
         "security": [{ "Bearer": [] }]
       }
+    },
+    "/printers/routing-rules": {
+      "get": {
+        "tags": ["Printers"],
+        "summary": "Get printer category routing rules for an outlet",
+        "operationId": "getPrinterRoutingRules",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "outletId", "in": "query", "type": "string", "description": "Outlet UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar pemetaan kategori produk ke printer station",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer routing rules retrieved successfully" },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "outletId": { "example": "123e4567-e89b-12d3-a456-426614174002" },
+                    "printers": { "type": "array" },
+                    "rules": { "type": "array" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "outletId is required" },
+          "404": { "description": "Outlet not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      },
+      "put": {
+        "tags": ["Printers"],
+        "summary": "Update printer category routing rules for an outlet",
+        "operationId": "updatePrinterRoutingRules",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["outletId", "routings"],
+              "properties": {
+                "outletId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174002" },
+                "routings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["categoryId", "printerId"],
+                    "properties": {
+                      "categoryId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174010" },
+                      "printerId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174094" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Routing rules berhasil diupdate",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Printer routing rules updated successfully" }
+              }
+            }
+          },
+          "400": { "description": "Invalid printer or category selection" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
+    },
+    "/printers/{id}/test-print": {
+      "post": {
+        "tags": ["Printers"],
+        "summary": "Eksekusi tes cetak printer untuk verifikasi koneksi",
+        "operationId": "testPrintPrinter",
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Printer UUID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tes cetak berhasil dieksekusi",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Test print executed successfully" },
+                "data": {
+                  "example": {
+                    "printerId": "123e4567-e89b-12d3-a456-426614174094",
+                    "name": "Kitchen Printer",
+                    "type": "KITCHEN",
+                    "connectionType": "BLUETOOTH",
+                    "paperSize": "58mm",
+                    "status": "READY_TO_PRINT",
+                    "escposPayload": "Base64TestSlipBytes=="
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Printer not found" },
+          "502": { "description": "Printer unreachable (network error)" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
     }
   }
 }

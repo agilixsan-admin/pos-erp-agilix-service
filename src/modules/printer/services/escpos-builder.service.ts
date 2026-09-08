@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Order } from '../../order/entities/order.entity';
+import { OrderItem } from '../../order/entities/order-item.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { PrinterPaperSize } from '../entities/printer.entity';
 
@@ -16,6 +17,23 @@ export interface ReceiptData {
   paperSize?: PrinterPaperSize;
   footerNote?: string;
   taxName?: string;
+}
+
+export interface StationTicketData {
+  order: Order;
+  items?: OrderItem[];
+  title?: string;
+  paperSize?: PrinterPaperSize;
+}
+
+export interface TestSlipData {
+  outletName: string;
+  printerName: string;
+  stationType: string;
+  connectionType: string;
+  paperSize?: PrinterPaperSize;
+  ipAddress?: string | null;
+  bluetoothMac?: string | null;
 }
 
 @Injectable()
@@ -261,10 +279,21 @@ export class EscPosBuilderService {
     };
   }
 
-  buildKitchenTicket(data: {
-    order: Order;
-    paperSize?: PrinterPaperSize;
-  }): EscPosResult {
+  buildKitchenTicket(data: StationTicketData): EscPosResult {
+    return this.buildStationTicket({
+      ...data,
+      title: data.title || '*** TIKET DAPUR ***',
+    });
+  }
+
+  buildBarTicket(data: StationTicketData): EscPosResult {
+    return this.buildStationTicket({
+      ...data,
+      title: data.title || '*** TIKET BAR ***',
+    });
+  }
+
+  buildStationTicket(data: StationTicketData): EscPosResult {
     const paperSize = data.paperSize || '58mm';
     const width = this.getColumnWidth(paperSize);
     const divider = '-'.repeat(width);
@@ -302,7 +331,8 @@ export class EscPosBuilderService {
 
     buffers.push(this.CMD_INIT);
 
-    append('*** TIKET DAPUR ***', {
+    const title = data.title || '*** TIKET PESANAN ***';
+    append(title, {
       align: 'CENTER',
       bold: true,
       doubleHeight: true,
@@ -323,9 +353,10 @@ export class EscPosBuilderService {
 
     append(divider);
 
-    if (data.order.items && data.order.items.length > 0) {
-      for (const item of data.order.items) {
-        const prodName = item.productName || 'Produk';
+    const itemsToPrint = data.items || data.order.items || [];
+    if (itemsToPrint.length > 0) {
+      for (const item of itemsToPrint) {
+        const prodName = item.productName || 'Item';
         const variantSuffix =
           item.variantName && item.variantName !== prodName
             ? ` (${item.variantName})`
@@ -356,13 +387,11 @@ export class EscPosBuilderService {
     };
   }
 
-  buildBarTicket(data: {
-    order: Order;
-    paperSize?: PrinterPaperSize;
-  }): EscPosResult {
+  buildTestSlip(data: TestSlipData): EscPosResult {
     const paperSize = data.paperSize || '58mm';
     const width = this.getColumnWidth(paperSize);
-    const divider = '-'.repeat(width);
+    const divider = '='.repeat(width);
+    const subDivider = '-'.repeat(width);
 
     const buffers: Buffer[] = [];
     const textLines: string[] = [];
@@ -370,74 +399,77 @@ export class EscPosBuilderService {
     const append = (
       text: string,
       opts?: {
-        align?: 'LEFT' | 'CENTER';
+        align?: 'LEFT' | 'CENTER' | 'RIGHT';
         bold?: boolean;
         doubleSize?: boolean;
         doubleHeight?: boolean;
       },
     ) => {
-      if (opts?.align === 'CENTER') {
-        buffers.push(this.CMD_ALIGN_CENTER);
-        textLines.push(this.padCenter(text, width));
-      } else {
-        buffers.push(this.CMD_ALIGN_LEFT);
-        textLines.push(text);
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (opts?.align === 'CENTER') {
+          buffers.push(this.CMD_ALIGN_CENTER);
+          textLines.push(this.padCenter(line, width));
+        } else if (opts?.align === 'RIGHT') {
+          buffers.push(this.CMD_ALIGN_RIGHT);
+          textLines.push(line.padStart(width));
+        } else {
+          buffers.push(this.CMD_ALIGN_LEFT);
+          textLines.push(line);
+        }
+
+        if (opts?.bold) buffers.push(this.CMD_BOLD_ON);
+        if (opts?.doubleSize) buffers.push(this.CMD_DOUBLE_SIZE);
+        else if (opts?.doubleHeight) buffers.push(this.CMD_DOUBLE_HEIGHT);
+
+        buffers.push(Buffer.from(line + '\n', 'utf-8'));
+
+        if (opts?.doubleSize || opts?.doubleHeight)
+          buffers.push(this.CMD_NORMAL_SIZE);
+        if (opts?.bold) buffers.push(this.CMD_BOLD_OFF);
       }
-
-      if (opts?.bold) buffers.push(this.CMD_BOLD_ON);
-      if (opts?.doubleSize) buffers.push(this.CMD_DOUBLE_SIZE);
-      else if (opts?.doubleHeight) buffers.push(this.CMD_DOUBLE_HEIGHT);
-
-      buffers.push(Buffer.from(text + '\n', 'utf-8'));
-
-      if (opts?.doubleSize || opts?.doubleHeight)
-        buffers.push(this.CMD_NORMAL_SIZE);
-      if (opts?.bold) buffers.push(this.CMD_BOLD_OFF);
     };
 
     buffers.push(this.CMD_INIT);
 
-    append('*** TIKET BAR ***', {
+    append(data.outletName || 'AGILIX POS', {
       align: 'CENTER',
       bold: true,
       doubleHeight: true,
     });
+    append('*** TES CETAK PRINTER ***', {
+      align: 'CENTER',
+      bold: true,
+    });
     append(divider);
 
-    append(`No: ${data.order.orderNumber}`, { bold: true });
-    const tableLabel =
-      data.order.orderType === 'DINE_IN'
-        ? `Meja: ${data.order.table?.tableNumber || data.order.tableNumber || '-'}`
-        : 'TAKE AWAY';
-    append(`Tipe: ${data.order.orderType} (${tableLabel})`, { bold: true });
+    append(`Printer : ${data.printerName}`);
+    append(`Station : ${data.stationType}`);
+    append(`Koneksi : ${data.connectionType}`);
+    append(`Kertas  : ${paperSize}`);
 
-    const orderTime = data.order.createdAt
-      ? new Date(data.order.createdAt).toLocaleTimeString('id-ID')
-      : new Date().toLocaleTimeString('id-ID');
-    append(`Waktu: ${orderTime}`);
-
-    append(divider);
-
-    if (data.order.items && data.order.items.length > 0) {
-      for (const item of data.order.items) {
-        const prodName = item.productName || 'Minuman';
-        const variantSuffix =
-          item.variantName && item.variantName !== prodName
-            ? ` (${item.variantName})`
-            : '';
-        append(`${item.quantity}x ${prodName}${variantSuffix}`, {
-          bold: true,
-          doubleHeight: true,
-        });
-
-        if (item.notes) {
-          append(`   >> Catatan: ${item.notes}`, { bold: true });
-        }
-      }
+    if (data.ipAddress) {
+      append(`IP/Port : ${data.ipAddress}`);
+    }
+    if (data.bluetoothMac) {
+      append(`BT MAC  : ${data.bluetoothMac}`);
     }
 
+    const testTime = new Date().toLocaleString('id-ID');
+    append(`Waktu   : ${testTime}`);
+    append(subDivider);
+
+    append('STATUS: KONEKSI OK', {
+      align: 'CENTER',
+      bold: true,
+      doubleHeight: true,
+    });
+    append('Printer siap digunakan!', {
+      align: 'CENTER',
+    });
     append(divider);
 
+    buffers.push(this.CMD_DRAWER_KICK);
     buffers.push(this.CMD_LINE_FEED);
     buffers.push(this.CMD_LINE_FEED);
     buffers.push(this.CMD_LINE_FEED);

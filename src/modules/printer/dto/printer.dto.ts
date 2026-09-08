@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -9,7 +10,9 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import type {
   PrinterConnectionType,
   PrinterPaperSize,
@@ -129,4 +132,31 @@ export class PrintOrderDto {
   @IsIn(['RECEIPT', 'KITCHEN', 'BAR'])
   @IsOptional()
   type?: PrinterType = 'RECEIPT';
+}
+
+export class PrinterRoutingItemDto {
+  @IsUUID()
+  @IsNotEmpty()
+  categoryId!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  printerId!: string;
+}
+
+export class UpdatePrinterRoutingDto {
+  @IsUUID()
+  @IsNotEmpty()
+  outletId!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrinterRoutingItemDto)
+  routings!: PrinterRoutingItemDto[];
+}
+
+export class DispatchOrderDto {
+  @IsIn(['AUTO', 'RECEIPT', 'KITCHEN', 'BAR'])
+  @IsOptional()
+  mode?: 'AUTO' | 'RECEIPT' | 'KITCHEN' | 'BAR' = 'AUTO';
 }

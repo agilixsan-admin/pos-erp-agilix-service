@@ -170,4 +170,61 @@ describe('EscPosBuilderService', () => {
       expect(result.rawText).toContain('Extra ice');
     });
   });
+
+  describe('buildStationTicket', () => {
+    it('builds station ticket with custom items and custom title', () => {
+      const order = {
+        id: 'order-station-1',
+        orderNumber: 'ORD-PATIO-1',
+        orderType: 'DINE_IN',
+        tableNumber: 'Patio 2',
+        createdAt: new Date(),
+        items: [],
+      } as unknown as Order;
+
+      const items = [
+        {
+          id: 'item-10',
+          quantity: 2,
+          productName: 'Shisha Mint',
+          variantName: '',
+          notes: 'Extra charcoal',
+        } as unknown as OrderItem,
+      ];
+
+      const result = service.buildStationTicket({
+        order,
+        items,
+        title: '*** TIKET PATIO ***',
+        paperSize: '58mm',
+      });
+
+      expect(result.rawText).toContain('TIKET PATIO');
+      expect(result.rawText).toContain('ORD-PATIO-1');
+      expect(result.rawText).toContain('2x Shisha Mint');
+      expect(result.rawText).toContain('Extra charcoal');
+    });
+  });
+
+  describe('buildTestSlip', () => {
+    it('builds valid test slip with printer details', () => {
+      const result = service.buildTestSlip({
+        outletName: 'Agilix Central',
+        printerName: 'Epson TM-T82 Kitchen',
+        stationType: 'KITCHEN',
+        connectionType: 'NETWORK',
+        paperSize: '80mm',
+        ipAddress: '192.168.1.50:9100',
+      });
+
+      expect(result.buffer).toBeInstanceOf(Buffer);
+      expect(result.rawText).toContain('Agilix Central');
+      expect(result.rawText).toContain('TES CETAK PRINTER');
+      expect(result.rawText).toContain('Epson TM-T82 Kitchen');
+      expect(result.rawText).toContain('Station : KITCHEN');
+      expect(result.rawText).toContain('Koneksi : NETWORK');
+      expect(result.rawText).toContain('IP/Port : 192.168.1.50:9100');
+      expect(result.rawText).toContain('STATUS: KONEKSI OK');
+    });
+  });
 });

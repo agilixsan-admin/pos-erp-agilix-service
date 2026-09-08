@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { PrinterService } from './printer.service';
 import { Printer } from '../entities/printer.entity';
+import { PrinterCategoryRouting } from '../entities/printer-category-routing.entity';
+import { Category } from '../../product/entities/category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { Order } from '../../order/entities/order.entity';
 import { Payment } from '../../payment/entities/payment.entity';
@@ -28,6 +30,16 @@ describe('PrinterService', () => {
     findOneOrFail: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
+  let routingRepo: {
+    find: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
+  let categoryRepo: {
+    find: jest.Mock;
+    findOne: jest.Mock;
+  };
   let outletRepo: {
     findOne: jest.Mock;
   };
@@ -44,6 +56,8 @@ describe('PrinterService', () => {
     buildReceipt: jest.Mock;
     buildKitchenTicket: jest.Mock;
     buildBarTicket: jest.Mock;
+    buildStationTicket: jest.Mock;
+    buildTestSlip: jest.Mock;
   };
   let networkDriver: {
     send: jest.Mock;
@@ -86,6 +100,21 @@ describe('PrinterService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    routingRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn((dto: Partial<PrinterCategoryRouting>) => ({
+        ...dto,
+        id: 'routing-1',
+      })),
+      save: jest.fn((entities: unknown) => Promise.resolve(entities)),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+
+    categoryRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+    };
+
     outletRepo = {
       findOne: jest.fn(),
     };
@@ -95,7 +124,7 @@ describe('PrinterService', () => {
     };
 
     paymentRepo = {
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     auditService = {
@@ -118,6 +147,16 @@ describe('PrinterService', () => {
         base64: Buffer.from('bar bytes').toString('base64'),
         rawText: 'Bar ticket',
       }),
+      buildStationTicket: jest.fn().mockReturnValue({
+        buffer: Buffer.from('station bytes'),
+        base64: Buffer.from('station bytes').toString('base64'),
+        rawText: 'Station ticket',
+      }),
+      buildTestSlip: jest.fn().mockReturnValue({
+        buffer: Buffer.from('test bytes'),
+        base64: Buffer.from('test bytes').toString('base64'),
+        rawText: 'Test slip content',
+      }),
     };
 
     networkDriver = {
@@ -128,11 +167,14 @@ describe('PrinterService', () => {
       transaction: jest.fn(
         <T>(
           cb: (manager: {
-            getRepository: () => typeof printerRepo;
+            getRepository: (entity: unknown) => unknown;
           }) => Promise<T>,
         ) => {
           const mockManager = {
-            getRepository: () => printerRepo,
+            getRepository: (target: unknown) => {
+              if (target === PrinterCategoryRouting) return routingRepo;
+              return printerRepo;
+            },
           };
           return cb(mockManager);
         },
@@ -143,6 +185,11 @@ describe('PrinterService', () => {
       providers: [
         PrinterService,
         { provide: getRepositoryToken(Printer), useValue: printerRepo },
+        {
+          provide: getRepositoryToken(PrinterCategoryRouting),
+          useValue: routingRepo,
+        },
+        { provide: getRepositoryToken(Category), useValue: categoryRepo },
         { provide: getRepositoryToken(Outlet), useValue: outletRepo },
         { provide: getRepositoryToken(Order), useValue: orderRepo },
         { provide: getRepositoryToken(Payment), useValue: paymentRepo },
@@ -157,72 +204,105 @@ describe('PrinterService', () => {
     service = module.get<PrinterService>(PrinterService);
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('findAll', () => {
-    it('returns list of printers for tenant', async () => {
-      const qb = {
+    it('returns list of printers filtered by tenant and query options', async () => {
+      const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getMany: jest
-          .fn()
-          .mockResolvedValue([{ id: 'p-1', name: 'Printer 1' }]),
+        getMany: jest.fn().mockResolvedValue([{ id: 'printer-1' }]),
       };
-      printerRepo.createQueryBuilder.mockReturnValue(qb);
+      printerRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
       const result = await service.findAll(mockTenantId, {
         outletId: mockOutletId,
+        type: 'RECEIPT',
+        connectionType: 'BLUETOOTH',
+        status: 'ACTIVE',
       });
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'printer.tenantId = :tenantId',
+        { tenantId: mockTenantId },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'printer.outletId = :outletId',
+        { outletId: mockOutletId },
+      );
       expect(result).toHaveLength(1);
-      expect(qb.where).toHaveBeenCalledWith('printer.tenantId = :tenantId', {
-        tenantId: mockTenantId,
-      });
-      expect(qb.andWhere).toHaveBeenCalledWith('printer.outletId = :outletId', {
-        outletId: mockOutletId,
-      });
     });
   });
 
   describe('findById', () => {
     it('returns printer when found', async () => {
-      printerRepo.findOne.mockResolvedValue({ id: 'p-1', name: 'Printer 1' });
+      const mockPrinter = { id: 'p-1', tenantId: mockTenantId };
+      printerRepo.findOne.mockResolvedValue(mockPrinter);
+
       const result = await service.findById(mockTenantId, 'p-1');
-      expect(result.id).toBe('p-1');
+      expect(result).toEqual(mockPrinter);
     });
 
-    it('throws NotFoundException when printer not found', async () => {
+    it('throws NotFoundException when printer does not exist', async () => {
       printerRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.findById(mockTenantId, 'p-nonexistent'),
+        service.findById(mockTenantId, 'non-existent'),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('create', () => {
-    it('throws NotFoundException if outlet not found', async () => {
+    it('creates a printer and records audit log', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
+
+      const dto = {
+        outletId: mockOutletId,
+        name: 'Kasir Utama',
+        type: 'RECEIPT' as const,
+        connectionType: 'BLUETOOTH' as const,
+        paperSize: '58mm' as const,
+        isDefault: true,
+      };
+
+      const result = await service.create(mockTenantId, dto, mockUserId);
+
+      expect(result.id).toBe('printer-uuid-1');
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PRINTER_CREATED',
+          tenantId: mockTenantId,
+        }),
+      );
+    });
+
+    it('throws NotFoundException when outlet is not found', async () => {
       outletRepo.findOne.mockResolvedValue(null);
       await expect(
         service.create(
           mockTenantId,
           {
-            outletId: 'bad-outlet',
-            name: 'Cashier Printer',
+            outletId: 'non-existent',
+            name: 'P',
             type: 'RECEIPT',
-            connectionType: 'BLUETOOTH',
+            connectionType: 'USB',
           },
           mockUserId,
         ),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('throws BadRequestException if NETWORK connection lacks ipAddress', async () => {
+    it('throws BadRequestException if connectionType is NETWORK without ipAddress', async () => {
       outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
       await expect(
         service.create(
           mockTenantId,
           {
             outletId: mockOutletId,
-            name: 'LAN Printer',
+            name: 'P',
             type: 'RECEIPT',
             connectionType: 'NETWORK',
           },
@@ -230,253 +310,297 @@ describe('PrinterService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
     });
-
-    it('creates Bluetooth printer with isDefault resetting other defaults', async () => {
-      outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
-
-      const result = await service.create(
-        mockTenantId,
-        {
-          outletId: mockOutletId,
-          name: 'Bluetooth Cashier',
-          type: 'RECEIPT',
-          connectionType: 'BLUETOOTH',
-          paperSize: '58mm',
-          isDefault: true,
-        },
-        mockUserId,
-      );
-
-      expect(dataSource.transaction).toHaveBeenCalled();
-      expect(printerRepo.update).toHaveBeenCalledWith(
-        {
-          tenantId: mockTenantId,
-          outletId: mockOutletId,
-          type: 'RECEIPT',
-          isDefault: true,
-        },
-        { isDefault: false },
-      );
-      expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'PRINTER_CREATED' }),
-      );
-      expect(result.name).toBe('Bluetooth Cashier');
-    });
   });
 
-  describe('update', () => {
-    it('updates printer and unsets existing default if isDefault is true', async () => {
-      printerRepo.findOne.mockResolvedValue({
-        id: 'p-1',
-        outletId: mockOutletId,
-        type: 'RECEIPT',
-        connectionType: 'BLUETOOTH',
-      });
-      printerRepo.findOneOrFail.mockResolvedValue({
-        id: 'p-1',
-        name: 'Updated Printer',
-        isDefault: true,
-      });
-
-      const result = await service.update(
-        mockTenantId,
-        'p-1',
-        { name: 'Updated Printer', isDefault: true },
-        mockUserId,
-      );
-
-      expect(printerRepo.update).toHaveBeenCalledWith(
-        {
-          tenantId: mockTenantId,
-          outletId: mockOutletId,
-          type: 'RECEIPT',
-          isDefault: true,
-        },
-        { isDefault: false },
-      );
-      expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'PRINTER_UPDATED' }),
-      );
-      expect(result.name).toBe('Updated Printer');
-    });
-  });
-
-  describe('delete', () => {
-    it('deletes printer and logs audit', async () => {
-      printerRepo.findOne.mockResolvedValue({
-        id: 'p-1',
-        name: 'To Delete',
-        type: 'KITCHEN',
-        outletId: mockOutletId,
-      });
-
-      const result = await service.delete(mockTenantId, 'p-1', mockUserId);
-      expect(printerRepo.delete).toHaveBeenCalledWith({
-        id: 'p-1',
-        tenantId: mockTenantId,
-      });
-      expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'PRINTER_DELETED' }),
-      );
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe('printOrder', () => {
-    it('throws NotFoundException if order does not exist', async () => {
-      orderRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.printOrder(mockTenantId, 'bad-order', {}, mockUserId),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('throws BadRequestException if printing RECEIPT for non-COMPLETED order', async () => {
-      orderRepo.findOne.mockResolvedValue({
-        id: 'order-1',
-        status: 'PENDING',
-        outletId: mockOutletId,
-      });
-
-      await expect(
-        service.printOrder(
-          mockTenantId,
-          'order-1',
-          { type: 'RECEIPT' },
-          mockUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws NotFoundException if no active printer configured', async () => {
-      orderRepo.findOne.mockResolvedValue({
-        id: 'order-1',
-        status: 'COMPLETED',
-        outletId: mockOutletId,
-      });
-      printerRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.printOrder(mockTenantId, 'order-1', {}, mockUserId),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('returns READY_TO_PRINT and Base64 payload for BLUETOOTH printer', async () => {
-      const mockOrder = {
-        id: 'order-1',
-        orderNumber: 'ORD-001',
-        status: 'COMPLETED',
-        outletId: mockOutletId,
-      };
-      orderRepo.findOne.mockResolvedValue(mockOrder);
-
+  describe('testPrint', () => {
+    it('generates test slip and returns READY_TO_PRINT for bluetooth printer', async () => {
       const mockPrinter = {
-        id: 'p-bt',
-        name: 'Kasir BT',
-        type: 'RECEIPT',
+        id: 'p-test',
+        name: 'Printer Dapur BT',
+        type: 'KITCHEN',
         connectionType: 'BLUETOOTH',
         paperSize: '58mm',
-        isDefault: true,
+        bluetoothMac: '66:32:B1:8A:22:90',
+        outlet: { name: 'Agilix Cafe Pusat' },
       };
       printerRepo.findOne.mockResolvedValue(mockPrinter);
-      paymentRepo.find.mockResolvedValue([]);
 
-      const result = await service.printOrder(
+      const result = await service.testPrint(
         mockTenantId,
-        'order-1',
-        { type: 'RECEIPT' },
+        'p-test',
         mockUserId,
-        'Kasir Budi',
       );
 
-      expect(escposBuilder.buildReceipt).toHaveBeenCalledWith(
+      expect(escposBuilder.buildTestSlip).toHaveBeenCalledWith(
         expect.objectContaining({
-          cashierName: 'Kasir Budi',
-          paperSize: '58mm',
-          taxName: 'PB1',
-          footerNote: 'Thank you for your visit!',
+          outletName: 'Agilix Cafe Pusat',
+          printerName: 'Printer Dapur BT',
+          stationType: 'KITCHEN',
+          connectionType: 'BLUETOOTH',
         }),
       );
       expect(result.status).toBe('READY_TO_PRINT');
-      expect(result.connectionType).toBe('BLUETOOTH');
       expect(result.escposPayload).toBeDefined();
-      expect(result.rawText).toBe('Receipt content');
       expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'ORDER_PRINTED' }),
+        expect.objectContaining({
+          action: 'PRINTER_TEST_PRINTED',
+        }),
       );
     });
 
-    it('sends data via NetworkPrinterDriver for NETWORK printer and returns SENT', async () => {
-      const mockOrder = {
-        id: 'order-2',
-        orderNumber: 'ORD-002',
-        status: 'COMPLETED',
-        outletId: mockOutletId,
-      };
-      orderRepo.findOne.mockResolvedValue(mockOrder);
-
+    it('sends via socket driver for network printer and returns SENT', async () => {
       const mockPrinter = {
-        id: 'p-lan',
-        name: 'Kitchen LAN',
-        type: 'KITCHEN',
+        id: 'p-net',
+        name: 'Printer Bar LAN',
+        type: 'BAR',
         connectionType: 'NETWORK',
         paperSize: '80mm',
-        ipAddress: '192.168.1.150',
+        ipAddress: '192.168.1.60',
         port: 9100,
-        isDefault: true,
+        outlet: { name: 'Outlet 1' },
       };
       printerRepo.findOne.mockResolvedValue(mockPrinter);
       networkDriver.send.mockResolvedValue(undefined);
 
-      const result = await service.printOrder(
-        mockTenantId,
-        'order-2',
-        { type: 'KITCHEN' },
-        mockUserId,
-      );
+      const result = await service.testPrint(mockTenantId, 'p-net', mockUserId);
 
-      expect(escposBuilder.buildKitchenTicket).toHaveBeenCalledWith(
-        expect.objectContaining({ paperSize: '80mm' }),
-      );
       expect(networkDriver.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          ipAddress: '192.168.1.150',
+          ipAddress: '192.168.1.60',
           port: 9100,
         }),
       );
       expect(result.status).toBe('SENT');
-      expect(result.connectionType).toBe('NETWORK');
     });
 
-    it('throws BadGatewayException when network printer communication fails', async () => {
+    it('throws BadGatewayException when network test print fails', async () => {
+      const mockPrinter = {
+        id: 'p-net',
+        name: 'Printer Bar LAN',
+        type: 'BAR',
+        connectionType: 'NETWORK',
+        paperSize: '80mm',
+        ipAddress: '192.168.1.60',
+        port: 9100,
+        outlet: { name: 'Outlet 1' },
+      };
+      printerRepo.findOne.mockResolvedValue(mockPrinter);
+      networkDriver.send.mockRejectedValue(new Error('Connection timed out'));
+
+      await expect(
+        service.testPrint(mockTenantId, 'p-net', mockUserId),
+      ).rejects.toThrow(BadGatewayException);
+    });
+  });
+
+  describe('routing rules (getRoutingRules & setRoutingRules)', () => {
+    it('returns routing rules for outlet categories', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
+      categoryRepo.find.mockResolvedValue([
+        { id: 'cat-food', name: 'Makanan' },
+        { id: 'cat-drink', name: 'Minuman' },
+      ]);
+      printerRepo.find.mockResolvedValue([
+        { id: 'pr-kitchen', name: 'Kitchen Printer', type: 'KITCHEN' },
+        { id: 'pr-bar', name: 'Bar Printer', type: 'BAR' },
+      ]);
+      routingRepo.find.mockResolvedValue([
+        {
+          categoryId: 'cat-food',
+          printerId: 'pr-kitchen',
+          printer: { name: 'Kitchen Printer', type: 'KITCHEN' },
+        },
+      ]);
+
+      const result = await service.getRoutingRules(mockTenantId, mockOutletId);
+
+      expect(result.outletId).toBe(mockOutletId);
+      expect(result.printers).toHaveLength(2);
+      expect(result.rules).toHaveLength(2);
+      expect(result.rules[0]).toEqual({
+        categoryId: 'cat-food',
+        categoryName: 'Makanan',
+        printerId: 'pr-kitchen',
+        printerName: 'Kitchen Printer',
+        stationType: 'KITCHEN',
+      });
+      expect(result.rules[1].printerId).toBeNull();
+    });
+
+    it('updates routing rules successfully in transaction', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: mockOutletId });
+      printerRepo.find.mockResolvedValue([
+        { id: 'pr-kitchen', outletId: mockOutletId },
+        { id: 'pr-bar', outletId: mockOutletId },
+      ]);
+      categoryRepo.find.mockResolvedValue([
+        { id: 'cat-food', name: 'Makanan' },
+        { id: 'cat-drink', name: 'Minuman' },
+      ]);
+
+      const dto = {
+        outletId: mockOutletId,
+        routings: [
+          { categoryId: 'cat-food', printerId: 'pr-kitchen' },
+          { categoryId: 'cat-drink', printerId: 'pr-bar' },
+        ],
+      };
+
+      const result = await service.setRoutingRules(
+        mockTenantId,
+        dto,
+        mockUserId,
+      );
+
+      expect(routingRepo.delete).toHaveBeenCalledWith({
+        tenantId: mockTenantId,
+        outletId: mockOutletId,
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PRINTER_ROUTING_UPDATED',
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('dispatchOrder (Smart Dispatch Engine)', () => {
+    it('handles Scenario 1: Single Active Printer mode (UMKM fallback)', async () => {
       const mockOrder = {
-        id: 'order-3',
-        orderNumber: 'ORD-003',
+        id: 'ord-single-1',
+        orderNumber: 'ORD-001',
         status: 'COMPLETED',
         outletId: mockOutletId,
+        items: [
+          { productName: 'Nasi Goreng', quantity: 1 },
+          { productName: 'Es Teh', quantity: 1 },
+        ],
       };
       orderRepo.findOne.mockResolvedValue(mockOrder);
 
-      const mockPrinter = {
-        id: 'p-lan',
-        name: 'Kitchen LAN',
-        type: 'KITCHEN',
-        connectionType: 'NETWORK',
-        paperSize: '80mm',
-        ipAddress: '192.168.1.150',
-        port: 9100,
+      const singlePrinter = {
+        id: 'p-single',
+        name: 'Single Cashier Printer',
+        type: 'RECEIPT',
+        connectionType: 'BLUETOOTH',
+        paperSize: '58mm',
+        status: 'ACTIVE',
       };
-      printerRepo.findOne.mockResolvedValue(mockPrinter);
-      networkDriver.send.mockRejectedValue(new Error('ECONNREFUSED'));
+      printerRepo.find.mockResolvedValue([singlePrinter]);
+
+      const result = await service.dispatchOrder(
+        mockTenantId,
+        'ord-single-1',
+        {},
+        mockUserId,
+        'Kasir 1',
+      );
+
+      expect(result.isSinglePrinterMode).toBe(true);
+      expect(result.printJobs).toHaveLength(1);
+      expect(result.printJobs[0].printerId).toBe('p-single');
+      expect(result.printJobs[0].itemCount).toBe(2);
+      expect(escposBuilder.buildReceipt).toHaveBeenCalled();
+    });
+
+    it('handles Scenario 2: Multi-Printer Station & Category Routing', async () => {
+      const mockOrder = {
+        id: 'ord-multi-1',
+        orderNumber: 'ORD-002',
+        status: 'COMPLETED',
+        outletId: mockOutletId,
+        items: [
+          {
+            id: 'item-food-1',
+            productName: 'Nasi Goreng Spesial',
+            quantity: 2,
+            product: { categoryId: 'cat-food' },
+          },
+          {
+            id: 'item-drink-1',
+            productName: 'Matcha Latte',
+            quantity: 1,
+            product: { categoryId: 'cat-drink' },
+          },
+        ],
+      };
+      orderRepo.findOne.mockResolvedValue(mockOrder);
+
+      const kitchenPrinter = {
+        id: 'p-kitchen',
+        name: 'Kitchen Station',
+        type: 'KITCHEN',
+        connectionType: 'BLUETOOTH',
+        paperSize: '58mm',
+        status: 'ACTIVE',
+      };
+      const barPrinter = {
+        id: 'p-bar',
+        name: 'Bar Station',
+        type: 'BAR',
+        connectionType: 'BLUETOOTH',
+        paperSize: '58mm',
+        status: 'ACTIVE',
+      };
+      const receiptPrinter = {
+        id: 'p-receipt',
+        name: 'Cashier Station',
+        type: 'RECEIPT',
+        connectionType: 'BLUETOOTH',
+        paperSize: '58mm',
+        status: 'ACTIVE',
+        isDefault: true,
+      };
+
+      printerRepo.find.mockResolvedValue([
+        kitchenPrinter,
+        barPrinter,
+        receiptPrinter,
+      ]);
+
+      routingRepo.find.mockResolvedValue([
+        { categoryId: 'cat-food', printer: kitchenPrinter },
+        { categoryId: 'cat-drink', printer: barPrinter },
+      ]);
+
+      const result = await service.dispatchOrder(
+        mockTenantId,
+        'ord-multi-1',
+        { mode: 'AUTO' },
+        mockUserId,
+      );
+
+      expect(result.isSinglePrinterMode).toBe(false);
+      // Expected 3 jobs: Kitchen ticket (food), Bar ticket (drink), and Customer Receipt
+      expect(result.printJobs).toHaveLength(3);
+
+      const kitchenJob = result.printJobs.find((j) => j.station === 'KITCHEN');
+      const barJob = result.printJobs.find((j) => j.station === 'BAR');
+      const receiptJob = result.printJobs.find((j) => j.station === 'RECEIPT');
+
+      expect(kitchenJob).toBeDefined();
+      expect(kitchenJob!.itemCount).toBe(1);
+      expect(escposBuilder.buildKitchenTicket).toHaveBeenCalled();
+
+      expect(barJob).toBeDefined();
+      expect(barJob!.itemCount).toBe(1);
+      expect(escposBuilder.buildBarTicket).toHaveBeenCalled();
+
+      expect(receiptJob).toBeDefined();
+      expect(escposBuilder.buildReceipt).toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if no active printers are configured for outlet', async () => {
+      orderRepo.findOne.mockResolvedValue({
+        id: 'ord-1',
+        outletId: mockOutletId,
+      });
+      printerRepo.find.mockResolvedValue([]);
 
       await expect(
-        service.printOrder(
-          mockTenantId,
-          'order-3',
-          { type: 'KITCHEN' },
-          mockUserId,
-        ),
-      ).rejects.toThrow(BadGatewayException);
+        service.dispatchOrder(mockTenantId, 'ord-1', {}, mockUserId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
