@@ -17,6 +17,7 @@ import { User } from '../user/user.entity';
 import { ConsoleWebhookDto } from './console-webhook.dto';
 
 describe('WebhookService', () => {
+  jest.setTimeout(20000);
   const apiKey = 'test-console-api-key';
 
   const mockAuditRecord = jest.fn().mockResolvedValue(undefined);

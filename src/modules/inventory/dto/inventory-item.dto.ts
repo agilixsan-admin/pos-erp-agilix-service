@@ -16,6 +16,11 @@ export class CreateInventoryItemDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['RAW_MATERIAL', 'PACKAGING'])
+  itemType?: 'RAW_MATERIAL' | 'PACKAGING' = 'RAW_MATERIAL';
+
+  @IsOptional()
+  @IsString()
   sku?: string;
 
   @IsOptional()
@@ -29,6 +34,11 @@ export class CreateInventoryItemDto {
   @IsOptional()
   @IsString()
   unit?: string = 'pcs';
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number = 0;
 
   @IsOptional()
   @IsNumber()
@@ -48,6 +58,11 @@ export class UpdateInventoryItemDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['RAW_MATERIAL', 'PACKAGING'])
+  itemType?: 'RAW_MATERIAL' | 'PACKAGING';
+
+  @IsOptional()
+  @IsString()
   sku?: string;
 
   @IsOptional()
@@ -60,6 +75,11 @@ export class UpdateInventoryItemDto {
 
   @IsString()
   unit!: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
 
   @IsNumber()
   @Min(0)
@@ -88,6 +108,24 @@ export class QueryInventoryDto {
   search?: string;
 
   @IsOptional()
+  @IsString()
+  @IsIn(['ALL', 'RAW_MATERIAL', 'PACKAGING', 'raw_material', 'packaging'])
+  itemType?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([
+    'ALL',
+    'NORMAL',
+    'LOW_STOCK',
+    'OUT_OF_STOCK',
+    'normal',
+    'low_stock',
+    'out_of_stock',
+  ])
+  stockStatus?: string;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
 
@@ -102,8 +140,9 @@ export class QueryInventoryDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['name', 'createdAt', 'updatedAt'])
-  sortBy?: 'name' | 'createdAt' | 'updatedAt' = 'createdAt';
+  @IsIn(['name', 'createdAt', 'updatedAt', 'sku', 'unitCost'])
+  sortBy?: 'name' | 'createdAt' | 'updatedAt' | 'sku' | 'unitCost' =
+    'createdAt';
 
   @IsOptional()
   @IsString()

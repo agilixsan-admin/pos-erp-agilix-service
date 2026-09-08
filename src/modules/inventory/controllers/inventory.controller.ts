@@ -315,11 +315,13 @@ export class InventoryController {
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('outletId') outletId?: string,
   ) {
+    const effectiveOutletId = outletId ?? user.outletId ?? undefined;
     const data = await this.inventoryService.findById(
       user.tenantId,
       id,
-      user.outletId ?? undefined,
+      effectiveOutletId,
     );
     return {
       success: true,

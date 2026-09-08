@@ -18,6 +18,7 @@ import { CreateSuppliersTable1700000000016 } from './1700000000016-CreateSupplie
 import { CreatePurchasesTables1700000000017 } from './1700000000017-CreatePurchasesTables';
 import { CreateStockOpnamesTables1700000000018 } from './1700000000018-CreateStockOpnamesTables';
 import { CreateStockAdjustmentsTable1700000000019 } from './1700000000019-CreateStockAdjustmentsTable';
+import { AddInventoryItemType1700000000020 } from './1700000000020-AddInventoryItemType';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -40,4 +41,5 @@ export const ALL_MIGRATIONS = [
   CreatePurchasesTables1700000000017,
   CreateStockOpnamesTables1700000000018,
   CreateStockAdjustmentsTable1700000000019,
+  AddInventoryItemType1700000000020,
 ];

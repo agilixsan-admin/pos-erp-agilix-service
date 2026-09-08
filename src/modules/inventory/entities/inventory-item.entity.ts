@@ -17,12 +17,21 @@ import { InventoryCategory } from './inventory-category.entity';
 @Entity('inventory_items')
 @Index(['tenantId', 'sku'])
 @Index(['categoryId'])
+@Index(['tenantId', 'itemType'])
 export class InventoryItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId!: string;
+
+  @Column({
+    name: 'item_type',
+    type: 'varchar',
+    length: 50,
+    default: 'RAW_MATERIAL',
+  })
+  itemType!: 'RAW_MATERIAL' | 'PACKAGING';
 
   @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId!: string | null;

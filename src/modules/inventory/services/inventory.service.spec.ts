@@ -130,23 +130,52 @@ describe('InventoryService', () => {
   });
 
   describe('findAll', () => {
-    it('returns paginated items scoped to tenantId', async () => {
+    it('returns paginated items with computed stock metrics and summary cards scoped to tenantId', async () => {
       const qb = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest
-          .fn()
-          .mockResolvedValue([[{ id: 'item-1', name: 'Beans' }], 1]),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'item-1',
+              name: 'Beans',
+              unitCost: 100,
+              minimumStock: 10,
+              stocks: [{ quantity: 5 }],
+            },
+          ],
+          1,
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({
+          totalItems: 1,
+          totalInventoryValue: 500,
+          lowStockCount: 1,
+          outOfStockCount: 0,
+        }),
       } as unknown as SelectQueryBuilder<InventoryItem>;
       mockItemRepo.createQueryBuilder.mockReturnValue(qb);
 
-      const result = await service.findAll('tenant-1', { page: 1, limit: 10 });
+      const result = await service.findAll('tenant-1', {
+        page: 1,
+        limit: 10,
+        itemType: 'RAW_MATERIAL',
+        stockStatus: 'LOW_STOCK',
+      });
       expect(result.data).toHaveLength(1);
+      expect(result.data[0].currentStock).toBe(5);
+      expect(result.data[0].stockValue).toBe(500);
+      expect(result.data[0].stockStatus).toBe('LOW_STOCK');
       expect(result.meta.total).toBe(1);
+      expect(result.summary.totalItems).toBe(1);
+      expect(result.summary.totalInventoryValue).toBe(500);
+      expect(result.summary.lowStockCount).toBe(1);
     });
   });
 
@@ -431,6 +460,12 @@ describe('InventoryService', () => {
       });
 
       expect(result.data).toHaveLength(1);
+      expect(
+        (result.data[0] as unknown as { inQuantity: number }).inQuantity,
+      ).toBe(5);
+      expect(
+        (result.data[0] as unknown as { outQuantity: number }).outQuantity,
+      ).toBe(0);
       expect(result.meta.total).toBe(1);
     });
   });

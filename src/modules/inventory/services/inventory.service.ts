@@ -183,6 +183,12 @@ export class InventoryService {
       });
     }
 
+    if (query.itemType && query.itemType.toUpperCase() !== 'ALL') {
+      qb.andWhere('item.itemType = :itemType', {
+        itemType: query.itemType.toUpperCase(),
+      });
+    }
+
     if (query.status) {
       qb.andWhere('item.status = :status', { status: query.status });
     }
@@ -194,7 +200,27 @@ export class InventoryService {
       );
     }
 
-    const sortColumn = query.sortBy === 'name' ? 'item.name' : 'item.createdAt';
+    if (query.stockStatus && query.stockStatus.toUpperCase() !== 'ALL') {
+      const statusFilter = query.stockStatus.toUpperCase();
+      if (statusFilter === 'OUT_OF_STOCK') {
+        qb.andWhere('(stock.quantity IS NULL OR stock.quantity <= 0)');
+      } else if (statusFilter === 'LOW_STOCK') {
+        qb.andWhere(
+          'stock.quantity > 0 AND stock.quantity <= item.minimumStock',
+        );
+      } else if (statusFilter === 'NORMAL') {
+        qb.andWhere('stock.quantity > item.minimumStock');
+      }
+    }
+
+    const sortColumn =
+      query.sortBy === 'name'
+        ? 'item.name'
+        : query.sortBy === 'sku'
+          ? 'item.sku'
+          : query.sortBy === 'unitCost'
+            ? 'item.unitCost'
+            : 'item.createdAt';
     const sortOrder = query.sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     qb.orderBy(sortColumn, sortOrder);
@@ -202,13 +228,85 @@ export class InventoryService {
 
     const [items, total] = await qb.getManyAndCount();
 
+    const data = items.map((item) => {
+      const currentStock =
+        item.stocks && item.stocks.length > 0
+          ? Number(item.stocks[0].quantity || 0)
+          : 0;
+      const unitCost = Number(item.unitCost || 0);
+      const minimumStock = Number(item.minimumStock || 0);
+      const stockValue = Math.round(currentStock * unitCost * 100) / 100;
+
+      let stockStatus = 'NORMAL';
+      if (currentStock <= 0) {
+        stockStatus = 'OUT_OF_STOCK';
+      } else if (currentStock <= minimumStock) {
+        stockStatus = 'LOW_STOCK';
+      }
+
+      return {
+        ...item,
+        currentStock,
+        stockValue,
+        stockStatus,
+      };
+    });
+
+    // Summary Metrics Cards
+    const summaryQb = this.itemRepository
+      .createQueryBuilder('item')
+      .where('item.tenantId = :tenantId', { tenantId });
+
+    if (query.outletId) {
+      summaryQb.leftJoin('item.stocks', 'stock', 'stock.outletId = :outletId', {
+        outletId: query.outletId,
+      });
+    } else {
+      summaryQb.leftJoin('item.stocks', 'stock');
+    }
+
+    if (query.itemType && query.itemType.toUpperCase() !== 'ALL') {
+      summaryQb.andWhere('item.itemType = :itemType', {
+        itemType: query.itemType.toUpperCase(),
+      });
+    }
+
+    const summaryResult = await summaryQb
+      .select('COUNT(DISTINCT item.id)', 'totalItems')
+      .addSelect(
+        'SUM(COALESCE(stock.quantity, 0) * COALESCE(item.unitCost, 0))',
+        'totalInventoryValue',
+      )
+      .addSelect(
+        'COUNT(DISTINCT CASE WHEN COALESCE(stock.quantity, 0) > 0 AND COALESCE(stock.quantity, 0) <= item.minimumStock THEN item.id END)',
+        'lowStockCount',
+      )
+      .addSelect(
+        'COUNT(DISTINCT CASE WHEN COALESCE(stock.quantity, 0) <= 0 THEN item.id END)',
+        'outOfStockCount',
+      )
+      .getRawOne<{
+        totalItems?: string | number;
+        totalInventoryValue?: string | number;
+        lowStockCount?: string | number;
+        outOfStockCount?: string | number;
+      }>();
+
     return {
-      data: items,
+      data,
       meta: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+      },
+      summary: {
+        totalItems: Number(summaryResult?.totalItems || 0),
+        totalInventoryValue:
+          Math.round(Number(summaryResult?.totalInventoryValue || 0) * 100) /
+          100,
+        lowStockCount: Number(summaryResult?.lowStockCount || 0),
+        outOfStockCount: Number(summaryResult?.outOfStockCount || 0),
       },
     };
   }
@@ -240,7 +338,27 @@ export class InventoryService {
       });
     }
 
-    return item;
+    const currentStock =
+      item.stocks && item.stocks.length > 0
+        ? Number(item.stocks[0].quantity || 0)
+        : 0;
+    const unitCost = Number(item.unitCost || 0);
+    const minimumStock = Number(item.minimumStock || 0);
+    const stockValue = Math.round(currentStock * unitCost * 100) / 100;
+
+    let stockStatus = 'NORMAL';
+    if (currentStock <= 0) {
+      stockStatus = 'OUT_OF_STOCK';
+    } else if (currentStock <= minimumStock) {
+      stockStatus = 'LOW_STOCK';
+    }
+
+    return {
+      ...item,
+      currentStock,
+      stockValue,
+      stockStatus,
+    };
   }
 
   async create(tenantId: string, dto: CreateInventoryItemDto) {
@@ -251,10 +369,12 @@ export class InventoryService {
     const item = this.itemRepository.create({
       tenantId,
       name: dto.name,
+      itemType: dto.itemType ?? 'RAW_MATERIAL',
       sku: dto.sku ?? null,
       categoryId: dto.categoryId ?? null,
       description: dto.description ?? null,
       unit: dto.unit ?? 'pcs',
+      unitCost: dto.unitCost ?? 0,
       minimumStock: dto.minimumStock ?? 0,
       status: dto.status ?? 'ACTIVE',
     });
@@ -264,7 +384,14 @@ export class InventoryService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateInventoryItemDto) {
-    const item = await this.findById(tenantId, id);
+    const item = await this.itemRepository.findOne({ where: { id, tenantId } });
+    if (!item) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Inventory item not found',
+        code: 'INVENTORY_ITEM_NOT_FOUND',
+      });
+    }
 
     if (dto.categoryId !== undefined) {
       if (dto.categoryId) {
@@ -273,12 +400,19 @@ export class InventoryService {
       item.categoryId = dto.categoryId ?? null;
     }
 
+    if (dto.itemType !== undefined) {
+      item.itemType = dto.itemType;
+    }
+
     item.name = dto.name;
     item.sku = dto.sku ?? null;
     if (dto.description !== undefined) {
       item.description = dto.description ?? null;
     }
     item.unit = dto.unit;
+    if (dto.unitCost !== undefined) {
+      item.unitCost = dto.unitCost;
+    }
     item.minimumStock = dto.minimumStock;
     item.status = dto.status;
 
@@ -727,8 +861,33 @@ export class InventoryService {
 
     const [items, total] = await qb.getManyAndCount();
 
+    const data = items.map((mov) => {
+      const typeUpper = (mov.movementType || '').toUpperCase();
+      const isOut = [
+        'OUT',
+        'SALE',
+        'ADJUSTMENT_OUT',
+        'VOID',
+        'WASTE',
+        'TRANSFER_OUT',
+      ].includes(typeUpper);
+      const isIn = [
+        'IN',
+        'PURCHASE',
+        'ADJUSTMENT_IN',
+        'INITIAL',
+        'TRANSFER_IN',
+      ].includes(typeUpper);
+
+      return {
+        ...mov,
+        inQuantity: isIn ? Number(mov.quantity || 0) : 0,
+        outQuantity: isOut ? Number(mov.quantity || 0) : 0,
+      };
+    });
+
     return {
-      data: items,
+      data,
       meta: {
         page,
         limit,
