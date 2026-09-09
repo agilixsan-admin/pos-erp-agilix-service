@@ -1,10 +1,18 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { UserService } from '../user/user.service';
 import { AuditService } from '../audit/audit.service';
 import { User } from '../user/user.entity';
+import { UserInvitation } from '../user/entities/user-invitation.entity';
 
 export function parseTtlToSeconds(ttl: string | number): number {
   if (typeof ttl === 'number') return ttl;
@@ -31,10 +39,18 @@ export function parseTtlToSeconds(ttl: string | number): number {
 export class AuthService {
   constructor(
     private readonly users: UserService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(UserInvitation)
+    private readonly invitationRepo: Repository<UserInvitation>,
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
   ) {}
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
 
   async login(email: string, password: string) {
     const user = await this.users.findByEmail(email);
@@ -99,6 +115,76 @@ export class AuthService {
     }
 
     return this.generateAuthResponse(user);
+  }
+
+  /**
+   * Verify an invitation token before showing password setup UI
+   */
+  async verifyInvitation(token: string) {
+    const tokenHash = this.hashToken(token);
+    const invitation = await this.invitationRepo.findOne({
+      where: { tokenHash },
+      relations: { user: { tenant: true, outlet: true, role: true } },
+    });
+
+    if (!invitation || invitation.usedAt || invitation.expiresAt < new Date()) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Invalid or expired invitation token',
+        code: 'INVALID_INVITATION_TOKEN',
+      });
+    }
+
+    return {
+      valid: true,
+      email: invitation.user.email,
+      name: invitation.user.name,
+      businessName: invitation.user.tenant?.businessName ?? 'Agilix POS',
+      outletName: invitation.user.outlet?.name ?? 'Semua Outlet',
+      roleName: invitation.user.role?.name ?? 'Staff',
+    };
+  }
+
+  /**
+   * Set user password using a valid invitation token
+   */
+  async setPassword(token: string, password: string) {
+    const tokenHash = this.hashToken(token);
+    const invitation = await this.invitationRepo.findOne({
+      where: { tokenHash },
+      relations: { user: { tenant: true, outlet: true, role: true } },
+    });
+
+    if (!invitation || invitation.usedAt || invitation.expiresAt < new Date()) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Invalid or expired invitation token',
+        code: 'INVALID_INVITATION_TOKEN',
+      });
+    }
+
+    const user = invitation.user;
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(password, salt);
+    user.status = 'ACTIVE';
+    await this.userRepo.save(user);
+
+    invitation.usedAt = new Date();
+    await this.invitationRepo.save(invitation);
+
+    await this.audit.record({
+      action: 'USER_PASSWORD_SET',
+      tenantId: user.tenantId,
+      actorType: 'USER',
+      actorId: user.id,
+      metadata: { email: user.email },
+    });
+
+    const authData = await this.generateAuthResponse(user);
+    return {
+      ...authData,
+      message: 'Password set successfully. Account is now active.',
+    };
   }
 
   validateUser(id: string) {

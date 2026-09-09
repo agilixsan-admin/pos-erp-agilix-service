@@ -1,12 +1,17 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Repository } from 'typeorm';
 import { AuthService, parseTtlToSeconds } from './auth.service';
 import { UserService } from '../user/user.service';
 import { AuditService } from '../audit/audit.service';
+import { User } from '../user/user.entity';
+import { UserInvitation } from '../user/entities/user-invitation.entity';
 
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
+  genSalt: jest.fn().mockResolvedValue('salt'),
+  hash: jest.fn().mockResolvedValue('hashed-new-password'),
 }));
 
 import * as bcrypt from 'bcryptjs';
@@ -21,6 +26,9 @@ describe('AuthService', () => {
     outletId: 'outlet-1',
     roleId: 'role-1',
     status: 'ACTIVE',
+    tenant: { businessName: 'Test Cafe' },
+    outlet: { name: 'Outlet Pusat' },
+    role: { name: 'Cashier' },
   };
 
   const findByEmail = jest.fn();
@@ -28,6 +36,15 @@ describe('AuthService', () => {
   const signAsync = jest.fn().mockResolvedValue('signed-token');
   const verifyAsync = jest.fn();
   const auditRecord = jest.fn().mockResolvedValue(undefined);
+
+  const mockUserRepo = {
+    save: jest.fn().mockResolvedValue(mockUser),
+  } as unknown as Repository<User>;
+
+  const mockInvitationRepo = {
+    findOne: jest.fn(),
+    save: jest.fn().mockResolvedValue({}),
+  } as unknown as Repository<UserInvitation>;
 
   const mockUserService = { findByEmail, findById } as unknown as UserService;
   const mockJwtService = {
@@ -52,6 +69,8 @@ describe('AuthService', () => {
     signAsync.mockResolvedValue('signed-token');
     service = new AuthService(
       mockUserService,
+      mockUserRepo,
+      mockInvitationRepo,
       mockJwtService,
       mockAuditService,
       mockConfigService,
@@ -102,7 +121,7 @@ describe('AuthService', () => {
         expiresIn: 900,
         refreshToken: 'signed-token',
         refreshExpiresIn: 604800,
-        user: {
+        user: expect.objectContaining({
           id: 'user-1',
           name: 'Cashier User',
           email: 'cashier@test.com',
@@ -110,7 +129,7 @@ describe('AuthService', () => {
           outletId: 'outlet-1',
           roleId: 'role-1',
           status: 'ACTIVE',
-        },
+        }),
       });
 
       expect(signAsync).toHaveBeenCalledTimes(2);
@@ -186,7 +205,7 @@ describe('AuthService', () => {
         expiresIn: 900,
         refreshToken: 'signed-token',
         refreshExpiresIn: 604800,
-        user: {
+        user: expect.objectContaining({
           id: 'user-1',
           name: 'Cashier User',
           email: 'cashier@test.com',
@@ -194,7 +213,7 @@ describe('AuthService', () => {
           outletId: 'outlet-1',
           roleId: 'role-1',
           status: 'ACTIVE',
-        },
+        }),
       });
       expect(verifyAsync).toHaveBeenCalledWith('valid-refresh-token', {
         secret: 'test-refresh-secret',
@@ -229,6 +248,98 @@ describe('AuthService', () => {
 
       await expect(service.refreshToken('valid-refresh-token')).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+  });
+
+  // ─── verifyInvitation ─────────────────────────────────────────────────────
+
+  describe('verifyInvitation', () => {
+    it('returns user and business info when token is valid', async () => {
+      (mockInvitationRepo.findOne as jest.Mock).mockResolvedValue({
+        id: 'inv-1',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+        user: mockUser,
+      });
+
+      const result = await service.verifyInvitation('valid-token-123');
+
+      expect(result).toEqual({
+        valid: true,
+        email: mockUser.email,
+        name: mockUser.name,
+        businessName: 'Test Cafe',
+        outletName: 'Outlet Pusat',
+        roleName: 'Cashier',
+      });
+    });
+
+    it('throws BadRequestException when invitation token is expired', async () => {
+      (mockInvitationRepo.findOne as jest.Mock).mockResolvedValue({
+        id: 'inv-1',
+        usedAt: null,
+        expiresAt: new Date(Date.now() - 3600 * 1000),
+        user: mockUser,
+      });
+
+      await expect(service.verifyInvitation('expired-token')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('throws BadRequestException when invitation token has already been used', async () => {
+      (mockInvitationRepo.findOne as jest.Mock).mockResolvedValue({
+        id: 'inv-1',
+        usedAt: new Date(),
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+        user: mockUser,
+      });
+
+      await expect(service.verifyInvitation('used-token')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  // ─── setPassword ──────────────────────────────────────────────────────────
+
+  describe('setPassword', () => {
+    it('updates password, marks token as used, and returns auth response', async () => {
+      const invitationRecord = {
+        id: 'inv-1',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+        user: { ...mockUser },
+      };
+      (mockInvitationRepo.findOne as jest.Mock).mockResolvedValue(
+        invitationRecord,
+      );
+
+      const result = await service.setPassword(
+        'valid-token-123',
+        'NewSecret123!',
+      );
+
+      expect(result.accessToken).toBe('signed-token');
+      expect(result.message).toBe(
+        'Password set successfully. Account is now active.',
+      );
+      expect(mockUserRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'ACTIVE',
+          passwordHash: 'hashed-new-password',
+        }),
+      );
+      expect(mockInvitationRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usedAt: expect.any(Date),
+        }),
+      );
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_PASSWORD_SET',
+        }),
       );
     });
   });

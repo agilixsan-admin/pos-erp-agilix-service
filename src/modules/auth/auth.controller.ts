@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  RefreshTokenDto,
+  SetPasswordDto,
+  VerifyInvitationDto,
+} from './dto/auth.dto';
 import { User } from '../user/user.entity';
 
 @Controller('auth')
@@ -29,6 +34,30 @@ export class AuthController {
       success: true,
       message: 'Token refreshed successfully',
       data: await this.auth.refreshToken(body.refreshToken),
+    };
+  }
+
+  @Public()
+  @Get('verify-invitation')
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
+  async verifyInvitation(@Query() query: VerifyInvitationDto) {
+    const data = await this.auth.verifyInvitation(query.token);
+    return {
+      success: true,
+      message: 'Invitation is valid',
+      data,
+    };
+  }
+
+  @Public()
+  @Post('set-password')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async setPassword(@Body() body: SetPasswordDto) {
+    const data = await this.auth.setPassword(body.token, body.password);
+    return {
+      success: true,
+      message: 'Password set successfully',
+      data,
     };
   }
 

@@ -14,3 +14,19 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken!: string;
 }
+
+export class VerifyInvitationDto {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
+
+export class SetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @IsString()
+  @MinLength(6)
+  password!: string;
+}
