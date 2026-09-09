@@ -36,13 +36,17 @@ export class MailService {
     const port = Number(this.config.get<number>('mail.port') ?? 2525);
     const user = this.config.get<string>('mail.username') ?? '';
     const pass = this.config.get<string>('mail.password') ?? '';
-    const secure = Boolean(this.config.get<boolean>('mail.secure') ?? false);
+    const secure =
+      Boolean(this.config.get<boolean>('mail.secure')) || port === 465;
 
     const transportOptions: nodemailer.TransportOptions = {
       host,
       port,
       secure,
       auth: user ? { user, pass } : undefined,
+      tls: {
+        rejectUnauthorized: false,
+      },
     } as unknown as nodemailer.TransportOptions;
 
     this.transporter = nodemailer.createTransport(transportOptions);

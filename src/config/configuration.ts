@@ -68,7 +68,10 @@ export default () => ({
     username: process.env.SMTP_USERNAME ?? '',
     password: process.env.SMTP_PASSWORD ?? '',
     from: process.env.SMTP_FROM ?? 'noreply@agilix.id',
-    secure: process.env.SSl === 'true',
+    secure:
+      (process.env.SMTP_SECURE || process.env.SSL || '')
+        .toLowerCase()
+        .trim() === 'true' || Number(process.env.SMTP_PORT ?? 2525) === 465,
   },
   app: {
     frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
