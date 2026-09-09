@@ -135,7 +135,7 @@ describe('UserService', () => {
   // ─── findById ─────────────────────────────────────────────────────────────
 
   describe('findById', () => {
-    it('returns user with role relation when found', async () => {
+    it('returns user with role, outlet, and tenant relations when found', async () => {
       findOneUserMock.mockResolvedValue(mockUser);
 
       const result = await service.findById('user-1');
@@ -143,7 +143,7 @@ describe('UserService', () => {
       expect(result).toEqual(mockUser);
       expect(findOneUserMock).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: { role: true },
+        relations: { role: true, outlet: true, tenant: true },
       });
     });
 

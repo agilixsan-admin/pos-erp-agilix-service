@@ -1,19 +1,10 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsEmail, IsString, MinLength } from 'class-validator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
+import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
 import { User } from '../user/user.entity';
-
-class LoginDto {
-  @IsEmail()
-  email!: string;
-
-  @IsString()
-  @MinLength(1)
-  password!: string;
-}
 
 @Controller('auth')
 export class AuthController {
@@ -27,6 +18,17 @@ export class AuthController {
       success: true,
       message: 'Login successful',
       data: await this.auth.login(body.email, body.password),
+    };
+  }
+
+  @Public()
+  @Post('refresh')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  async refresh(@Body() body: RefreshTokenDto) {
+    return {
+      success: true,
+      message: 'Token refreshed successfully',
+      data: await this.auth.refreshToken(body.refreshToken),
     };
   }
 

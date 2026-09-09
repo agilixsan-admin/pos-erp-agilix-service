@@ -43,15 +43,20 @@ export class UserService {
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
       .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.outlet', 'outlet')
+      .leftJoinAndSelect('user.tenant', 'tenant')
       .where('LOWER(user.email) = LOWER(:email)', { email })
       .getOne();
   }
 
   /**
-   * Internal lookup by ID (used by JWT strategy)
+   * Internal lookup by ID (used by JWT strategy & auth refresh)
    */
   findById(id: string) {
-    return this.users.findOne({ where: { id }, relations: { role: true } });
+    return this.users.findOne({
+      where: { id },
+      relations: { role: true, outlet: true, tenant: true },
+    });
   }
 
   /**
