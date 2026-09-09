@@ -62,4 +62,16 @@ export default () => ({
       isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
     },
   },
+  mail: {
+    host: process.env.SMTP_HOST ?? 'smtp.mailtrap.io',
+    port: Number(process.env.SMTP_PORT ?? 2525),
+    username: process.env.SMTP_USERNAME ?? '',
+    password: process.env.SMTP_PASSWORD ?? '',
+    from: process.env.SMTP_FROM ?? 'noreply@agilix.id',
+    secure: process.env.SSl === 'true',
+  },
+  app: {
+    frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    invitationExpiresHours: Number(process.env.INVITATION_EXPIRES_HOURS ?? 24),
+  },
 });
