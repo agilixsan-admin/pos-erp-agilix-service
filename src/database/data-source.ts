@@ -35,6 +35,8 @@ import { PurchaseItem } from '../modules/purchase/entities/purchase-item.entity'
 import { StockOpname } from '../modules/stock-opname/entities/stock-opname.entity';
 import { StockOpnameItem } from '../modules/stock-opname/entities/stock-opname-item.entity';
 import { StockAdjustment } from '../modules/inventory/entities/stock-adjustment.entity';
+import { EmailTemplate } from '../modules/mail/entities/email-template.entity';
+import { UserInvitation } from '../modules/user/entities/user-invitation.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
 export default new DataSource({
@@ -81,6 +83,8 @@ export default new DataSource({
     StockOpname,
     StockOpnameItem,
     StockAdjustment,
+    EmailTemplate,
+    UserInvitation,
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,
