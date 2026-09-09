@@ -35,10 +35,10 @@ jobs:
         run: npm ci
 
       - name: Lint Code Style
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Run Unit & Hardening Test Suites
-        run: npm test -- --no-watchman --maxWorkers=2 --if-present
+        run: npm test -- --no-watchman --maxWorkers=2
 
   build-and-push:
     name: Build & Push Docker Image
@@ -96,7 +96,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           source: 'docker-stack.yml'
-          target: 'home/${{ secrets.DEPLOY_USER }}/agilix-pos'
+          target: '/home/${{ secrets.DEPLOY_USER }}/agilix-pos'
 
       - name: Execute Swarm Stack Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -106,7 +106,7 @@ jobs:
           ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER}}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           envs: IMAGE_TAG,GHCR_PAT,ACTOR
