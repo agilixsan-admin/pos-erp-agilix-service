@@ -27,6 +27,7 @@ import { PackagingModule } from './modules/packaging/packaging.module';
 import { SupplierModule } from './modules/supplier/supplier.module';
 import { PurchaseModule } from './modules/purchase/purchase.module';
 import { StockOpnameModule } from './modules/stock-opname/stock-opname.module';
+import { MailModule } from './modules/mail/mail.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { TenantStatusGuard } from './common/guards/tenant-status.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -42,6 +43,7 @@ const conditionalModules = isProductionOrDevDb
       OutletModule,
       UserModule,
       AuthModule,
+      MailModule,
       RbacModule,
       AuditModule,
       WebhookModule,

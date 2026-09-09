@@ -1,5 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -23,7 +24,19 @@ export class CreateUserDto {
 
   @IsString()
   @MinLength(6)
-  password!: string;
+  @IsOptional()
+  password?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): boolean | undefined =>
+    value === 'true' || value === true
+      ? true
+      : value === 'false' || value === false
+        ? false
+        : undefined,
+  )
+  isSuperAdmin?: boolean;
 
   @IsUUID()
   @IsOptional()
@@ -47,6 +60,17 @@ export class UpdateUserDto {
   @MinLength(6)
   @IsOptional()
   password?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): boolean | undefined =>
+    value === 'true' || value === true
+      ? true
+      : value === 'false' || value === false
+        ? false
+        : undefined,
+  )
+  isSuperAdmin?: boolean;
 
   @IsUUID()
   @IsOptional()
@@ -82,6 +106,21 @@ export class QueryUserDto {
   @IsUUID()
   @IsOptional()
   outletId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  roleId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): boolean | undefined =>
+    value === 'true' || value === true
+      ? true
+      : value === 'false' || value === false
+        ? false
+        : undefined,
+  )
+  isSuperAdmin?: boolean;
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])

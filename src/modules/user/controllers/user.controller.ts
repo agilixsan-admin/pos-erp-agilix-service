@@ -63,6 +63,20 @@ export class UserController {
     };
   }
 
+  @Post(':id/resend-invitation')
+  @Permissions('user.create')
+  async resendInvitation(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const result = await this.userService.resendInvitation(
+      user.tenantId,
+      id,
+      user.id,
+    );
+    return result;
+  }
+
   @Put(':id')
   @Permissions('user.update')
   async update(

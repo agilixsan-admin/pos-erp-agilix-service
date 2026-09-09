@@ -5,11 +5,15 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { UserService } from './user.service';
 import { User } from './user.entity';
 import { Role } from '../rbac/role.entity';
 import { Outlet } from '../outlet/outlet.entity';
+import { Tenant } from '../tenant/tenant.entity';
+import { UserInvitation } from './entities/user-invitation.entity';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
 
 describe('UserService', () => {
   let service: UserService;
@@ -21,6 +25,7 @@ describe('UserService', () => {
     tenantId: 'tenant-1',
     outletId: 'outlet-1',
     roleId: 'role-1',
+    isSuperAdmin: false,
     status: 'ACTIVE',
   };
 
@@ -55,9 +60,36 @@ describe('UserService', () => {
     findOne: findOneOutletMock,
   };
 
+  const findOneTenantMock = jest.fn();
+  const mockTenantRepo = {
+    findOne: findOneTenantMock,
+  };
+
+  const createInvitationMock = jest.fn();
+  const saveInvitationMock = jest.fn();
+  const updateInvitationMock = jest.fn();
+  const mockInvitationRepo = {
+    create: createInvitationMock,
+    save: saveInvitationMock,
+    update: updateInvitationMock,
+  };
+
   const recordAuditMock = jest.fn();
   const mockAuditService = {
     record: recordAuditMock,
+  };
+
+  const sendUserInvitationMock = jest.fn().mockResolvedValue(true);
+  const mockMailService = {
+    sendUserInvitation: sendUserInvitationMock,
+  };
+
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      if (key === 'app.frontendUrl') return 'http://localhost:3000';
+      if (key === 'app.invitationExpiresHours') return 24;
+      return null;
+    }),
   };
 
   beforeEach(async () => {
@@ -85,13 +117,23 @@ describe('UserService', () => {
       getManyAndCount: getManyAndCountMock,
     });
 
+    createInvitationMock.mockImplementation((dto) => dto);
+    saveInvitationMock.mockResolvedValue({});
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Role), useValue: mockRoleRepo },
         { provide: getRepositoryToken(Outlet), useValue: mockOutletRepo },
+        { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
+        {
+          provide: getRepositoryToken(UserInvitation),
+          useValue: mockInvitationRepo,
+        },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: MailService, useValue: mockMailService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
@@ -159,11 +201,13 @@ describe('UserService', () => {
   // ─── findAll ──────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
-    it('returns paginated users with filters', async () => {
+    it('returns paginated users with filters including roleId and isSuperAdmin', async () => {
       const result = await service.findAll('tenant-1', {
         page: 1,
         limit: 10,
         outletId: 'outlet-1',
+        roleId: 'role-1',
+        isSuperAdmin: true,
         status: 'ACTIVE',
         search: 'cashier',
       });
@@ -181,6 +225,15 @@ describe('UserService', () => {
       expect(andWhereMock).toHaveBeenCalledWith('user.outlet_id = :outletId', {
         outletId: 'outlet-1',
       });
+      expect(andWhereMock).toHaveBeenCalledWith('user.role_id = :roleId', {
+        roleId: 'role-1',
+      });
+      expect(andWhereMock).toHaveBeenCalledWith(
+        'user.is_super_admin = :isSuperAdmin',
+        {
+          isSuperAdmin: true,
+        },
+      );
       expect(andWhereMock).toHaveBeenCalledWith('user.status = :status', {
         status: 'ACTIVE',
       });
@@ -198,7 +251,7 @@ describe('UserService', () => {
       expect(result).toEqual(mockUser);
       expect(findOneUserMock).toHaveBeenCalledWith({
         where: { id: 'user-1', tenantId: 'tenant-1' },
-        relations: { role: true, outlet: true },
+        relations: { role: true, outlet: true, tenant: true },
       });
     });
 
@@ -214,12 +267,21 @@ describe('UserService', () => {
   // ─── create ───────────────────────────────────────────────────────────────
 
   describe('create', () => {
-    it('creates a user with hashed password and logs audit', async () => {
+    it('creates a user, generates invitation token, and sends setup email', async () => {
       getOneMock.mockResolvedValue(null); // No duplicate email
-      findOneRoleMock.mockResolvedValue({ id: 'role-1', tenantId: 'tenant-1' });
+      findOneRoleMock.mockResolvedValue({
+        id: 'role-1',
+        name: 'Cashier',
+        tenantId: 'tenant-1',
+      });
       findOneOutletMock.mockResolvedValue({
         id: 'outlet-1',
+        name: 'Outlet Pusat',
         tenantId: 'tenant-1',
+      });
+      findOneTenantMock.mockResolvedValue({
+        id: 'tenant-1',
+        businessName: 'Test Cafe',
       });
       createUserMock.mockReturnValue(mockUser);
       saveUserMock.mockResolvedValue(mockUser);
@@ -228,7 +290,6 @@ describe('UserService', () => {
       const result = await service.create('tenant-1', 'admin-1', {
         name: 'New Cashier',
         email: 'newcashier@test.com',
-        password: 'Password123!',
         roleId: 'role-1',
         outletId: 'outlet-1',
       });
@@ -239,6 +300,19 @@ describe('UserService', () => {
           tenantId: 'tenant-1',
           name: 'New Cashier',
           email: 'newcashier@test.com',
+        }),
+      );
+      expect(createInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: mockUser.id,
+        }),
+      );
+      expect(saveInvitationMock).toHaveBeenCalled();
+      expect(sendUserInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'cashier@test.com',
+          name: 'Cashier Staff',
+          businessName: 'Test Cafe',
         }),
       );
       expect(recordAuditMock).toHaveBeenCalledWith(
@@ -257,7 +331,6 @@ describe('UserService', () => {
         service.create('tenant-1', 'admin-1', {
           name: 'Duplicate User',
           email: 'cashier@test.com',
-          password: 'Password123!',
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -270,7 +343,6 @@ describe('UserService', () => {
         service.create('tenant-1', 'admin-1', {
           name: 'User Bad Role',
           email: 'badrole@test.com',
-          password: 'Password123!',
           roleId: 'invalid-role',
         }),
       ).rejects.toThrow(BadRequestException);
@@ -284,10 +356,53 @@ describe('UserService', () => {
         service.create('tenant-1', 'admin-1', {
           name: 'User Bad Outlet',
           email: 'badoutlet@test.com',
-          password: 'Password123!',
           outletId: 'invalid-outlet',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── resendInvitation ─────────────────────────────────────────────────────
+
+  describe('resendInvitation', () => {
+    it('invalidates old invitations, generates new token, and resends email', async () => {
+      findOneUserMock.mockResolvedValue({
+        ...mockUser,
+        tenant: { businessName: 'Test Cafe' },
+        outlet: { name: 'Outlet Pusat' },
+        role: { name: 'Cashier' },
+      });
+
+      const result = await service.resendInvitation(
+        'tenant-1',
+        'user-1',
+        'admin-1',
+      );
+
+      expect(result.success).toBe(true);
+      expect(updateInvitationMock).toHaveBeenCalled();
+      expect(createInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1' }),
+      );
+      expect(sendUserInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'cashier@test.com',
+          businessName: 'Test Cafe',
+        }),
+      );
+      expect(recordAuditMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_INVITATION_RESENT',
+        }),
+      );
+    });
+
+    it('throws NotFoundException when user is not found', async () => {
+      findOneUserMock.mockResolvedValue(null);
+
+      await expect(
+        service.resendInvitation('tenant-1', 'unknown-user', 'admin-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -304,15 +419,21 @@ describe('UserService', () => {
       };
       findOneUserMock.mockResolvedValueOnce(existingUser);
       findOneRoleMock.mockResolvedValue({ id: 'role-2', tenantId: 'tenant-1' });
-      saveUserMock.mockResolvedValue({ ...existingUser, name: 'New Name' });
+      saveUserMock.mockResolvedValue({
+        ...existingUser,
+        name: 'New Name',
+        isSuperAdmin: true,
+      });
       findOneUserMock.mockResolvedValueOnce({
         ...existingUser,
         name: 'New Name',
+        isSuperAdmin: true,
       });
 
       const result = await service.update('tenant-1', 'user-1', 'admin-1', {
         name: 'New Name',
         roleId: 'role-2',
+        isSuperAdmin: true,
         password: 'NewPassword123!',
       });
 
