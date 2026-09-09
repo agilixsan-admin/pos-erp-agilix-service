@@ -40,76 +40,7 @@ export class CreateEmailTemplatesAndUserInvitations1700000000024 implements Migr
       `CREATE INDEX IF NOT EXISTS "IDX_user_invitations_user_id" ON "user_invitations" ("user_id")`,
     );
 
-    // 4. Seed default email templates
-    const welcomeTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <title>Selamat Datang di Agilix</title>
-  <style type="text/css">
-    @import url("https://fonts.googleapis.com/css?family=Nunito+Sans:400,700&display=swap");
-    body { width:100%!important; height:100%; margin:0; -webkit-text-size-adjust:none; background-color:#F2F4F6; font-family:"Nunito Sans",Helvetica,Arial,sans-serif; }
-    a { color:#1A3A5C; }
-    td { word-break:break-word; }
-    h1 { margin-top:0; color:#1A3A5C; font-size:22px; font-weight:bold; }
-    h2 { margin-top:0; color:#1A3A5C; font-size:16px; font-weight:bold; }
-    p { margin:.4em 0 1.1875em; font-size:14px; line-height:1.625; color:#51545E; }
-    .email-wrapper { width:100%; margin:0; padding:0; background-color:#F2F4F6; }
-    .email-body_inner { width:570px; margin:0 auto; padding:0; background-color:#FFFFFF; border-radius:8px; overflow:hidden; }
-    .email-footer { width:570px; margin:0 auto; padding:20px 0; text-align:center; }
-    .email-footer p { color:#A8AAAF; font-size:12px; }
-    .masthead { background-color:#1A3A5C; padding:30px 45px; text-align:center; }
-    .masthead-title { color:#FFFFFF; font-size:24px; font-weight:bold; letter-spacing:2px; margin:0; }
-    .masthead-subtitle { color:#A8C4E0; font-size:12px; margin:4px 0 0 0; }
-    .content-cell { padding:45px; }
-    .divider { border:none; border-top:1px solid #EAEAEC; margin:24px 0; }
-    .info-table { width:100%; border-collapse:collapse; margin:20px 0; }
-    .info-table td { padding:10px 14px; font-size:14px; color:#51545E; }
-    .info-table tr:nth-child(odd) td { background-color:#F8F9FB; }
-    .info-table .label { font-weight:bold; color:#1A3A5C; width:40%; }
-    .badge { display:inline-block; background-color:#E8F0F8; color:#1A3A5C; font-size:12px; font-weight:bold; padding:4px 12px; border-radius:20px; }
-    .footer-bar { background-color:#1A3A5C; height:6px; }
-    @media only screen and (max-width:600px) { .email-body_inner,.email-footer { width:100%!important; } .content-cell { padding:24px!important; } }
-  </style>
-</head>
-<body style="margin:0;padding:0;">
-  <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0">
-    <tr><td align="center" style="padding:40px 0;">
-      <table class="email-body_inner" width="570" cellpadding="0" cellspacing="0">
-        <tr><td class="masthead">
-          <p class="masthead-title">AGILIX</p>
-          <p class="masthead-subtitle">SaaS Monitoring Tenant POS</p>
-        </td></tr>
-        <tr><td class="content-cell">
-          <h1>Selamat Datang, {{ownerName}}! 🎉</h1>
-          <p>Terima kasih telah bergabung dengan <strong>Agilix</strong>. Akun bisnis Anda telah berhasil didaftarkan dan siap digunakan.</p>
-          <hr class="divider" />
-          <h2>Detail Akun Bisnis</h2>
-          <table class="info-table" cellpadding="0" cellspacing="0">
-            <tr><td class="label">Nama Bisnis</td><td>{{businessName}}</td></tr>
-            <tr><td class="label">Nama Pemilik</td><td>{{ownerName}}</td></tr>
-            <tr><td class="label">Paket Langganan</td><td><span class="badge">{{planType}}</span></td></tr>
-            <tr><td class="label">Jumlah Outlet</td><td>{{outletCount}} outlet</td></tr>
-            <tr><td class="label">Berlaku Hingga</td><td>{{expiryDate}}</td></tr>
-          </table>
-          <hr class="divider" />
-          <p>Jika Anda memiliki pertanyaan atau membutuhkan bantuan, jangan ragu untuk menghubungi tim support kami.</p>
-          <p>Salam,<br /><strong>Tim Agilix</strong></p>
-        </td></tr>
-        <tr><td class="footer-bar"></td></tr>
-      </table>
-      <table class="email-footer" width="570" cellpadding="0" cellspacing="0">
-        <tr><td>
-          <p>Email ini dikirim secara otomatis oleh sistem Agilix. Mohon tidak membalas email ini.</p>
-          <p>© 2026 Agilix. All rights reserved.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
+    // 4. Seed default email template for user staff invitation
     const userInvitationTemplate = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -187,13 +118,6 @@ export class CreateEmailTemplatesAndUserInvitations1700000000024 implements Migr
   </table>
 </body>
 </html>`;
-
-    await queryRunner.query(
-      `INSERT INTO "email_templates" ("slug", "subject", "template")
-       VALUES ($1, $2, $3)
-       ON CONFLICT ("slug") DO UPDATE SET "subject" = EXCLUDED."subject", "template" = EXCLUDED."template", "updated_at" = now()`,
-      ['welcome', 'Selamat Datang di Agilix, {{ownerName}}!', welcomeTemplate],
-    );
 
     await queryRunner.query(
       `INSERT INTO "email_templates" ("slug", "subject", "template")

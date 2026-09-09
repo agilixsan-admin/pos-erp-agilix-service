@@ -67,6 +67,33 @@ export class MailService {
   }
 
   /**
+   * Convert HTML string to plain text for multipart/alternative email delivery.
+   * This prevents spam filter penalties (such as SpamAssassin MIME_HTML_ONLY) and improves deliverability.
+   */
+  htmlToPlainText(html: string): string {
+    return html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(
+        /<a\s+(?:[^>]*?\s+)?href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gi,
+        '$2 ($1)',
+      )
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<\/tr>/gi, '\n')
+      .replace(/<\/h[1-6]>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&copy;/gi, '©')
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .trim();
+  }
+
+  /**
    * Send an email using a database template identified by slug
    */
   async sendBySlug(
@@ -92,13 +119,19 @@ export class MailService {
         variables,
       );
       const html = this.compile(templateRecord.template, variables);
+      const text = this.htmlToPlainText(html);
       const from = this.config.get<string>('mail.from') ?? 'noreply@agilix.id';
 
       const info = await this.transporter.sendMail({
         from,
         to,
         subject,
+        text,
         html,
+        headers: {
+          'X-Mailer': 'Agilix POS Mailer',
+          'Auto-Submitted': 'auto-generated',
+        },
       });
 
       this.logger.log(

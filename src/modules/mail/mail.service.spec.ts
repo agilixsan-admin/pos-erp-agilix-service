@@ -56,6 +56,26 @@ describe('MailService', () => {
     });
   });
 
+  describe('htmlToPlainText', () => {
+    it('converts html tags, links, and line breaks into clean readable plain text', () => {
+      const html = `
+        <style>body { color: red; }</style>
+        <h1>Welcome to Agilix</h1>
+        <p>Hello <strong>Ahmad</strong>,</p>
+        <p>Click <a href="https://app.agilix.id/invitation">here</a> to join.</p>
+        <br/>
+        <footer>&copy; 2026 Agilix POS</footer>
+      `;
+      const plainText = service.htmlToPlainText(html);
+      expect(plainText).toContain('Welcome to Agilix');
+      expect(plainText).toContain('Hello Ahmad,');
+      expect(plainText).toContain('here (https://app.agilix.id/invitation)');
+      expect(plainText).toContain('© 2026 Agilix POS');
+      expect(plainText).not.toContain('<style>');
+      expect(plainText).not.toContain('<h1>');
+    });
+  });
+
   describe('sendBySlug', () => {
     it('fetches template from DB, compiles, and sends email successfully', async () => {
       (mockTemplateRepo.findOne as jest.Mock).mockResolvedValue({
@@ -80,12 +100,19 @@ describe('MailService', () => {
       expect(mockTemplateRepo.findOne).toHaveBeenCalledWith({
         where: { slug: 'user-invitation' },
       });
-      expect(sendMailMock).toHaveBeenCalledWith({
-        from: 'noreply@agilix.id',
-        to: 'staff@test.com',
-        subject: 'Undangan Bergabung ke Cafe Agilix',
-        html: '<h1>Halo Budi</h1><a href="http://localhost:3000/auth/set-password?token=abc">Set Password</a>',
-      });
+      expect(sendMailMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: 'noreply@agilix.id',
+          to: 'staff@test.com',
+          subject: 'Undangan Bergabung ke Cafe Agilix',
+          html: '<h1>Halo Budi</h1><a href="http://localhost:3000/auth/set-password?token=abc">Set Password</a>',
+          text: expect.stringContaining('Set Password'),
+          headers: {
+            'X-Mailer': 'Agilix POS Mailer',
+            'Auto-Submitted': 'auto-generated',
+          },
+        }),
+      );
     });
 
     it('returns false when template is not found in database', async () => {
