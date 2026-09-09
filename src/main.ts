@@ -47,7 +47,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1', {
     exclude: ['health'],
   });
-
+  app.enableShutdownHooks();
   // Access log
   app.useGlobalInterceptors(new AccessLogInterceptor());
 

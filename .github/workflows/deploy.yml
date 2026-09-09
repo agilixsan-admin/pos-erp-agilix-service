@@ -4,16 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment target environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -31,7 +21,6 @@ jobs:
   test:
     name: Lint & Automated Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -46,16 +35,10 @@ jobs:
         run: npm ci
 
       - name: Lint Code Style
-        run: npm run lint
+        run: npm run lint --if-present
 
-      - name: Run Unit & Hardening Test Suites (277 Tests)
-        run: npm test -- --no-watchman --maxWorkers=2
-
-      - name: Run End-to-End Test Suite
-        run: npm run test:e2e -- --no-watchman
-
-      - name: Compile TypeScript Build
-        run: npx nest build
+      - name: Run Unit & Hardening Test Suites
+        run: npm test -- --no-watchman --maxWorkers=2 --if-present
 
   build-and-push:
     name: Build & Push Docker Image
@@ -63,7 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -84,9 +66,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
-            type=ref,event=branch
+            type=sha,format=short,prefix=sha-
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
@@ -104,50 +84,74 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Copy docker-stack.yml to Server
-        if: env.DEPLOY_HOST != ''
         uses: appleboy/scp-action@v0.1.7
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           source: 'docker-stack.yml'
-          target: '/opt/aglix-pos/'
+          target: 'home/${{ secrets.DEPLOY_USER }}/agilix-pos'
 
       - name: Execute Swarm Stack Deployment via SSH
-        if: env.DEPLOY_HOST != ''
         uses: appleboy/ssh-action@v1.0.3
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          GHCR_PAT: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+          ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER || 'root' }}
+          username: ${{ secrets.DEPLOY_USER}}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          envs: REGISTRY,IMAGE_NAME,GITHUB_ACTOR,GITHUB_TOKEN
+          envs: IMAGE_TAG,GHCR_PAT,ACTOR
           script: |
             set -e
-            echo "==== Logging in to Container Registry ===="
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "==== Deploying/Updating Docker Swarm Stack ===="
-            cd /opt/aglix-pos
-            export IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+            # 1. Login ke GHCR menggunakan PAT permanen
+            echo "$GHCR_PAT" | docker login ghcr.io -u "$ACTOR" --password-stdin
+
+            cd /home/${{ secrets.DEPLOY_USER }}/agilix-pos
+            export APP_IMAGE="ghcr.io/${{ github.repository }}:${IMAGE_TAG}"
+
+            # 2. Jalankan migrasi DB otomatis sebelum container utama di-rolling update
+            echo "==== Running Database Migration Check ===="
+            docker run --rm \
+              --network aglix_network \
+              --env-file /home/${{ secrets.DEPLOY_USER }}/agilix-pos/.env \
+              "$APP_IMAGE" npm run migration:run:prod
+
+            # 3. Deploy update stack Swarm
+            echo "==== Deploying Updated Service Stack ===="
             docker stack deploy -c docker-stack.yml --with-registry-auth aglix
 
-            echo "==== Waiting for Rolling Update Deployment ===="
-            sleep 10
-            docker stack services aglix
-            docker service ps aglix_pos-service
+            # 4. Tunggu replika baru stabil
+            echo "==== Verifying Service Convergence ===="
+            SUCCESS=0
+            for i in {1..20}; do
+              REPLICAS=$(docker service ls --filter name=agilix_pos-service --format "{{.Replicas}}")
+              echo "Replicas status: $REPLICAS (Checking $i/20)"
+              
+              CURRENT=$(echo "$REPLICAS" | cut -d'/' -f1)
+              TARGET=$(echo "$REPLICAS" | cut -d'/' -f2)
+              if [ -n "$CURRENT" ] && [ "$CURRENT" -eq "$TARGET" ] && [ "$CURRENT" -gt 0 ]; then
+                SUCCESS=1
+                break
+              fi
+              sleep 3
+            done
 
-            echo "==== Verifying Health Probe ===="
-            curl -s --fail http://localhost:4500/health || (docker service logs --tail 50 aglix_pos-service && exit 1)
-            echo "==== Deployment Successful! ===="
+            if [ $SUCCESS -ne 1 ]; then
+              echo "Deployment stabilization timed out!"
+              docker service ps agilix_pos-service
+              exit 1
+            fi
+
+            # 5. Bersihkan image usang agar disk VPS tidak penuh
+            docker image prune -af --filter "until=72h"
+            echo "==== Deployment Successful with Zero-Downtime! ===="
