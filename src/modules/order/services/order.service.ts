@@ -945,7 +945,7 @@ export class OrderService {
         }
       }
 
-      let packagingFee = Number(order.packagingFee ?? 0);
+      const packagingFee = Number(order.packagingFee ?? 0);
 
       let taxAmount = 0;
       let isInclusiveTax = false;
@@ -998,8 +998,10 @@ export class OrderService {
         manager,
       );
 
-      return this.findById(tenantId, order.id);
+      return orderRepo.findOne({
+        where: { id: order.id, tenantId },
+        relations: { items: true, outlet: true, creator: true, table: true },
+      });
     });
   }
 }
-

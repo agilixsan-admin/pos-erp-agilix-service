@@ -1003,13 +1003,12 @@ describe('OrderService', () => {
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
         inventoryItemId: 'item-flour',
-        currentStock: 1000,
-        minimumStock: 100,
+        quantity: 1000,
       };
 
       let savedItems: unknown[] = [];
       let savedOrder: Record<string, unknown> | null = null;
-      let savedMovements: unknown[] = [];
+      const savedMovements: unknown[] = [];
 
       mockDataSource.transaction.mockImplementationOnce(
         (callback: (m: unknown) => Promise<unknown>) => {
@@ -1019,7 +1018,7 @@ describe('OrderService', () => {
                 return {
                   create: jest.fn((items: unknown[]) => items),
                   save: jest.fn((items: unknown[]) => {
-                    savedItems = items as unknown[];
+                    savedItems = items;
                     return Promise.resolve(items);
                   }),
                 };
@@ -1057,6 +1056,24 @@ describe('OrderService', () => {
                     savedOrder = o;
                     return Promise.resolve(o);
                   }),
+                  findOne: jest.fn().mockResolvedValue({
+                    ...existingOrder,
+                    subtotal: 75000,
+                    totalAmount: 75000,
+                    items: [
+                      ...existingOrder.items,
+                      {
+                        id: 'item-2',
+                        variantId: 'var-2',
+                        productName: 'Butter Croissant',
+                        variantName: 'Croissant',
+                        quantity: 1,
+                        unitPrice: 25000,
+                        subtotal: 25000,
+                        status: 'ACTIVE',
+                      },
+                    ],
+                  }),
                 };
               }
               return {
@@ -1070,32 +1087,12 @@ describe('OrderService', () => {
         },
       );
 
-      // findById mock for return
-      mockOrderRepo.findOne.mockResolvedValueOnce({
-        ...existingOrder,
-        subtotal: 75000,
-        totalAmount: 75000,
-        items: [
-          ...existingOrder.items,
-          {
-            id: 'item-2',
-            variantId: 'var-2',
-            productName: 'Butter Croissant',
-            variantName: 'Croissant',
-            quantity: 1,
-            unitPrice: 25000,
-            subtotal: 25000,
-            status: 'ACTIVE',
-          },
-        ],
-      });
-
       const result = await service.addItems('tenant-1', 'user-1', 'ord-100', {
         items: [{ variantId: 'var-2', quantity: 1, notes: 'Warm' }],
       });
 
       expect(savedItems).toHaveLength(1);
-      expect(mockStock.currentStock).toBe(900); // 1000 - 100
+      expect(mockStock.quantity).toBe(900); // 1000 - 100
       expect(savedMovements).toHaveLength(1);
       expect(savedMovements[0]).toEqual(
         expect.objectContaining({
@@ -1110,8 +1107,11 @@ describe('OrderService', () => {
       expect(mockAuditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'ORDER_ITEMS_ADDED',
-          entityId: 'ord-100',
+          metadata: expect.objectContaining({
+            orderId: 'ord-100',
+          }),
         }),
+        expect.anything(),
       );
       expect(result.items).toHaveLength(2);
     });
@@ -1174,4 +1174,3 @@ describe('OrderService', () => {
     });
   });
 });
-

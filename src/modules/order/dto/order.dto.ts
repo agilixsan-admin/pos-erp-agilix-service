@@ -159,4 +159,3 @@ export class AddOrderItemsDto {
   @Type(() => CreateOrderItemDto)
   items!: CreateOrderItemDto[];
 }
-
