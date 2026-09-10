@@ -28,8 +28,10 @@ export const configurationValidationSchema = Joi.object({
     .allow('')
     .when('NODE_ENV', { is: 'production', then: Joi.required() }),
   THROTTLE_TTL: Joi.number().default(60000),
-  THROTTLE_LIMIT: Joi.number().default(120),
-  SWAGGER: Joi.string().valid('development', 'staging').optional().allow(''),
+  SWAGGER: Joi.string()
+    .valid('development', 'staging', 'production', 'disabled')
+    .optional()
+    .allow(''),
   STORAGE_DRIVER: Joi.string().valid('s3', 'minio', 'local').default('s3'),
   S3_ENDPOINT: Joi.string().optional().allow(''),
   S3_REGION: Joi.string().default('us-east-1'),
