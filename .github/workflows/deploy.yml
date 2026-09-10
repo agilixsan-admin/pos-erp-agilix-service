@@ -122,13 +122,13 @@ jobs:
             # 2. Jalankan migrasi DB otomatis sebelum container utama di-rolling update
             echo "==== Running Database Migration Check ===="
             docker run --rm \
-              --network aglix_network \
+              --network agilix_network \
               --env-file /home/${{ secrets.DEPLOY_USER }}/agilix-pos/.env \
               "$APP_IMAGE" npm run migration:run:prod
 
             # 3. Deploy update stack Swarm
             echo "==== Deploying Updated Service Stack ===="
-            docker stack deploy -c docker-stack.yml --with-registry-auth aglix
+            docker stack deploy -c docker-stack.yml --with-registry-auth agilix
 
             # 4. Tunggu replika baru stabil
             echo "==== Verifying Service Convergence ===="
