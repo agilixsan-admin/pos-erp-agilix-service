@@ -11,6 +11,9 @@ import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
+import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
+import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
 import { DiscountService } from '../../settings/services/discount.service';
@@ -283,7 +286,110 @@ export class OrderService {
         }),
       );
 
-      await itemRepo.save(items);
+      const savedItems = await itemRepo.save(items);
+
+      // Deduct raw materials for all items sent to station (recipes)
+      const recipeRepo = manager.getRepository(Recipe);
+      const stockRepo = manager.getRepository(InventoryStock);
+      const movementRepo = manager.getRepository(InventoryMovement);
+
+      for (const item of savedItems) {
+        const recipes = await recipeRepo.find({
+          where: { tenantId, variantId: item.variantId },
+        });
+
+        for (const recipe of recipes) {
+          const deductionQty = Number(item.quantity) * Number(recipe.quantity);
+
+          let stock = await stockRepo.findOne({
+            where: {
+              tenantId,
+              outletId: targetOutletId,
+              inventoryItemId: recipe.inventoryItemId,
+            },
+          });
+
+          if (!stock) {
+            stock = stockRepo.create({
+              tenantId,
+              outletId: targetOutletId,
+              inventoryItemId: recipe.inventoryItemId,
+              quantity: -deductionQty,
+            });
+          } else {
+            stock.quantity = Number(stock.quantity) - deductionQty;
+          }
+          await stockRepo.save(stock);
+
+          const movement = movementRepo.create({
+            tenantId,
+            outletId: targetOutletId,
+            inventoryItemId: recipe.inventoryItemId,
+            movementType: 'SALE',
+            quantity: deductionQty,
+            referenceType: 'ORDER',
+            referenceId: savedOrder.id,
+            notes: `Sent to station via Order ${savedOrder.orderNumber} (${item.productName} - ${item.variantName})`,
+            movementDate: new Date(),
+            createdBy: userId,
+            metadata: {
+              orderItemId: item.id,
+              variantId: item.variantId,
+            },
+          });
+          await movementRepo.save(movement);
+        }
+      }
+
+      // Packaging-based stock deduction for TAKE_AWAY orders
+      if (orderType === 'TAKE_AWAY') {
+        const packagings = await this.packagingService.findApplicableForOrder(
+          tenantId,
+          targetOutletId,
+          orderType,
+        );
+
+        for (const pkg of packagings) {
+          if (!pkg.inventoryItemId) continue;
+
+          let pStock = await stockRepo.findOne({
+            where: {
+              tenantId,
+              outletId: targetOutletId,
+              inventoryItemId: pkg.inventoryItemId,
+            },
+          });
+
+          if (!pStock) {
+            pStock = stockRepo.create({
+              tenantId,
+              outletId: targetOutletId,
+              inventoryItemId: pkg.inventoryItemId,
+              quantity: -1,
+            });
+          } else {
+            pStock.quantity = Number(pStock.quantity) - 1;
+          }
+          await stockRepo.save(pStock);
+
+          const pMovement = movementRepo.create({
+            tenantId,
+            outletId: targetOutletId,
+            inventoryItemId: pkg.inventoryItemId,
+            movementType: 'SALE',
+            quantity: 1,
+            referenceType: 'ORDER',
+            referenceId: savedOrder.id,
+            notes: `Takeaway packaging for Order ${savedOrder.orderNumber} (${pkg.name})`,
+            movementDate: new Date(),
+            createdBy: userId,
+            metadata: {
+              packagingId: pkg.id,
+            },
+          });
+          await movementRepo.save(pMovement);
+        }
+      }
 
       await this.audit.record(
         {
@@ -431,6 +537,14 @@ export class OrderService {
   ) {
     const order = await this.findById(tenantId, id);
 
+    if (order.status === 'COMPLETED' || order.status === 'PAID') {
+      throw new BadRequestException({
+        success: false,
+        message: 'Cannot void an order that has already been paid/completed',
+        code: 'ORDER_LOCKED',
+      });
+    }
+
     if (order.status === 'VOID') {
       throw new BadRequestException({
         success: false,
@@ -439,53 +553,193 @@ export class OrderService {
       });
     }
 
-    if (order.status === 'COMPLETED') {
+    const targetItem = order.items?.find((item) => item.id === dto.orderItemId);
+    if (!targetItem) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Order item not found in this order',
+        code: 'ITEM_NOT_FOUND',
+      });
+    }
+
+    if (targetItem.status === 'VOID') {
       throw new BadRequestException({
         success: false,
-        message: 'Cannot void a completed order',
-        code: 'ORDER_LOCKED',
+        message: 'This menu item has already been voided',
+        code: 'ITEM_ALREADY_VOIDED',
       });
     }
 
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
+      const itemRepo = manager.getRepository(OrderItem);
       const voidRepo = manager.getRepository(Void);
       const tableRepo = manager.getRepository(Table);
+      const movementRepo = manager.getRepository(InventoryMovement);
 
-      order.status = 'VOID';
-      await orderRepo.save(order);
+      // 1. Mark item as VOID
+      targetItem.status = 'VOID';
+      await itemRepo.save(targetItem);
 
-      if (order.tableId) {
-        const table = await tableRepo.findOne({
-          where: { id: order.tableId, tenantId },
-        });
-        if (table && table.status === 'OCCUPIED') {
-          table.status = 'AVAILABLE';
-          await tableRepo.save(table);
-        }
-      }
-
+      // 2. Create Void record
       const voidRecord = voidRepo.create({
         tenantId,
         outletId: order.outletId,
         orderId: order.id,
+        orderItemId: targetItem.id,
         reasonCategoryId: dto.reasonCategoryId ?? null,
         reason: dto.reason,
         voidedBy: userId,
       });
-
       const savedVoid = await voidRepo.save(voidRecord);
+
+      // 3. Reclassify inventory movements for this voided menu item from SALE to WASTE
+      // Raw materials were already deducted when the order was sent to the station,
+      // so we do not deduct stock again or restore it. We update the movement record to WASTE.
+      const movements = await movementRepo.find({
+        where: {
+          tenantId,
+          outletId: order.outletId,
+          referenceType: 'ORDER',
+          referenceId: order.id,
+        },
+      });
+
+      for (const movement of movements) {
+        const meta = movement.metadata;
+        if (meta && meta.orderItemId === targetItem.id) {
+          movement.movementType = 'WASTE';
+          movement.referenceType = 'VOID';
+          movement.referenceId = savedVoid.id;
+          movement.reasonCategoryId = dto.reasonCategoryId ?? null;
+          movement.notes = `Void menu item: ${targetItem.productName} - ${targetItem.variantName} (${dto.reason})`;
+          movement.metadata = {
+            ...meta,
+            voidId: savedVoid.id,
+            voidReason: dto.reason,
+          };
+          await movementRepo.save(movement);
+        }
+      }
+
+      // 4. Recalculate remaining active items in the order
+      const activeItems = (order.items ?? []).filter(
+        (i) => i.id !== targetItem.id && i.status === 'ACTIVE',
+      );
+
+      const calculatedSubtotal = activeItems.reduce(
+        (sum, item) => sum + Number(item.subtotal),
+        0,
+      );
+
+      const settings = await this.settingsService.getSettings(
+        tenantId,
+        order.outletId,
+      );
+
+      let discountAmount = 0;
+      if (order.discountId && calculatedSubtotal > 0) {
+        const discount = await this.discountService.findById(
+          tenantId,
+          order.discountId,
+        );
+        const activeCheck = this.discountService.isDiscountActive(
+          discount,
+          new Date(),
+          calculatedSubtotal,
+        );
+        if (activeCheck.isValid) {
+          discountAmount = this.discountService.calculateDiscount(
+            discount,
+            activeItems.map((item) => ({
+              productId: item.productId,
+              unitPrice: Number(item.unitPrice),
+              quantity: Number(item.quantity),
+            })),
+            calculatedSubtotal,
+          );
+        }
+      } else if (settings.discountEnabled && calculatedSubtotal > 0) {
+        if (settings.discountType === 'PERCENTAGE') {
+          discountAmount = Math.round(
+            (calculatedSubtotal * Number(settings.discountValue)) / 100,
+          );
+        } else {
+          discountAmount = Math.min(
+            calculatedSubtotal,
+            Number(settings.discountValue),
+          );
+        }
+      }
+
+      let packagingFee = Number(order.packagingFee ?? 0);
+      if (order.orderType === 'TAKE_AWAY' && activeItems.length === 0) {
+        packagingFee = 0;
+      }
+
+      let taxAmount = 0;
+      let isInclusiveTax = false;
+      if (settings.taxEnabled && calculatedSubtotal > 0) {
+        const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+        const activeTax = settings.defaultGlobalTax;
+        const rate = activeTax
+          ? Number(activeTax.rate)
+          : Number(settings.taxRate || 0);
+        const taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+
+        if (taxType === 'INCLUSIVE' && rate > 0) {
+          isInclusiveTax = true;
+          taxAmount = Math.round(taxableBase - taxableBase / (1 + rate / 100));
+        } else if (rate > 0) {
+          taxAmount = Math.round((taxableBase * rate) / 100);
+        }
+      }
+
+      const totalAmount = Math.max(
+        calculatedSubtotal -
+          discountAmount +
+          packagingFee +
+          (isInclusiveTax ? 0 : taxAmount),
+        0,
+      );
+
+      order.subtotal = calculatedSubtotal;
+      order.discountAmount = discountAmount;
+      order.taxAmount = taxAmount;
+      order.packagingFee = packagingFee;
+      order.totalAmount = totalAmount;
+
+      // If all items are voided, mark order as VOID and release table
+      if (activeItems.length === 0) {
+        order.status = 'VOID';
+        if (order.tableId) {
+          const table = await tableRepo.findOne({
+            where: { id: order.tableId, tenantId },
+          });
+          if (table && table.status === 'OCCUPIED') {
+            table.status = 'AVAILABLE';
+            await tableRepo.save(table);
+          }
+        }
+      }
+
+      await orderRepo.save(order);
 
       await this.audit.record(
         {
-          action: 'ORDER_VOIDED',
+          action: 'ORDER_ITEM_VOIDED',
           tenantId,
           actorType: 'USER',
           actorId: userId,
           metadata: {
             orderId: order.id,
+            orderItemId: targetItem.id,
+            productName: targetItem.productName,
+            variantName: targetItem.variantName,
             voidId: savedVoid.id,
             reason: dto.reason,
+            newTotalAmount: order.totalAmount,
+            isWholeOrderVoided: activeItems.length === 0,
           },
         },
         manager,
@@ -493,6 +747,7 @@ export class OrderService {
 
       return {
         order,
+        voidedItem: targetItem,
         void: savedVoid,
       };
     });

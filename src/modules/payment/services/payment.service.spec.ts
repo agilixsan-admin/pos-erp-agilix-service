@@ -10,7 +10,6 @@ import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { Table } from '../../table/entities/table.entity';
-import { Packaging } from '../../packaging/entities/packaging.entity';
 import { AuditService } from '../../audit/audit.service';
 import { QRIS_PROVIDER_TOKEN } from '../interfaces/qris-provider.interface';
 import { SettingsService } from '../../settings/services/settings.service';
@@ -280,15 +279,15 @@ describe('PaymentService', () => {
       );
     });
 
-    it('deducts packaging inventory for TAKE_AWAY orders during settlement', async () => {
+    it('completes TAKE_AWAY orders and creates transaction during settlement', async () => {
       const order = {
         id: 'ord-takeaway',
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
-        orderNumber: 'ORD-TAKEAWAY-1',
+        orderNumber: 'ORD-TAKEAWAY',
+        orderType: 'TAKE_AWAY',
         status: 'PENDING',
         totalAmount: 25000,
-        orderType: 'TAKE_AWAY',
         items: [],
       };
       mockOrderRepo.findOne.mockResolvedValue(order);
@@ -310,36 +309,6 @@ describe('PaymentService', () => {
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
       };
-      const managerRecipeRepo = {
-        find: jest.fn().mockResolvedValue([]),
-      };
-      const managerStockRepo = {
-        findOne: jest.fn().mockResolvedValue({
-          id: 'stock-pkg',
-          quantity: 50,
-        }),
-        save: jest.fn((s: Record<string, unknown>) => Promise.resolve(s)),
-      };
-      const managerMovementRepo = {
-        create: jest.fn((m: Record<string, unknown>) => ({
-          ...m,
-          id: 'mov-pkg',
-        })),
-        save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
-      };
-      const managerPackagingRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([
-            {
-              id: 'pkg-1',
-              name: 'Eco Box',
-              inventoryItemId: 'item-box',
-            },
-          ]),
-        }),
-      };
       const managerTableRepo = {
         findOne: jest.fn(),
         save: jest.fn(),
@@ -355,10 +324,6 @@ describe('PaymentService', () => {
               if (entityClass === Payment) return managerPaymentRepo;
               if (entityClass === Transaction) return managerTrxRepo;
               if (entityClass === Order) return managerOrderRepo;
-              if (entityClass === Recipe) return managerRecipeRepo;
-              if (entityClass === InventoryStock) return managerStockRepo;
-              if (entityClass === InventoryMovement) return managerMovementRepo;
-              if (entityClass === Packaging) return managerPackagingRepo;
               if (entityClass === Table) return managerTableRepo;
               return managerAuditRepo;
             },
@@ -373,17 +338,12 @@ describe('PaymentService', () => {
       });
 
       expect(result.order.status).toBe('COMPLETED');
-      expect(managerStockRepo.save).toHaveBeenCalledWith(
+      expect(result.transaction).toBeDefined();
+      expect(managerTrxRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'stock-pkg',
-          quantity: 49,
-        }),
-      );
-      expect(managerMovementRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          inventoryItemId: 'item-box',
-          movementType: 'SALE',
-          quantity: 1,
+          orderId: 'ord-takeaway',
+          amount: 25000,
+          status: 'COMPLETED',
         }),
       );
     });

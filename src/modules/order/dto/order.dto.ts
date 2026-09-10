@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDateString,
   IsIn,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -138,6 +139,10 @@ export class QueryOrderDto {
 }
 
 export class VoidOrderDto {
+  @IsUUID()
+  @IsNotEmpty()
+  orderItemId!: string;
+
   @IsString()
   @MinLength(1)
   reason!: string;

@@ -9,6 +9,9 @@ import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
+import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
+import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/services/settings.service';
 import { DiscountService } from '../../settings/services/discount.service';
@@ -172,6 +175,13 @@ describe('OrderService', () => {
         save: jest.fn().mockResolvedValue({}),
       };
 
+      const defaultRepo = {
+        find: jest.fn().mockResolvedValue([]),
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((x: any) => x),
+        save: jest.fn((x: any) => Promise.resolve(x)),
+      };
+
       mockDataSource.transaction.mockImplementation(
         (callback: (m: unknown) => Promise<unknown>) => {
           return callback({
@@ -179,7 +189,8 @@ describe('OrderService', () => {
               if (entityClass === Order) return managerOrderRepo;
               if (entityClass === OrderItem) return managerItemRepo;
               if (entityClass === Table) return managerTableRepo;
-              return managerAuditRepo;
+              if (entityClass === AuditService) return managerAuditRepo;
+              return defaultRepo;
             },
           });
         },
@@ -191,6 +202,105 @@ describe('OrderService', () => {
 
       expect(result).toBeDefined();
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('deducts raw material recipe stocks and records SALE movements when sending order to station', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 25000,
+          tenantId: 'tenant-1',
+          product: { name: 'Americano' },
+        },
+      ]);
+
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => ({
+          ...o,
+          id: 'ord-stock-1',
+          orderNumber: 'ORD-STOCK-1',
+        })),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+        findOne: jest.fn().mockResolvedValue({
+          id: 'ord-stock-1',
+          orderNumber: 'ORD-STOCK-1',
+          totalAmount: 50000,
+        }),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => ({
+          ...i,
+          id: 'item-1',
+        })),
+        save: jest.fn((items: any[]) => Promise.resolve(items)),
+      };
+      const managerRecipeRepo = {
+        find: jest.fn().mockResolvedValue([
+          {
+            inventoryItemId: 'inv-coffee-beans',
+            quantity: 18,
+          },
+        ]),
+      };
+      const managerStockRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          inventoryItemId: 'inv-coffee-beans',
+          quantity: 1000,
+        }),
+        save: jest.fn((s: Record<string, unknown>) => Promise.resolve(s)),
+      };
+      const managerMovementRepo = {
+        create: jest.fn((m: Record<string, unknown>) => ({
+          ...m,
+          id: 'mov-1',
+        })),
+        save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              if (entityClass === Recipe) return managerRecipeRepo;
+              if (entityClass === InventoryStock) return managerStockRepo;
+              if (entityClass === InventoryMovement) return managerMovementRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      });
+
+      // Quantity 2 * 18g = 36g deducted upon creation (when sent to station)
+      expect(managerStockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quantity: 1000 - 36,
+        }),
+      );
+      expect(managerMovementRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          movementType: 'SALE',
+          quantity: 36,
+          referenceType: 'ORDER',
+          notes: expect.stringContaining('Sent to station via Order'),
+        }),
+      );
     });
 
     it('applies tax and discount automatically according to operational settings', async () => {
@@ -231,9 +341,6 @@ describe('OrderService', () => {
         create: jest.fn((i: Record<string, unknown>) => i),
         save: jest.fn().mockResolvedValue([]),
       };
-      const managerAuditRepo = {
-        save: jest.fn().mockResolvedValue({}),
-      };
 
       mockDataSource.transaction.mockImplementation(
         (callback: (m: unknown) => Promise<unknown>) => {
@@ -241,7 +348,12 @@ describe('OrderService', () => {
             getRepository: (entityClass: unknown) => {
               if (entityClass === Order) return managerOrderRepo;
               if (entityClass === OrderItem) return managerItemRepo;
-              return managerAuditRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -311,7 +423,12 @@ describe('OrderService', () => {
                   save: jest.fn().mockResolvedValue([]),
                 };
               }
-              return {};
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -369,9 +486,6 @@ describe('OrderService', () => {
         create: jest.fn((i: Record<string, unknown>) => i),
         save: jest.fn().mockResolvedValue([]),
       };
-      const managerAuditRepo = {
-        save: jest.fn().mockResolvedValue({}),
-      };
 
       mockDataSource.transaction.mockImplementation(
         (callback: (m: unknown) => Promise<unknown>) => {
@@ -379,7 +493,12 @@ describe('OrderService', () => {
             getRepository: (entityClass: unknown) => {
               if (entityClass === Order) return managerOrderRepo;
               if (entityClass === OrderItem) return managerItemRepo;
-              return managerAuditRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -437,7 +556,12 @@ describe('OrderService', () => {
             getRepository: (entityClass: unknown) => {
               if (entityClass === Order) return managerOrderRepo;
               if (entityClass === OrderItem) return managerItemRepo;
-              return { save: jest.fn().mockResolvedValue({}) };
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -502,9 +626,6 @@ describe('OrderService', () => {
       const managerTableRepo = {
         save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
       };
-      const managerAuditRepo = {
-        save: jest.fn().mockResolvedValue({}),
-      };
 
       mockDataSource.transaction.mockImplementation(
         (callback: (m: unknown) => Promise<unknown>) => {
@@ -513,7 +634,12 @@ describe('OrderService', () => {
               if (entityClass === Order) return managerOrderRepo;
               if (entityClass === OrderItem) return managerItemRepo;
               if (entityClass === Table) return managerTableRepo;
-              return managerAuditRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -586,7 +712,7 @@ describe('OrderService', () => {
       await expect(
         service.create('tenant-1', 'user-1', 'outlet-1', {
           orderType: 'DINE_IN',
-          tableId: 'non-existent-table',
+          tableId: 'tbl-non-existent',
           items: [{ variantId: 'var-1', quantity: 1 }],
         }),
       ).rejects.toThrow(BadRequestException);
@@ -622,11 +748,11 @@ describe('OrderService', () => {
         id: 'outlet-1',
         tenantId: 'tenant-1',
       });
-      mockVariantRepo.find.mockResolvedValue([]); // not found for tenant-1
+      mockVariantRepo.find.mockResolvedValue([]);
 
       await expect(
         service.create('tenant-1', 'user-1', 'outlet-1', {
-          items: [{ variantId: 'var-foreign', quantity: 1 }],
+          items: [{ variantId: 'var-invalid', quantity: 1 }],
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -634,7 +760,7 @@ describe('OrderService', () => {
 
   describe('findById', () => {
     it('returns order with relations when found for tenant', async () => {
-      const order = { id: 'ord-1', tenantId: 'tenant-1', orderNumber: 'ORD-1' };
+      const order = { id: 'ord-1', tenantId: 'tenant-1' };
       const qb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -656,21 +782,38 @@ describe('OrderService', () => {
       } as unknown as SelectQueryBuilder<Order>;
       mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
 
-      await expect(service.findById('tenant-1', 'ord-foreign')).rejects.toThrow(
+      await expect(service.findById('tenant-1', 'ord-invalid')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
   describe('void', () => {
-    it('sets order to VOID, releases table, and logs void entry', async () => {
+    it('voids specific menu item, reclassifies movement to WASTE without double deduction, recalculates order, and releases table if all items voided', async () => {
+      const item1 = {
+        id: 'item-1',
+        orderId: 'ord-1',
+        variantId: 'var-1',
+        productName: 'Americano',
+        variantName: 'Regular',
+        unitPrice: 25000,
+        quantity: 1,
+        subtotal: 25000,
+        status: 'ACTIVE',
+      };
       const order = {
         id: 'ord-1',
         tenantId: 'tenant-1',
         outletId: 'outlet-1',
-        tableId: 'tbl-1',
+        orderNumber: 'ORD-123',
         status: 'PENDING',
+        orderType: 'DINE_IN',
+        tableId: 'tbl-1',
+        subtotal: 25000,
+        totalAmount: 25000,
+        items: [item1],
       };
+
       const qb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -681,6 +824,9 @@ describe('OrderService', () => {
 
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
+      };
+      const managerItemRepo = {
+        save: jest.fn().mockResolvedValue(item1),
       };
       const managerVoidRepo = {
         create: jest.fn((v: Record<string, unknown>) => ({
@@ -696,8 +842,19 @@ describe('OrderService', () => {
         }),
         save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
       };
-      const managerAuditRepo = {
-        save: jest.fn().mockResolvedValue({}),
+      const existingMovement = {
+        id: 'mov-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        referenceType: 'ORDER',
+        referenceId: 'ord-1',
+        movementType: 'SALE',
+        quantity: 18,
+        metadata: { orderItemId: 'item-1', variantId: 'var-1' },
+      };
+      const managerMovementRepo = {
+        find: jest.fn().mockResolvedValue([existingMovement]),
+        save: jest.fn((m: Record<string, unknown>) => Promise.resolve(m)),
       };
 
       mockDataSource.transaction.mockImplementation(
@@ -705,9 +862,16 @@ describe('OrderService', () => {
           return callback({
             getRepository: (entityClass: unknown) => {
               if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
               if (entityClass === Void) return managerVoidRepo;
               if (entityClass === Table) return managerTableRepo;
-              return managerAuditRepo;
+              if (entityClass === InventoryMovement) return managerMovementRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
             },
           });
         },
@@ -719,18 +883,73 @@ describe('OrderService', () => {
         'outlet-1',
         'ord-1',
         {
-          reason: 'Customer cancelled order',
+          orderItemId: 'item-1',
+          reason: 'Customer cancelled drink',
         },
       );
 
+      expect(result.voidedItem.status).toBe('VOID');
       expect(result.order.status).toBe('VOID');
+      expect(result.order.totalAmount).toBe(0);
+      expect(managerMovementRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          movementType: 'WASTE',
+          referenceType: 'VOID',
+          notes: expect.stringContaining('Void menu item: Americano'),
+        }),
+      );
       expect(managerTableRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'tbl-1',
           status: 'AVAILABLE',
         }),
       );
-      expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('rejects void if order is already completed', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        status: 'COMPLETED',
+        items: [{ id: 'item-1', status: 'ACTIVE' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.void('tenant-1', 'user-1', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Cancel',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects void if item is already voided', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        status: 'PENDING',
+        items: [{ id: 'item-1', status: 'VOID' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.void('tenant-1', 'user-1', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Cancel',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

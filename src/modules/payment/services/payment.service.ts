@@ -9,11 +9,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Payment } from '../entities/payment.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { Order } from '../../order/entities/order.entity';
-import { Recipe } from '../../recipe/entities/recipe.entity';
-import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
-import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { Table } from '../../table/entities/table.entity';
-import { Packaging } from '../../packaging/entities/packaging.entity';
 import { AuditService } from '../../audit/audit.service';
 import {
   CreatePaymentDto,
@@ -56,9 +52,6 @@ export class PaymentService {
   ) {
     const trxRepo = manager.getRepository(Transaction);
     const orderRepo = manager.getRepository(Order);
-    const recipeRepo = manager.getRepository(Recipe);
-    const stockRepo = manager.getRepository(InventoryStock);
-    const movementRepo = manager.getRepository(InventoryMovement);
     const tableRepo = manager.getRepository(Table);
 
     const orderTotal = Number(order.totalAmount);
@@ -87,107 +80,6 @@ export class PaymentService {
       if (table && table.status === 'OCCUPIED') {
         table.status = 'AVAILABLE';
         await tableRepo.save(table);
-      }
-    }
-
-    // Automatic Recipe-based Stock Deduction
-    for (const item of order.items ?? []) {
-      const recipes = await recipeRepo.find({
-        where: { tenantId: order.tenantId, variantId: item.variantId },
-      });
-
-      for (const recipe of recipes) {
-        const deductionQty = Number(item.quantity) * Number(recipe.quantity);
-
-        let stock = await stockRepo.findOne({
-          where: {
-            tenantId: order.tenantId,
-            outletId: order.outletId,
-            inventoryItemId: recipe.inventoryItemId,
-          },
-        });
-
-        if (!stock) {
-          stock = stockRepo.create({
-            tenantId: order.tenantId,
-            outletId: order.outletId,
-            inventoryItemId: recipe.inventoryItemId,
-            quantity: -deductionQty,
-          });
-        } else {
-          stock.quantity = Number(stock.quantity) - deductionQty;
-        }
-        await stockRepo.save(stock);
-
-        const movement = movementRepo.create({
-          tenantId: order.tenantId,
-          outletId: order.outletId,
-          inventoryItemId: recipe.inventoryItemId,
-          movementType: 'SALE',
-          quantity: deductionQty,
-          referenceType: 'ORDER',
-          referenceId: order.id,
-          notes: `Sold via Order ${order.orderNumber} (${item.productName} - ${item.variantName})`,
-          movementDate: new Date(),
-          createdBy: userId ?? null,
-        });
-        await movementRepo.save(movement);
-      }
-    }
-
-    // Automatic Packaging-based Stock Deduction for Takeaway Orders
-    if (order.orderType === 'TAKE_AWAY') {
-      const packagingRepo = manager.getRepository(Packaging);
-      const packagings = await packagingRepo
-        .createQueryBuilder('p')
-        .where('p.tenantId = :tenantId', { tenantId: order.tenantId })
-        .andWhere('(p.outletId = :outletId OR p.outletId IS NULL)', {
-          outletId: order.outletId,
-        })
-        .andWhere('p.status = :status', { status: 'ACTIVE' })
-        .andWhere('p.applyToOrderType IN (:...types)', {
-          types: ['TAKE_AWAY', 'ALL'],
-        })
-        .getMany();
-
-      for (const pkg of packagings) {
-        if (!pkg.inventoryItemId) continue;
-
-        const deductionQty = 1;
-
-        let stock = await stockRepo.findOne({
-          where: {
-            tenantId: order.tenantId,
-            outletId: order.outletId,
-            inventoryItemId: pkg.inventoryItemId,
-          },
-        });
-
-        if (!stock) {
-          stock = stockRepo.create({
-            tenantId: order.tenantId,
-            outletId: order.outletId,
-            inventoryItemId: pkg.inventoryItemId,
-            quantity: -deductionQty,
-          });
-        } else {
-          stock.quantity = Number(stock.quantity) - deductionQty;
-        }
-        await stockRepo.save(stock);
-
-        const movement = movementRepo.create({
-          tenantId: order.tenantId,
-          outletId: order.outletId,
-          inventoryItemId: pkg.inventoryItemId,
-          movementType: 'SALE',
-          quantity: deductionQty,
-          referenceType: 'ORDER',
-          referenceId: order.id,
-          notes: `Packaging deduction: ${pkg.name} for Order ${order.orderNumber}`,
-          movementDate: new Date(),
-          createdBy: userId ?? null,
-        });
-        await movementRepo.save(movement);
       }
     }
 

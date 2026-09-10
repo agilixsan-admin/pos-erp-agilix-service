@@ -128,6 +128,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
             if (entity === OrderItem) return fakeItemRepo;
             if (entity === Table) return fakeTableRepo;
             return {
+              find: jest.fn().mockResolvedValue([]),
               create: jest.fn((d) => d),
               save: jest.fn((d) => Promise.resolve(d)),
               findOne: jest.fn(),
@@ -170,6 +171,22 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
     const mockDataSource = { transaction: jest.fn() };
     const mockAuditService = { record: jest.fn().mockResolvedValue(undefined) };
 
+    const mockSettingsService = {
+      getSettings: jest.fn().mockResolvedValue({
+        taxEnabled: false,
+        taxRate: 0,
+        discountEnabled: false,
+      }),
+    };
+    const mockDiscountService = {
+      findById: jest.fn(),
+      isDiscountActive: jest.fn().mockReturnValue({ isValid: false }),
+      calculateDiscount: jest.fn().mockReturnValue(0),
+    };
+    const mockPackagingService = {
+      findApplicableForOrder: jest.fn().mockResolvedValue([]),
+    };
+
     beforeEach(() => {
       jest.clearAllMocks();
       orderService = new OrderService(
@@ -181,9 +198,9 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockTableRepo as any,
         mockDataSource as any,
         mockAuditService as any,
-        {} as any,
-        {} as any,
-        {} as any,
+        mockSettingsService as any,
+        mockDiscountService as any,
+        mockPackagingService as any,
       );
     });
 
@@ -192,6 +209,16 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         id: 'table-1',
         status: 'OCCUPIED',
       };
+      const item1 = {
+        id: 'item-1',
+        variantId: 'var-1',
+        productId: 'prod-1',
+        productName: 'Fried Rice',
+        variantName: 'Spicy',
+        quantity: 1,
+        subtotal: 35000,
+        status: 'ACTIVE',
+      };
       const sentOrder: Partial<Order> = {
         id: 'order-1',
         tenantId,
@@ -199,6 +226,12 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         orderType: 'DINE_IN',
         tableId: 'table-1',
         table: occupiedTable as Table,
+        subtotal: 35000,
+        totalAmount: 35000,
+        packagingFee: 0,
+        discountAmount: 0,
+        taxAmount: 0,
+        items: [item1 as any],
       };
 
       mockQueryBuilder.getOne.mockResolvedValue(sentOrder);
@@ -211,6 +244,9 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
       const fakeOrderRepo = {
         save: jest.fn((data) => Promise.resolve(data)),
       };
+      const fakeItemRepo = {
+        save: jest.fn((data) => Promise.resolve(data)),
+      };
       const fakeTableRepo = {
         findOne: jest.fn().mockResolvedValue(occupiedTable),
         save: jest.fn((data) => Promise.resolve(data)),
@@ -221,8 +257,11 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
           getRepository: jest.fn((entity) => {
             if (entity === Void) return fakeVoidRepo;
             if (entity === Order) return fakeOrderRepo;
+            if (entity === OrderItem) return fakeItemRepo;
             if (entity === Table) return fakeTableRepo;
             return {
+              find: jest.fn().mockResolvedValue([]),
+              findOne: jest.fn().mockResolvedValue(null),
               create: jest.fn((d) => d),
               save: jest.fn((d) => Promise.resolve(d)),
             };
@@ -237,6 +276,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         outletId,
         'order-1',
         {
+          orderItemId: 'item-1',
           reason: 'Customer changed mind',
         },
       );
@@ -249,7 +289,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
       );
       expect(mockAuditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'ORDER_VOIDED',
+          action: 'ORDER_ITEM_VOIDED',
           tenantId,
         }),
         expect.anything(),
