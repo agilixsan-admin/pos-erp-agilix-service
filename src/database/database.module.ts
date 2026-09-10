@@ -23,6 +23,16 @@ import { ALL_MIGRATIONS } from './migrations';
           config.get<string>('nodeEnv') !== 'production' ||
           process.env.DB_MIGRATIONS_RUN === 'true',
         synchronize: false,
+        extra: {
+          max: config.get<number>('database.poolMax') ?? 20,
+          min: config.get<number>('database.poolMin') ?? 2,
+          statement_cache_size:
+            config.get<number>('database.statementCacheSize') ?? 0,
+          idleTimeoutMillis:
+            config.get<number>('database.idleTimeoutMillis') ?? 30000,
+          connectionTimeoutMillis:
+            config.get<number>('database.connectionTimeoutMillis') ?? 5000,
+        },
       }),
     }),
   ],

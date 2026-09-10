@@ -88,4 +88,11 @@ export default new DataSource({
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,
+  extra: {
+    max: Number(process.env.DB_POOL_MAX ?? 20),
+    min: Number(process.env.DB_POOL_MIN ?? 2),
+    statement_cache_size: Number(process.env.DB_STATEMENT_CACHE_SIZE ?? 0),
+    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT ?? 30000),
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT ?? 5000),
+  },
 });

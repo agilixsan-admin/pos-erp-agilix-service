@@ -12,6 +12,11 @@ export default () => ({
     autoCreate: process.env.DB_AUTO_CREATE === 'false' ? false : true,
     ssl: process.env.DB_SSL === 'true',
     logging: process.env.DB_LOGGING === 'true',
+    poolMax: Number(process.env.DB_POOL_MAX ?? 20),
+    poolMin: Number(process.env.DB_POOL_MIN ?? 2),
+    statementCacheSize: Number(process.env.DB_STATEMENT_CACHE_SIZE ?? 0),
+    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT ?? 30000),
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT ?? 5000),
   },
   jwt: {
     secret: process.env.JWT_SECRET,
