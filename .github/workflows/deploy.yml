@@ -118,23 +118,28 @@ jobs:
 
             cd /home/${{ secrets.DEPLOY_USER }}/agilix-pos
             
-            # Load file .env ke environment shell agar semua variabel terbaca oleh Swarm
+            # 2. Bersihkan karakter \r dan load file .env ke environment shell secara aman
             if [ -f .env ]; then
-              set -a
-              . ./.env
-              set +a
+              sed -i 's/\r$//' .env
+              while IFS='=' read -r key value || [ -n "$key" ]; do
+                [[ "$key" =~ ^[[:space:]]*# ]] && continue
+                [[ -z "$key" ]] && continue
+                key=$(echo "$key" | xargs)
+                value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+                export "$key=$value"
+              done < .env
             fi
 
             export APP_IMAGE="ghcr.io/${{ github.repository }}:${IMAGE_TAG}"
 
-            # 2. Jalankan migrasi DB otomatis sebelum container utama di-rolling update
+            # 3. Jalankan migrasi DB otomatis sebelum container utama di-rolling update
             echo "==== Running Database Migration Check ===="
             docker run --rm \
               --network agilix_network \
               --env-file /home/${{ secrets.DEPLOY_USER }}/agilix-pos/.env \
               "$APP_IMAGE" npm run migration:run:prod
 
-            # 3. Deploy update stack Swarm
+            # 4. Deploy update stack Swarm murni
             echo "==== Deploying Updated Service Stack ===="
             docker stack deploy -c docker-stack.yml --with-registry-auth agilix
 
