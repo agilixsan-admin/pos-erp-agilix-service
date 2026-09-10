@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { OrderService } from '../services/order.service';
 import {
+  AddOrderItemsDto,
   CreateOrderDto,
   QueryOrderDto,
   UpdateOrderDto,
@@ -106,6 +107,26 @@ export class OrderController {
     return {
       success: true,
       message: 'Order voided successfully',
+      data,
+    };
+  }
+
+  @Post(':id/items')
+  @Permissions('order.update')
+  async addItems(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddOrderItemsDto,
+  ) {
+    const data = await this.orderService.addItems(
+      user.tenantId,
+      user.id,
+      id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Items added to order successfully',
       data,
     };
   }

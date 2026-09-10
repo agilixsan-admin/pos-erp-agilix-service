@@ -151,3 +151,12 @@ export class VoidOrderDto {
   @IsUUID()
   reasonCategoryId?: string;
 }
+
+export class AddOrderItemsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  items!: CreateOrderItemDto[];
+}
+

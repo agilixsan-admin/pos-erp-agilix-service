@@ -952,4 +952,226 @@ describe('OrderService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('addItems', () => {
+    it('successfully adds new items to PENDING order, deducts stock, recalculates totals, and logs audit', async () => {
+      const existingOrder = {
+        id: 'ord-100',
+        orderNumber: 'ORD-100',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        subtotal: 50000,
+        discountAmount: 0,
+        taxAmount: 0,
+        packagingFee: 0,
+        totalAmount: 50000,
+        items: [
+          {
+            id: 'item-1',
+            variantId: 'var-1',
+            productName: 'Latte',
+            variantName: 'Regular',
+            quantity: 1,
+            unitPrice: 50000,
+            subtotal: 50000,
+            status: 'ACTIVE',
+          },
+        ],
+      };
+
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(existingOrder),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockVariantRepo.find.mockResolvedValueOnce([
+        {
+          id: 'var-2',
+          productId: 'prod-2',
+          name: 'Croissant',
+          price: 25000,
+          tenantId: 'tenant-1',
+          product: { name: 'Butter Croissant' },
+        },
+      ]);
+
+      const mockStock = {
+        id: 'stock-flour',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        inventoryItemId: 'item-flour',
+        currentStock: 1000,
+        minimumStock: 100,
+      };
+
+      let savedItems: unknown[] = [];
+      let savedOrder: Record<string, unknown> | null = null;
+      let savedMovements: unknown[] = [];
+
+      mockDataSource.transaction.mockImplementationOnce(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entity: unknown) => {
+              if (entity === OrderItem) {
+                return {
+                  create: jest.fn((items: unknown[]) => items),
+                  save: jest.fn((items: unknown[]) => {
+                    savedItems = items as unknown[];
+                    return Promise.resolve(items);
+                  }),
+                };
+              }
+              if (entity === Recipe) {
+                return {
+                  find: jest.fn().mockResolvedValue([
+                    {
+                      id: 'recipe-1',
+                      variantId: 'var-2',
+                      inventoryItemId: 'item-flour',
+                      quantity: 100,
+                    },
+                  ]),
+                };
+              }
+              if (entity === InventoryStock) {
+                return {
+                  findOne: jest.fn().mockResolvedValue(mockStock),
+                  save: jest.fn((stk: unknown) => Promise.resolve(stk)),
+                };
+              }
+              if (entity === InventoryMovement) {
+                return {
+                  create: jest.fn((mv: unknown) => mv),
+                  save: jest.fn((mv: unknown) => {
+                    savedMovements.push(mv);
+                    return Promise.resolve(mv);
+                  }),
+                };
+              }
+              if (entity === Order) {
+                return {
+                  save: jest.fn((o: Record<string, unknown>) => {
+                    savedOrder = o;
+                    return Promise.resolve(o);
+                  }),
+                };
+              }
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
+            },
+          });
+        },
+      );
+
+      // findById mock for return
+      mockOrderRepo.findOne.mockResolvedValueOnce({
+        ...existingOrder,
+        subtotal: 75000,
+        totalAmount: 75000,
+        items: [
+          ...existingOrder.items,
+          {
+            id: 'item-2',
+            variantId: 'var-2',
+            productName: 'Butter Croissant',
+            variantName: 'Croissant',
+            quantity: 1,
+            unitPrice: 25000,
+            subtotal: 25000,
+            status: 'ACTIVE',
+          },
+        ],
+      });
+
+      const result = await service.addItems('tenant-1', 'user-1', 'ord-100', {
+        items: [{ variantId: 'var-2', quantity: 1, notes: 'Warm' }],
+      });
+
+      expect(savedItems).toHaveLength(1);
+      expect(mockStock.currentStock).toBe(900); // 1000 - 100
+      expect(savedMovements).toHaveLength(1);
+      expect(savedMovements[0]).toEqual(
+        expect.objectContaining({
+          movementType: 'SALE',
+          referenceType: 'ORDER',
+          quantity: 100,
+        }),
+      );
+      expect(savedOrder).not.toBeNull();
+      expect(savedOrder?.['subtotal']).toBe(75000);
+      expect(savedOrder?.['totalAmount']).toBe(75000);
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ORDER_ITEMS_ADDED',
+          entityId: 'ord-100',
+        }),
+      );
+      expect(result.items).toHaveLength(2);
+    });
+
+    it('throws NotFoundException if order does not exist', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.addItems('tenant-1', 'user-1', 'ord-999', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException if order is not PENDING (e.g. COMPLETED)', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'ord-comp',
+          status: 'COMPLETED',
+          tenantId: 'tenant-1',
+          items: [],
+        }),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.addItems('tenant-1', 'user-1', 'ord-comp', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if variant is not found', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'ord-100',
+          status: 'PENDING',
+          tenantId: 'tenant-1',
+          items: [],
+        }),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockVariantRepo.find.mockResolvedValueOnce([]); // No variant found
+
+      await expect(
+        service.addItems('tenant-1', 'user-1', 'ord-100', {
+          items: [{ variantId: 'non-existent-var', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });
+

@@ -19,6 +19,7 @@ import { SettingsService } from '../../settings/services/settings.service';
 import { DiscountService } from '../../settings/services/discount.service';
 import { PackagingService } from '../../packaging/services/packaging.service';
 import {
+  AddOrderItemsDto,
   CreateOrderDto,
   QueryOrderDto,
   UpdateOrderDto,
@@ -752,4 +753,253 @@ export class OrderService {
       };
     });
   }
+
+  async addItems(
+    tenantId: string,
+    userId: string,
+    orderId: string,
+    dto: AddOrderItemsDto,
+  ) {
+    const qb = this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.items', 'item')
+      .leftJoinAndSelect('order.outlet', 'outlet')
+      .leftJoinAndSelect('order.table', 'table')
+      .where('order.id = :id AND order.tenantId = :tenantId', {
+        id: orderId,
+        tenantId,
+      });
+
+    const order = await qb.getOne();
+    if (!order) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Order not found',
+        code: 'ORDER_NOT_FOUND',
+      });
+    }
+
+    if (order.status !== 'PENDING') {
+      throw new BadRequestException({
+        success: false,
+        message: `Cannot add items to an order with status ${order.status}`,
+        code: 'ORDER_LOCKED',
+      });
+    }
+
+    const variantIds = dto.items.map((i) => i.variantId);
+    const variants = await this.variantRepository.find({
+      where: { id: In(variantIds), tenantId },
+      relations: { product: true },
+    });
+
+    if (variants.length !== new Set(variantIds).size) {
+      throw new BadRequestException({
+        success: false,
+        message:
+          'One or more product variants do not exist or belong to another tenant',
+        code: 'INVALID_VARIANTS',
+      });
+    }
+
+    const variantMap = new Map(variants.map((v) => [v.id, v]));
+
+    const newOrderItemsToCreate: Partial<OrderItem>[] = [];
+    for (const itemDto of dto.items) {
+      const variant = variantMap.get(itemDto.variantId);
+      if (!variant) continue;
+
+      const unitPrice = Number(variant.price);
+      const discountAmount = Number(itemDto.discountAmount ?? 0);
+      const quantity = Number(itemDto.quantity);
+      const subtotal = Math.max(0, unitPrice * quantity - discountAmount);
+
+      newOrderItemsToCreate.push({
+        tenantId,
+        orderId: order.id,
+        productId: variant.productId,
+        variantId: variant.id,
+        productName: variant.product?.name ?? 'Unknown Product',
+        variantName: variant.name,
+        quantity,
+        unitPrice,
+        discountAmount,
+        subtotal,
+        notes: itemDto.notes ?? null,
+        status: 'ACTIVE',
+      });
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const itemRepo = manager.getRepository(OrderItem);
+      const recipeRepo = manager.getRepository(Recipe);
+      const stockRepo = manager.getRepository(InventoryStock);
+      const movementRepo = manager.getRepository(InventoryMovement);
+
+      // 1. Create and save new order items
+      const itemEntities = newOrderItemsToCreate.map((item) =>
+        itemRepo.create(item),
+      );
+      const savedNewItems = await itemRepo.save(itemEntities);
+
+      // 2. Deduct raw materials for newly added items sent to station
+      for (const item of savedNewItems) {
+        const recipes = await recipeRepo.find({
+          where: { tenantId, variantId: item.variantId },
+        });
+
+        for (const recipe of recipes) {
+          const deductionQty = Number(item.quantity) * Number(recipe.quantity);
+
+          let stock = await stockRepo.findOne({
+            where: {
+              tenantId,
+              outletId: order.outletId,
+              inventoryItemId: recipe.inventoryItemId,
+            },
+          });
+
+          if (!stock) {
+            stock = stockRepo.create({
+              tenantId,
+              outletId: order.outletId,
+              inventoryItemId: recipe.inventoryItemId,
+              quantity: -deductionQty,
+            });
+          } else {
+            stock.quantity = Number(stock.quantity) - deductionQty;
+          }
+          await stockRepo.save(stock);
+
+          const movement = movementRepo.create({
+            tenantId,
+            outletId: order.outletId,
+            inventoryItemId: recipe.inventoryItemId,
+            movementType: 'SALE',
+            quantity: deductionQty,
+            referenceType: 'ORDER',
+            referenceId: order.id,
+            notes: `Additional item sent to station via Order ${order.orderNumber} (${item.productName} - ${item.variantName})`,
+            movementDate: new Date(),
+            createdBy: userId,
+            metadata: {
+              orderItemId: item.id,
+              variantId: item.variantId,
+            },
+          });
+          await movementRepo.save(movement);
+        }
+      }
+
+      // 3. Recalculate order financials across all active items
+      const allActiveItems = [
+        ...(order.items ?? []).filter((i) => i.status === 'ACTIVE'),
+        ...savedNewItems,
+      ];
+
+      const calculatedSubtotal = allActiveItems.reduce(
+        (sum, item) => sum + Number(item.subtotal),
+        0,
+      );
+
+      const settings = await this.settingsService.getSettings(
+        tenantId,
+        order.outletId,
+      );
+
+      let discountAmount = 0;
+      if (order.discountId && calculatedSubtotal > 0) {
+        const discount = await this.discountService.findById(
+          tenantId,
+          order.discountId,
+        );
+        if (discount) {
+          const activeCheck = this.discountService.isDiscountActive(
+            discount,
+            new Date(),
+            calculatedSubtotal,
+          );
+          if (activeCheck.isValid) {
+            discountAmount = this.discountService.calculateDiscount(
+              discount,
+              allActiveItems.map((item) => ({
+                productId: item.productId,
+                unitPrice: Number(item.unitPrice),
+                quantity: Number(item.quantity),
+              })),
+              calculatedSubtotal,
+            );
+          }
+        }
+      } else if (settings.discountEnabled && calculatedSubtotal > 0) {
+        if (settings.discountType === 'PERCENTAGE') {
+          discountAmount = Math.round(
+            (calculatedSubtotal * Number(settings.discountValue)) / 100,
+          );
+        } else {
+          discountAmount = Math.min(
+            calculatedSubtotal,
+            Number(settings.discountValue),
+          );
+        }
+      }
+
+      let packagingFee = Number(order.packagingFee ?? 0);
+
+      let taxAmount = 0;
+      let isInclusiveTax = false;
+      if (settings.taxEnabled && calculatedSubtotal > 0) {
+        const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+        const activeTax = settings.defaultGlobalTax;
+        const rate = activeTax
+          ? Number(activeTax.rate)
+          : Number(settings.taxRate || 0);
+        const taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+
+        if (taxType === 'INCLUSIVE' && rate > 0) {
+          isInclusiveTax = true;
+          taxAmount = Math.round(taxableBase - taxableBase / (1 + rate / 100));
+        } else if (rate > 0) {
+          taxAmount = Math.round((taxableBase * rate) / 100);
+        }
+      }
+
+      const totalAmount = Math.max(
+        calculatedSubtotal -
+          discountAmount +
+          packagingFee +
+          (isInclusiveTax ? 0 : taxAmount),
+        0,
+      );
+
+      order.subtotal = calculatedSubtotal;
+      order.discountAmount = discountAmount;
+      order.taxAmount = taxAmount;
+      order.packagingFee = packagingFee;
+      order.totalAmount = totalAmount;
+
+      await orderRepo.save(order);
+
+      await this.audit.record(
+        {
+          action: 'ORDER_ITEMS_ADDED',
+          tenantId,
+          actorType: 'USER',
+          actorId: userId,
+          metadata: {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            addedItemCount: savedNewItems.length,
+            newSubtotal: order.subtotal,
+            newTotalAmount: order.totalAmount,
+          },
+        },
+        manager,
+      );
+
+      return this.findById(tenantId, order.id);
+    });
+  }
 }
+

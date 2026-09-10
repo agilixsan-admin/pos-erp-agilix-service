@@ -332,6 +332,69 @@
         },
         "security": [{ "Bearer": [] }]
       }
+    },
+    "/orders/{id}/items": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Tambah item baru ke pesanan berjalan (DINE_IN / PENDING)",
+        "operationId": "addOrderItems",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string", "description": "Order UUID" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": ["items"],
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["variantId", "quantity"],
+                    "properties": {
+                      "variantId": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174011" },
+                      "quantity": { "type": "integer", "example": 1 },
+                      "notes": { "type": "string", "example": "Extra hot" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item berhasil ditambahkan ke pesanan berjalan dan stok bahan baku otomatis terpotong",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "example": true },
+                "message": { "example": "Items added to order successfully" },
+                "data": {
+                  "example": {
+                    "id": "123e4567-e89b-12d3-a456-426614174030",
+                    "orderNumber": "ORD-20260901-001",
+                    "status": "PENDING",
+                    "subtotal": 100000,
+                    "totalAmount": 100000,
+                    "items": [
+                      { "id": "item-1", "variantId": "var-1", "productName": "Americano", "quantity": 2, "unitPrice": 25000, "subtotal": 50000 },
+                      { "id": "item-2", "variantId": "var-2", "productName": "Croissant", "quantity": 2, "unitPrice": 25000, "subtotal": 50000 }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Order locked (sudah COMPLETED/PAID/VOID) atau varian tidak valid / outlet tidak sesuai" },
+          "404": { "description": "Order not found" }
+        },
+        "security": [{ "Bearer": [] }]
+      }
     }
   }
 }
