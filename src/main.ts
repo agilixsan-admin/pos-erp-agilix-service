@@ -35,12 +35,28 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
   // CORS
-  const corsOrigin = config.get<string>('cors') ?? '*';
+  const corsConfig = config.get<string>('cors') ?? '*';
+  const corsOrigin =
+    corsConfig === '*'
+      ? true
+      : corsConfig.includes(',')
+        ? corsConfig.split(',').map((s) => s.trim().replace(/\/+$/, ''))
+        : corsConfig.trim();
+
   app.enableCors({
     origin: corsOrigin,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
-    exposedHeaders: ['x-request-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-request-id',
+      'X-Outlet-Id',
+      'x-outlet-id',
+      'X-Requested-With',
+      'Accept',
+    ],
+    exposedHeaders: ['x-request-id', 'set-cookie'],
   });
 
   // API versioning - allow /health to be probed directly at root path without version prefix
