@@ -310,7 +310,7 @@ export class InventoryController {
     };
   }
 
-  @Get('items/:id')
+  @Get([':id', 'items/:id'])
   @Permissions('inventory.read')
   async findById(
     @CurrentUser() user: User,
@@ -330,7 +330,7 @@ export class InventoryController {
     };
   }
 
-  @Post('items')
+  @Post(['', 'items'])
   @Permissions('inventory.create')
   async create(@CurrentUser() user: User, @Body() dto: CreateInventoryItemDto) {
     const data = await this.inventoryService.create(user.tenantId, dto);
@@ -341,7 +341,7 @@ export class InventoryController {
     };
   }
 
-  @Put('items/:id')
+  @Put([':id', 'items/:id'])
   @Permissions('inventory.update')
   async update(
     @CurrentUser() user: User,
@@ -356,7 +356,7 @@ export class InventoryController {
     };
   }
 
-  @Delete('items/:id')
+  @Delete([':id', 'items/:id'])
   @Permissions('inventory.delete')
   async delete(
     @CurrentUser() user: User,
@@ -370,7 +370,7 @@ export class InventoryController {
     };
   }
 
-  @Post('items/:id/stocks')
+  @Post([':id/stocks', 'items/:id/stocks'])
   @Permissions('inventory.adjust')
   async setStock(
     @CurrentUser() user: User,
