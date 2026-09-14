@@ -102,6 +102,31 @@ describe('CategoryService', () => {
         service.create('tenant-1', { name: 'Food' }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('restores soft-deleted category if created again with same name', async () => {
+      // First findOne (active) returns null
+      // Second findOne (withDeleted) returns soft-deleted entity
+      mockRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'cat-1',
+        name: 'Food',
+        status: 'INACTIVE',
+        tenantId: 'tenant-1',
+        deletedAt: new Date(),
+      });
+
+      const restored = {
+        id: 'cat-1',
+        name: 'Food',
+        status: 'ACTIVE',
+        tenantId: 'tenant-1',
+        deletedAt: null,
+      };
+      mockRepo.save.mockResolvedValue(restored);
+
+      const result = await service.create('tenant-1', { name: 'Food' });
+      expect(result.deletedAt).toBeNull();
+      expect(mockRepo.save).toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

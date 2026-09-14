@@ -62,6 +62,17 @@ export class CategoryService {
       });
     }
 
+    const softDeleted = await this.categoryRepository.findOne({
+      where: { tenantId, name: dto.name },
+      withDeleted: true,
+    });
+
+    if (softDeleted && softDeleted.deletedAt) {
+      softDeleted.deletedAt = null;
+      softDeleted.status = dto.status ?? 'ACTIVE';
+      return this.categoryRepository.save(softDeleted);
+    }
+
     const category = this.categoryRepository.create({
       tenantId,
       name: dto.name,

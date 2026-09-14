@@ -14,7 +14,10 @@ import { Tenant } from '../../tenant/tenant.entity';
 import { Product } from './product.entity';
 
 @Entity('categories')
-@Index(['tenantId', 'name'], { unique: true })
+@Index('UQ_categories_tenant_name_active', ['tenantId', 'name'], {
+  unique: true,
+  where: '"deleted_at" IS NULL',
+})
 export class Category {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

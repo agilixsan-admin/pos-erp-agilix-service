@@ -77,10 +77,16 @@ export class ProductService {
     const minPrice = prices.length ? Math.min(...prices) : 0;
     const maxPrice = prices.length ? Math.max(...prices) : 0;
     const primaryVariant = variants[0];
+    const price = primaryVariant
+      ? Number(primaryVariant.price || 0)
+      : minPrice || 0;
+    const sku = primaryVariant?.sku ?? null;
 
     return {
       ...product,
       variants,
+      price,
+      sku,
       minPrice,
       maxPrice,
       totalCogs: primaryVariant?.totalCogs || 0,
@@ -179,75 +185,79 @@ export class ProductService {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const productRepo = manager.getRepository(Product);
-      const variantRepo = manager.getRepository(ProductVariant);
-      const recipeRepo = manager.getRepository(Recipe);
+    const savedProductId = await this.dataSource.transaction(
+      async (manager) => {
+        const productRepo = manager.getRepository(Product);
+        const variantRepo = manager.getRepository(ProductVariant);
+        const recipeRepo = manager.getRepository(Recipe);
 
-      const product = productRepo.create({
-        tenantId,
-        categoryId: dto.categoryId ?? null,
-        name: dto.name,
-        description: dto.description ?? null,
-        status: dto.status ?? 'ACTIVE',
-      });
-
-      const savedProduct = await productRepo.save(product);
-
-      const variantDtos = dto.variants?.length
-        ? dto.variants
-        : [
-            {
-              name: 'Default',
-              sku: dto.sku,
-              price: dto.price ?? 0,
-              status: 'ACTIVE',
-              recipes: dto.recipes,
-            },
-          ];
-
-      for (const v of variantDtos) {
-        const variant = variantRepo.create({
+        const product = productRepo.create({
           tenantId,
-          productId: savedProduct.id,
-          name: v.name,
-          sku: v.sku ?? null,
-          price: v.price ?? 0,
-          status: v.status ?? 'ACTIVE',
+          categoryId: dto.categoryId ?? null,
+          name: dto.name,
+          description: dto.description ?? null,
+          status: dto.status ?? 'ACTIVE',
         });
 
-        const savedVariant = await variantRepo.save(variant);
+        const savedProduct = await productRepo.save(product);
 
-        if (v.recipes && v.recipes.length > 0) {
-          const recipes = v.recipes.map((r) =>
-            recipeRepo.create({
-              tenantId,
-              variantId: savedVariant.id,
-              inventoryItemId: r.inventoryItemId,
-              quantity: r.quantity,
-              unit: r.unit,
-            }),
-          );
-          await recipeRepo.save(recipes);
-        }
-      }
+        const variantDtos = dto.variants?.length
+          ? dto.variants
+          : [
+              {
+                name: 'Default',
+                sku: dto.sku,
+                price: dto.price ?? 0,
+                status: 'ACTIVE',
+                recipes: dto.recipes,
+              },
+            ];
 
-      await this.audit.record(
-        {
-          action: 'PRODUCT_CREATED',
-          tenantId,
-          actorType: 'USER',
-          actorId: userId,
-          metadata: {
+        for (const v of variantDtos) {
+          const variant = variantRepo.create({
+            tenantId,
             productId: savedProduct.id,
-            productName: savedProduct.name,
-          },
-        },
-        manager,
-      );
+            name: v.name,
+            sku: v.sku ?? null,
+            price: v.price ?? 0,
+            status: v.status ?? 'ACTIVE',
+          });
 
-      return this.findById(tenantId, savedProduct.id);
-    });
+          const savedVariant = await variantRepo.save(variant);
+
+          if (v.recipes && v.recipes.length > 0) {
+            const recipes = v.recipes.map((r) =>
+              recipeRepo.create({
+                tenantId,
+                variantId: savedVariant.id,
+                inventoryItemId: r.inventoryItemId,
+                quantity: r.quantity,
+                unit: r.unit,
+              }),
+            );
+            await recipeRepo.save(recipes);
+          }
+        }
+
+        await this.audit.record(
+          {
+            action: 'PRODUCT_CREATED',
+            tenantId,
+            actorType: 'USER',
+            actorId: userId,
+            metadata: {
+              productId: savedProduct.id,
+              productName: savedProduct.name,
+            },
+          },
+          manager,
+        );
+
+        return savedProduct.id;
+      },
+    );
+
+    return this.findById(tenantId, savedProductId);
   }
 
   async update(
@@ -386,9 +396,9 @@ export class ProductService {
         },
         manager,
       );
-
-      return this.findById(tenantId, id);
     });
+
+    return this.findById(tenantId, id);
   }
 
   async delete(tenantId: string, userId: string, id: string) {
