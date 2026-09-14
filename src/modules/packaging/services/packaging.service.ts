@@ -279,9 +279,9 @@ export class PackagingService {
       description: dto.description ?? null,
       outletId: dto.outletId ?? null,
       inventoryItemId: dto.inventoryItemId ?? null,
-      costPrice: 0,
-      extraPrice: 0,
-      applyToOrderType: 'TAKE_AWAY',
+      costPrice: dto.costPrice ?? 0,
+      extraPrice: dto.extraPrice ?? 0,
+      applyToOrderType: dto.applyToOrderType ?? 'TAKE_AWAY',
       status: dto.status ?? 'ACTIVE',
     });
 
@@ -379,6 +379,18 @@ export class PackagingService {
 
     if (dto.description !== undefined) {
       packaging.description = dto.description ?? null;
+    }
+
+    if (dto.costPrice !== undefined) {
+      packaging.costPrice = dto.costPrice;
+    }
+
+    if (dto.extraPrice !== undefined) {
+      packaging.extraPrice = dto.extraPrice;
+    }
+
+    if (dto.applyToOrderType !== undefined) {
+      packaging.applyToOrderType = dto.applyToOrderType;
     }
 
     if (dto.status !== undefined) {

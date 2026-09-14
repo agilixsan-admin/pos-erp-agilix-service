@@ -3,6 +3,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -36,6 +37,21 @@ export class CreatePackagingDto {
   inventoryItemId?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  costPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  extraPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['TAKE_AWAY', 'ALL', 'CUSTOM'])
+  applyToOrderType?: 'TAKE_AWAY' | 'ALL' | 'CUSTOM';
+
+  @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: 'ACTIVE' | 'INACTIVE' = 'ACTIVE';
 }
@@ -64,6 +80,21 @@ export class UpdatePackagingDto {
   @IsUUID()
   @IsOptional()
   inventoryItemId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  costPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  extraPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['TAKE_AWAY', 'ALL', 'CUSTOM'])
+  applyToOrderType?: 'TAKE_AWAY' | 'ALL' | 'CUSTOM';
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
