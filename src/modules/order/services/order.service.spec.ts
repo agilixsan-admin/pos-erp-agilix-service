@@ -1113,7 +1113,7 @@ describe('OrderService', () => {
         }),
         expect.anything(),
       );
-      expect(result.items).toHaveLength(2);
+      expect(result!.items).toHaveLength(2);
     });
 
     it('throws NotFoundException if order does not exist', async () => {

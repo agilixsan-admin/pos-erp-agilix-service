@@ -307,6 +307,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
 
       await expect(
         orderService.void(tenantId, userId, outletId, 'order-1', {
+          orderItemId: 'item-1',
           reason: 'Customer returned',
         }),
       ).rejects.toThrow(BadRequestException);
@@ -323,6 +324,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
 
       await expect(
         orderService.void(tenantId, userId, outletId, 'order-1', {
+          orderItemId: 'item-1',
           reason: 'Double void attempt',
         }),
       ).rejects.toThrow(BadRequestException);
