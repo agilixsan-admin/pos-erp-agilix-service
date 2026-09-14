@@ -69,8 +69,8 @@ export class AuditService {
 
     const qb = this.logs
       .createQueryBuilder('log')
-      .where('log.tenant_id = :tenantId', { tenantId })
-      .orderBy('log.created_at', 'DESC')
+      .where('log.tenantId = :tenantId', { tenantId })
+      .orderBy('log.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -79,19 +79,19 @@ export class AuditService {
     }
 
     if (actorType) {
-      qb.andWhere('log.actor_type = :actorType', { actorType });
+      qb.andWhere('log.actorType = :actorType', { actorType });
     }
 
     if (actorId) {
-      qb.andWhere('log.actor_id = :actorId', { actorId });
+      qb.andWhere('log.actorId = :actorId', { actorId });
     }
 
     if (startDate) {
-      qb.andWhere('log.created_at >= :startDate', { startDate });
+      qb.andWhere('log.createdAt >= :startDate', { startDate });
     }
 
     if (endDate) {
-      qb.andWhere('log.created_at <= :endDate', { endDate });
+      qb.andWhere('log.createdAt <= :endDate', { endDate });
     }
 
     const [data, total] = await qb.getManyAndCount();

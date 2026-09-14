@@ -219,17 +219,17 @@ describe('UserService', () => {
         total: 1,
         totalPages: 1,
       });
-      expect(whereMock).toHaveBeenCalledWith('user.tenant_id = :tenantId', {
+      expect(whereMock).toHaveBeenCalledWith('user.tenantId = :tenantId', {
         tenantId: 'tenant-1',
       });
-      expect(andWhereMock).toHaveBeenCalledWith('user.outlet_id = :outletId', {
+      expect(andWhereMock).toHaveBeenCalledWith('user.outletId = :outletId', {
         outletId: 'outlet-1',
       });
-      expect(andWhereMock).toHaveBeenCalledWith('user.role_id = :roleId', {
+      expect(andWhereMock).toHaveBeenCalledWith('user.roleId = :roleId', {
         roleId: 'role-1',
       });
       expect(andWhereMock).toHaveBeenCalledWith(
-        'user.is_super_admin = :isSuperAdmin',
+        'user.isSuperAdmin = :isSuperAdmin',
         {
           isSuperAdmin: true,
         },

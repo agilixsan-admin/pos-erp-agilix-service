@@ -203,7 +203,7 @@ describe('AuditService', () => {
       const result = await service.findAll('tenant-1', { page: 1, limit: 10 });
 
       expect(mockRepo.createQueryBuilder).toHaveBeenCalledWith('log');
-      expect(qb.where).toHaveBeenCalledWith('log.tenant_id = :tenantId', {
+      expect(qb.where).toHaveBeenCalledWith('log.tenantId = :tenantId', {
         tenantId: 'tenant-1',
       });
       expect(result.data).toHaveLength(1);
@@ -230,7 +230,7 @@ describe('AuditService', () => {
 
       await service.findAll('tenant-1', { actorType: 'USER' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('log.actor_type = :actorType', {
+      expect(qb.andWhere).toHaveBeenCalledWith('log.actorType = :actorType', {
         actorType: 'USER',
       });
     });
@@ -240,7 +240,7 @@ describe('AuditService', () => {
 
       await service.findAll('tenant-1', { actorId: 'user-1' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('log.actor_id = :actorId', {
+      expect(qb.andWhere).toHaveBeenCalledWith('log.actorId = :actorId', {
         actorId: 'user-1',
       });
     });
@@ -252,7 +252,7 @@ describe('AuditService', () => {
         startDate: '2026-09-01T00:00:00.000Z',
       });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('log.created_at >= :startDate', {
+      expect(qb.andWhere).toHaveBeenCalledWith('log.createdAt >= :startDate', {
         startDate: '2026-09-01T00:00:00.000Z',
       });
     });
@@ -264,7 +264,7 @@ describe('AuditService', () => {
         endDate: '2026-09-30T23:59:59.000Z',
       });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('log.created_at <= :endDate', {
+      expect(qb.andWhere).toHaveBeenCalledWith('log.createdAt <= :endDate', {
         endDate: '2026-09-30T23:59:59.000Z',
       });
     });

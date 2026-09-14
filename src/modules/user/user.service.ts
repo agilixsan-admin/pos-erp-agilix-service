@@ -101,21 +101,21 @@ export class UserService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.outlet', 'outlet')
-      .where('user.tenant_id = :tenantId', { tenantId })
-      .orderBy('user.created_at', 'DESC')
+      .where('user.tenantId = :tenantId', { tenantId })
+      .orderBy('user.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (outletId) {
-      qb.andWhere('user.outlet_id = :outletId', { outletId });
+      qb.andWhere('user.outletId = :outletId', { outletId });
     }
 
     if (roleId) {
-      qb.andWhere('user.role_id = :roleId', { roleId });
+      qb.andWhere('user.roleId = :roleId', { roleId });
     }
 
     if (isSuperAdmin !== undefined) {
-      qb.andWhere('user.is_super_admin = :isSuperAdmin', { isSuperAdmin });
+      qb.andWhere('user.isSuperAdmin = :isSuperAdmin', { isSuperAdmin });
     }
 
     if (status) {
