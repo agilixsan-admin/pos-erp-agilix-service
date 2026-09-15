@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { StockOpname } from '../entities/stock-opname.entity';
 import { StockOpnameItem } from '../entities/stock-opname-item.entity';
 import { Outlet } from '../../outlet/outlet.entity';
@@ -123,8 +123,16 @@ export class StockOpnameService {
   /**
    * Get stock opname detail by ID
    */
-  async findById(tenantId: string, id: string): Promise<StockOpname> {
-    const opname = await this.stockOpnameRepository.findOne({
+  async findById(
+    tenantId: string,
+    id: string,
+    manager?: EntityManager,
+  ): Promise<StockOpname> {
+    const repo = manager
+      ? manager.getRepository(StockOpname)
+      : this.stockOpnameRepository;
+
+    const opname = await repo.findOne({
       where: { id, tenantId },
       relations: {
         outlet: true,
@@ -314,7 +322,7 @@ export class StockOpnameService {
         manager,
       );
 
-      return this.findById(tenantId, saved.id);
+      return this.findById(tenantId, saved.id, manager);
     });
   }
 
