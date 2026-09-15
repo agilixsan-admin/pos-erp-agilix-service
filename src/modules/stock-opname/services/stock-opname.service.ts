@@ -222,7 +222,7 @@ export class StockOpnameService {
     const itemQuery = this.inventoryItemRepository
       .createQueryBuilder('item')
       .where('item.tenantId = :tenantId', { tenantId })
-      .andWhere('item.isActive = :isActive', { isActive: true });
+      .andWhere('item.status = :status', { status: 'ACTIVE' });
 
     if (scope === 'CATEGORY' && dto.categoryId) {
       itemQuery.andWhere('item.categoryId = :categoryId', {
@@ -257,58 +257,65 @@ export class StockOpnameService {
 
     const opnameNumber = await this.generateOpnameNumber(tenantId);
 
-    // Create StockOpname and Items
-    const opnameItems: StockOpnameItem[] = [];
-    for (const item of inventoryItems) {
-      const currentQty = stockMap.get(item.id) || 0;
-      const opnameItem = this.stockOpnameItemRepository.create({
+    return this.dataSource.transaction(async (manager) => {
+      const opnameRepo = manager.getRepository(StockOpname);
+      const itemRepo = manager.getRepository(StockOpnameItem);
+
+      const opname = opnameRepo.create({
         tenantId,
-        inventoryItemId: item.id,
-        systemStock: currentQty,
-        actualStock: null,
-        difference: 0,
-        status: 'UNCOUNTED',
-        notes: null,
+        outletId: dto.outletId,
+        opnameNumber,
+        opnameDate: dto.opnameDate ? new Date(dto.opnameDate) : new Date(),
+        status: 'IN_PROGRESS',
+        scope,
+        categoryId: scope === 'CATEGORY' ? (dto.categoryId ?? null) : null,
+        totalItems: inventoryItems.length,
+        countedItems: 0,
+        matchedItems: 0,
+        deficitItems: 0,
+        surplusItems: 0,
+        totalDifferenceValue: 0,
+        notes: dto.notes ?? null,
+        createdBy: actorId,
       });
-      opnameItems.push(opnameItem);
-    }
 
-    const opname = this.stockOpnameRepository.create({
-      tenantId,
-      outletId: dto.outletId,
-      opnameNumber,
-      opnameDate: dto.opnameDate ? new Date(dto.opnameDate) : new Date(),
-      status: 'IN_PROGRESS',
-      scope,
-      categoryId: scope === 'CATEGORY' ? (dto.categoryId ?? null) : null,
-      totalItems: opnameItems.length,
-      countedItems: 0,
-      matchedItems: 0,
-      deficitItems: 0,
-      surplusItems: 0,
-      totalDifferenceValue: 0,
-      notes: dto.notes ?? null,
-      createdBy: actorId,
-      items: opnameItems,
+      const saved = await opnameRepo.save(opname);
+
+      const opnameItems = inventoryItems.map((item) => {
+        const currentQty = stockMap.get(item.id) || 0;
+        return itemRepo.create({
+          tenantId,
+          stockOpnameId: saved.id,
+          inventoryItemId: item.id,
+          systemStock: currentQty,
+          actualStock: null,
+          difference: 0,
+          status: 'UNCOUNTED',
+          notes: null,
+        });
+      });
+
+      await itemRepo.save(opnameItems);
+
+      await this.audit.record(
+        {
+          action: 'STOCK_OPNAME_CREATED',
+          tenantId,
+          actorType: 'USER',
+          actorId,
+          metadata: {
+            opnameId: saved.id,
+            opnameNumber: saved.opnameNumber,
+            outletId: saved.outletId,
+            scope: saved.scope,
+            totalItems: saved.totalItems,
+          },
+        },
+        manager,
+      );
+
+      return this.findById(tenantId, saved.id);
     });
-
-    const saved = await this.stockOpnameRepository.save(opname);
-
-    await this.audit.record({
-      action: 'STOCK_OPNAME_CREATED',
-      tenantId,
-      actorType: 'USER',
-      actorId,
-      metadata: {
-        opnameId: saved.id,
-        opnameNumber: saved.opnameNumber,
-        outletId: saved.outletId,
-        scope: saved.scope,
-        totalItems: saved.totalItems,
-      },
-    });
-
-    return this.findById(tenantId, saved.id);
   }
 
   /**

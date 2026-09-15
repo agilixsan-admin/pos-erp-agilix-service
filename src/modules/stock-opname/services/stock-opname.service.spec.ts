@@ -20,6 +20,7 @@ describe('StockOpnameService', () => {
   let inventoryItemRepo: jest.Mocked<Repository<InventoryItem>>;
   let inventoryStockRepo: jest.Mocked<Repository<InventoryStock>>;
   let auditService: jest.Mocked<AuditService>;
+  let dataSource: jest.Mocked<DataSource>;
 
   const tenantId = 'tenant-123';
   const outletId = 'outlet-123';
@@ -99,6 +100,17 @@ describe('StockOpnameService', () => {
     inventoryItemRepo = module.get(getRepositoryToken(InventoryItem));
     inventoryStockRepo = module.get(getRepositoryToken(InventoryStock));
     auditService = module.get(AuditService);
+    dataSource = module.get(DataSource);
+
+    (dataSource.transaction as jest.Mock).mockImplementation((cb: (manager: any) => Promise<any>) =>
+      cb({
+        getRepository: (entity: any) => {
+          if (entity === StockOpname) return opnameRepo;
+          if (entity === StockOpnameItem) return opnameItemRepo;
+          return null;
+        },
+      }),
+    );
   });
 
   describe('create', () => {
