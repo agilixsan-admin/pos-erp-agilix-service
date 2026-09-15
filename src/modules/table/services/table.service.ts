@@ -44,6 +44,12 @@ export class TableService {
       qb.andWhere('table.status = :status', { status: query.status });
     }
 
+    if (query.section) {
+      qb.andWhere('LOWER(table.section) = LOWER(:section)', {
+        section: query.section.trim(),
+      });
+    }
+
     if (query.search) {
       qb.andWhere('LOWER(table.tableNumber) LIKE LOWER(:search)', {
         search: `%${query.search}%`,
@@ -118,6 +124,7 @@ export class TableService {
       tableNumber: dto.tableNumber,
       capacity: dto.capacity ?? 4,
       status: dto.status ?? 'AVAILABLE',
+      section: dto.section?.trim() || 'Main Area',
     });
 
     const saved = await this.tableRepository.save(table);
@@ -131,6 +138,7 @@ export class TableService {
         tableId: saved.id,
         tableNumber: saved.tableNumber,
         outletId: saved.outletId,
+        section: saved.section,
       },
     });
 
@@ -172,6 +180,10 @@ export class TableService {
       table.status = dto.status;
     }
 
+    if (dto.section !== undefined) {
+      table.section = dto.section.trim() || 'Main Area';
+    }
+
     const updated = await this.tableRepository.save(table);
 
     await this.audit.record({
@@ -183,6 +195,7 @@ export class TableService {
         tableId: updated.id,
         tableNumber: updated.tableNumber,
         status: updated.status,
+        section: updated.section,
       },
     });
 

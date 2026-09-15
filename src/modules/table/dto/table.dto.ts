@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -29,6 +30,11 @@ export class CreateTableDto {
   @IsString()
   @IsIn(['AVAILABLE', 'OCCUPIED', 'RESERVED'])
   status?: TableStatus = 'AVAILABLE';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  section?: string = 'Main Area';
 }
 
 export class UpdateTableDto {
@@ -47,6 +53,11 @@ export class UpdateTableDto {
   @IsString()
   @IsIn(['AVAILABLE', 'OCCUPIED', 'RESERVED'])
   status?: TableStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  section?: string;
 }
 
 export class QueryTableDto {
@@ -70,6 +81,10 @@ export class QueryTableDto {
   @IsString()
   @IsIn(['AVAILABLE', 'OCCUPIED', 'RESERVED'])
   status?: TableStatus;
+
+  @IsOptional()
+  @IsString()
+  section?: string;
 
   @IsOptional()
   @IsString()

@@ -6,6 +6,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -15,6 +16,8 @@ import { User } from '../../user/user.entity';
 import { Table } from '../../table/entities/table.entity';
 import { Discount } from '../../settings/entities/discount.entity';
 import { OrderItem } from './order-item.entity';
+import { Payment } from '../../payment/entities/payment.entity';
+import { Transaction } from '../../payment/entities/transaction.entity';
 
 @Entity('orders')
 @Index(['tenantId', 'outletId'])
@@ -127,4 +130,10 @@ export class Order {
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items!: OrderItem[];
+
+  @OneToMany(() => Payment, (payment) => payment.order)
+  payments!: Payment[];
+
+  @OneToOne(() => Transaction, (transaction) => transaction.order)
+  transaction!: Transaction | null;
 }

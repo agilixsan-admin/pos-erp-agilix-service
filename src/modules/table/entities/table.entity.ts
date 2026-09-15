@@ -19,6 +19,7 @@ export type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'RESERVED';
 @Index(['tenantId'])
 @Index(['outletId'])
 @Index(['tenantId', 'status'])
+@Index(['tenantId', 'outletId', 'section'])
 export class Table {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -37,6 +38,9 @@ export class Table {
 
   @Column({ type: 'varchar', length: 20, default: 'AVAILABLE' })
   status!: TableStatus;
+
+  @Column({ type: 'varchar', length: 50, default: 'Main Area' })
+  section!: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

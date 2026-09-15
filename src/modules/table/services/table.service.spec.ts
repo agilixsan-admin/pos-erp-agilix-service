@@ -95,6 +95,7 @@ describe('TableService', () => {
       const result = await service.findAll('tenant-1', {
         outletId: 'outlet-1',
         status: 'AVAILABLE',
+        section: 'VIP Room',
         search: 'Table',
         page: 1,
         limit: 10,
@@ -112,6 +113,10 @@ describe('TableService', () => {
       expect(andWhere).toHaveBeenCalledWith('table.status = :status', {
         status: 'AVAILABLE',
       });
+      expect(andWhere).toHaveBeenCalledWith(
+        'LOWER(table.section) = LOWER(:section)',
+        { section: 'VIP Room' },
+      );
       expect(andWhere).toHaveBeenCalledWith(
         'LOWER(table.tableNumber) LIKE LOWER(:search)',
         { search: '%Table%' },
@@ -161,6 +166,7 @@ describe('TableService', () => {
         tableNumber: 'Table 10',
         capacity: 4,
         status: 'AVAILABLE',
+        section: 'VIP Room',
       };
       mockTableRepo.create.mockReturnValue(tableData);
       mockTableRepo.save.mockResolvedValue(tableData);
@@ -169,6 +175,7 @@ describe('TableService', () => {
         outletId: 'outlet-1',
         tableNumber: 'Table 10',
         capacity: 4,
+        section: 'VIP Room',
       });
 
       expect(result).toEqual(tableData);
