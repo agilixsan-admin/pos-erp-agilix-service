@@ -172,6 +172,42 @@ describe('PurchaseService', () => {
         tenantId: 'tenant-1',
       });
     });
+
+    it('filters purchases by outletId when outletId is provided', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              ...mockPurchase,
+              id: 'pur-cabang-a',
+              outletId: 'outlet-cabang-a',
+            },
+          ],
+          1,
+        ]),
+      } as unknown as SelectQueryBuilder<Purchase>;
+
+      purchaseRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-cabang-a',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'purchase.outletId = :outletId',
+        { outletId: 'outlet-cabang-a' },
+      );
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].outletId).toBe('outlet-cabang-a');
+    });
   });
 
   describe('findById', () => {
