@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import type { TaxStatus, TaxType } from '../entities/tax.entity';
 
@@ -80,6 +81,11 @@ export class UpdateTaxDto {
   @IsOptional()
   @IsBoolean()
   isGlobal?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, val) => val !== null && val !== undefined)
+  @IsUUID()
+  outletId?: string | null;
 }
 
 export class QueryTaxDto {

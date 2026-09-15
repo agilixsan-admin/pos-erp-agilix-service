@@ -187,6 +187,58 @@ describe('TaxService', () => {
         expect.objectContaining({ action: 'TAX_UPDATED' }),
       );
     });
+
+    it('updates tax outletId to specific outlet or unsets it', async () => {
+      const existingTax = {
+        id: 'tax-1',
+        tenantId: 'tenant-1',
+        name: 'PPN 11%',
+        outletId: null,
+      };
+
+      mockTaxRepo.findOne.mockResolvedValue(existingTax);
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockTaxRepo.save.mockImplementation((d) => Promise.resolve(d));
+
+      const updatedToOutlet = await service.update(
+        'tenant-1',
+        'user-1',
+        'tax-1',
+        {
+          outletId: 'outlet-1',
+        },
+      );
+      expect(updatedToOutlet.outletId).toBe('outlet-1');
+
+      const updatedToGlobal = await service.update(
+        'tenant-1',
+        'user-1',
+        'tax-1',
+        {
+          outletId: null,
+        },
+      );
+      expect(updatedToGlobal.outletId).toBeNull();
+    });
+
+    it('throws NotFoundException if specified outlet does not exist', async () => {
+      const existingTax = {
+        id: 'tax-1',
+        tenantId: 'tenant-1',
+        name: 'PPN 11%',
+      };
+      mockTaxRepo.findOne.mockResolvedValue(existingTax);
+      mockOutletRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.update('tenant-1', 'user-1', 'tax-1', {
+          outletId: 'invalid-outlet',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('delete', () => {

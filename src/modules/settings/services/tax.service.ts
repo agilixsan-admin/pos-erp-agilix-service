@@ -203,6 +203,24 @@ export class TaxService {
       tax.isGlobal = dto.isGlobal;
     }
 
+    if (dto.outletId !== undefined) {
+      if (dto.outletId) {
+        const outlet = await this.outletRepository.findOne({
+          where: { id: dto.outletId, tenantId },
+        });
+        if (!outlet) {
+          throw new NotFoundException({
+            success: false,
+            message: 'Outlet not found',
+            code: 'OUTLET_NOT_FOUND',
+          });
+        }
+        tax.outletId = dto.outletId;
+      } else {
+        tax.outletId = null;
+      }
+    }
+
     const saved = await this.taxRepository.save(tax);
 
     await this.audit.record({

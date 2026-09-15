@@ -41,7 +41,10 @@ export class TaxController {
     @CurrentUser() user: User,
     @Query('outletId') outletId?: string,
   ) {
-    const targetOutletId = outletId ?? user.outletId ?? undefined;
+    const targetOutletId =
+      outletId === 'GLOBAL' || outletId === ''
+        ? undefined
+        : (outletId ?? user.outletId ?? undefined);
     const data = await this.taxService.getGlobalConfig(
       user.tenantId,
       targetOutletId,
