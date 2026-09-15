@@ -27,7 +27,11 @@ export class OrderController {
   @Get()
   @Permissions('order.read')
   async findAll(@CurrentUser() user: User, @Query() query: QueryOrderDto) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const requestedOutletId =
+      query.outletId && query.outletId !== 'ALL' && query.outletId.trim() !== ''
+        ? query.outletId
+        : undefined;
+    const effectiveOutletId = requestedOutletId ?? user.outletId ?? undefined;
     const result = await this.orderService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
