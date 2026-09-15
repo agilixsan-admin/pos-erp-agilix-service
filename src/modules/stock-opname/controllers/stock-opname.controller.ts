@@ -28,7 +28,11 @@ export class StockOpnameController {
     @CurrentUser() user: User,
     @Query() query: QueryStockOpnameDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const requestedOutletId =
+      query.outletId && query.outletId !== 'ALL' && query.outletId.trim() !== ''
+        ? query.outletId
+        : undefined;
+    const effectiveOutletId = requestedOutletId ?? user.outletId ?? undefined;
     const result = await this.stockOpnameService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,

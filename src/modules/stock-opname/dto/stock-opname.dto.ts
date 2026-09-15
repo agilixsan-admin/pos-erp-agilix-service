@@ -83,7 +83,7 @@ export class QueryStockOpnameDto {
   scope?: 'ALL' | 'CATEGORY';
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   outletId?: string;
 
   @IsOptional()
