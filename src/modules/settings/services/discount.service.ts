@@ -205,6 +205,7 @@ export class DiscountService {
 
       return {
         ...d,
+        isGlobal: !d.outletId,
         validityDescription: this.formatValidityDescription(d),
         isCurrentlyActive: activeCheck.isValid,
         effectiveStatus: displayStatus,
@@ -288,9 +289,10 @@ export class DiscountService {
     dto: CreateDiscountDto,
     userId: string,
   ): Promise<Discount> {
-    if (dto.outletId) {
+    const targetOutletId = dto.isGlobal ? null : (dto.outletId ?? null);
+    if (targetOutletId) {
       const outlet = await this.outletRepository.findOne({
-        where: { id: dto.outletId, tenantId },
+        where: { id: targetOutletId, tenantId },
       });
       if (!outlet) {
         throw new NotFoundException({
@@ -351,7 +353,7 @@ export class DiscountService {
 
       const discount = discountRepo.create({
         tenantId,
-        outletId: dto.outletId ?? null,
+        outletId: targetOutletId,
         name: dto.name,
         type: dto.type,
         value: dto.value,
@@ -396,16 +398,37 @@ export class DiscountService {
   ): Promise<Discount> {
     const existing = await this.findById(tenantId, id);
 
-    if (dto.outletId !== undefined && dto.outletId !== null) {
-      const outlet = await this.outletRepository.findOne({
-        where: { id: dto.outletId, tenantId },
-      });
-      if (!outlet) {
-        throw new NotFoundException({
-          success: false,
-          message: 'Outlet not found',
-          code: 'OUTLET_NOT_FOUND',
+    if (dto.isGlobal !== undefined) {
+      if (dto.isGlobal) {
+        existing.outletId = null;
+      } else if (dto.outletId) {
+        const outlet = await this.outletRepository.findOne({
+          where: { id: dto.outletId, tenantId },
         });
+        if (!outlet) {
+          throw new NotFoundException({
+            success: false,
+            message: 'Outlet not found',
+            code: 'OUTLET_NOT_FOUND',
+          });
+        }
+        existing.outletId = dto.outletId;
+      }
+    } else if (dto.outletId !== undefined) {
+      if (dto.outletId) {
+        const outlet = await this.outletRepository.findOne({
+          where: { id: dto.outletId, tenantId },
+        });
+        if (!outlet) {
+          throw new NotFoundException({
+            success: false,
+            message: 'Outlet not found',
+            code: 'OUTLET_NOT_FOUND',
+          });
+        }
+        existing.outletId = dto.outletId;
+      } else {
+        existing.outletId = null;
       }
     }
 
@@ -441,7 +464,6 @@ export class DiscountService {
       const discountRepo = manager.getRepository(Discount);
 
       if (dto.name !== undefined) existing.name = dto.name;
-      if (dto.outletId !== undefined) existing.outletId = dto.outletId;
       if (dto.type !== undefined) existing.type = dto.type;
       if (dto.value !== undefined) existing.value = dto.value;
       if (dto.validityType !== undefined)

@@ -46,7 +46,10 @@ export class DiscountController {
   @Get()
   @Permissions('discount.read')
   async findAll(@CurrentUser() user: User, @Query() query: QueryDiscountDto) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId =
+      query.outletId === 'GLOBAL' || query.outletId === ''
+        ? undefined
+        : (query.outletId ?? user.outletId ?? undefined);
     const data = await this.discountService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -62,7 +65,9 @@ export class DiscountController {
   @Post()
   @Permissions('discount.create')
   async create(@CurrentUser() user: User, @Body() dto: CreateDiscountDto) {
-    const effectiveOutletId = dto.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = dto.isGlobal
+      ? undefined
+      : (dto.outletId ?? user.outletId ?? undefined);
     const data = await this.discountService.create(
       user.tenantId,
       { ...dto, outletId: effectiveOutletId },

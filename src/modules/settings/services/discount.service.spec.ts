@@ -323,6 +323,62 @@ describe('DiscountService', () => {
         service.create(mockTenantId, dto, mockUserId),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('creates GLOBAL discount when isGlobal is true', async () => {
+      const dto = {
+        name: 'National Day 17%',
+        type: 'PERCENTAGE' as const,
+        value: 17,
+        validityType: 'ALWAYS_ACTIVE' as const,
+        isGlobal: true,
+      };
+
+      const result = await service.create(mockTenantId, dto, mockUserId);
+      expect(result.id).toBe('discount-uuid-1');
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'DISCOUNT_CREATED',
+          metadata: expect.objectContaining({ name: 'National Day 17%' }),
+        }),
+      );
+    });
+  });
+
+  describe('update', () => {
+    it('updates discount to global or specific outlet', async () => {
+      const existing = {
+        id: 'd-1',
+        tenantId: mockTenantId,
+        outletId: mockOutletId,
+        name: 'Promo Outlet',
+        type: 'PERCENTAGE' as const,
+        value: 10,
+        validityType: 'ALWAYS_ACTIVE' as const,
+        status: 'ACTIVE' as const,
+      };
+
+      discountRepo.findOne.mockResolvedValue(existing);
+      outletRepo.findOne.mockResolvedValue({
+        id: 'outlet-2',
+        tenantId: mockTenantId,
+      });
+
+      const updated = await service.update(
+        mockTenantId,
+        'd-1',
+        { isGlobal: true },
+        mockUserId,
+      );
+      expect(updated.outletId).toBeNull();
+
+      const updatedOutlet = await service.update(
+        mockTenantId,
+        'd-1',
+        { isGlobal: false, outletId: 'outlet-2' },
+        mockUserId,
+      );
+      expect(updatedOutlet.outletId).toBe('outlet-2');
+    });
   });
 
   describe('findAll', () => {

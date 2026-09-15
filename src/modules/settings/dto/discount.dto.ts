@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsNumber,
@@ -8,6 +9,7 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import type {
@@ -31,6 +33,10 @@ export class CreateDiscountDto {
   @IsUUID()
   @IsOptional()
   outletId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isGlobal?: boolean;
 
   @IsString()
   @IsNotEmpty()
@@ -90,9 +96,14 @@ export class CreateDiscountDto {
 }
 
 export class UpdateDiscountDto {
-  @IsUUID()
   @IsOptional()
+  @ValidateIf((_, val) => val !== null && val !== undefined)
+  @IsUUID()
   outletId?: string | null;
+
+  @IsBoolean()
+  @IsOptional()
+  isGlobal?: boolean;
 
   @IsString()
   @IsOptional()
