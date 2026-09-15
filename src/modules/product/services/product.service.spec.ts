@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, SelectQueryBuilder } from 'typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { ProductService } from './product.service';
+import { QueryProductsDto } from '../dto/product.dto';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
@@ -106,6 +107,47 @@ describe('ProductService', () => {
         totalPages: 1,
       });
       expect(mockProductRepo.createQueryBuilder).toHaveBeenCalled();
+    });
+
+    it('accepts outletId in query without error', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      } as unknown as SelectQueryBuilder<Product>;
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: '917450a5-0644-4f47-818f-545e023d150d',
+      });
+
+      expect(result.data).toEqual([]);
+      expect(result.meta.total).toBe(0);
+    });
+
+    it('passes ValidationPipe with outletId without throwing error', async () => {
+      const validator = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      });
+
+      const query = {
+        outletId: '917450a5-0644-4f47-818f-545e023d150d',
+        search: 'Espresso',
+      };
+
+      const transformed = await validator.transform(query, {
+        type: 'query',
+        metatype: QueryProductsDto,
+      });
+
+      expect(transformed.outletId).toBe('917450a5-0644-4f47-818f-545e023d150d');
+      expect(transformed.search).toBe('Espresso');
     });
   });
 

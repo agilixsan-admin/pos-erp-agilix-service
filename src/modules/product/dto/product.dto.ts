@@ -172,6 +172,10 @@ export class QueryProductsDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsUUID()
+  outletId?: string;
+
+  @IsOptional()
   @IsString()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
