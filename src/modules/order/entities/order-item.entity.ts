@@ -1,4 +1,5 @@
 import {
+  AfterLoad,
   Column,
   CreateDateColumn,
   Entity,
@@ -18,6 +19,13 @@ import { ProductVariant } from '../../product/entities/product-variant.entity';
 export class OrderItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  price?: number;
+
+  @AfterLoad()
+  populatePrice() {
+    this.price = Number(this.unitPrice || 0);
+  }
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId!: string;
