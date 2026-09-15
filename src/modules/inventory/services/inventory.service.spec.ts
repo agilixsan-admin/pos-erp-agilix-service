@@ -177,6 +177,57 @@ describe('InventoryService', () => {
       expect(result.summary.totalInventoryValue).toBe(500);
       expect(result.summary.lowStockCount).toBe(1);
     });
+
+    it('scopes item stocks and summary cards to specific outletId when outletId is provided', async () => {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'item-1',
+              name: 'Packaging Box',
+              unitCost: 1500,
+              minimumStock: 50,
+              stocks: [{ quantity: 120, outletId: 'outlet-cabang-a' }],
+            },
+          ],
+          1,
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({
+          totalItems: 1,
+          totalInventoryValue: 180000,
+          lowStockCount: 0,
+          outOfStockCount: 0,
+        }),
+      } as unknown as SelectQueryBuilder<InventoryItem>;
+      mockItemRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-cabang-a',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith(
+        'item.stocks',
+        'stock',
+        'stock.outletId = :outletId',
+        { outletId: 'outlet-cabang-a' },
+      );
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].currentStock).toBe(120);
+      expect(result.data[0].stockValue).toBe(180000);
+      expect(result.data[0].stockStatus).toBe('NORMAL');
+      expect(result.summary.totalInventoryValue).toBe(180000);
+    });
   });
 
   describe('create', () => {
