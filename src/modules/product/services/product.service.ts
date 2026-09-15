@@ -81,9 +81,12 @@ export class ProductService {
       ? Number(primaryVariant.price || 0)
       : minPrice || 0;
     const sku = primaryVariant?.sku ?? null;
+    const image = product.imageUrl ?? null;
 
     return {
       ...product,
+      image,
+      imageUrl: image,
       variants,
       price,
       sku,
