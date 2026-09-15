@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsNumber,
   IsOptional,
+  IsString,
   IsUUID,
   Min,
 } from 'class-validator';
@@ -15,7 +16,7 @@ export class QuerySalesReportDto {
   endDate!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   outletId?: string;
 }
 
@@ -27,22 +28,23 @@ export class QuerySummaryReportDto {
   endDate!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   outletId?: string;
 }
 
 export class QueryInventoryReportDto {
   @IsOptional()
-  @IsUUID()
+  @IsString()
   outletId?: string;
 
   @IsOptional()
+  @IsString()
   search?: string;
 }
 
 export class QueryInventoryMovementsReportDto {
   @IsOptional()
-  @IsUUID()
+  @IsString()
   outletId?: string;
 
   @IsOptional()

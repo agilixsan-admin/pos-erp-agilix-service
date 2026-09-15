@@ -14,13 +14,28 @@ import { User } from '../../user/user.entity';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
+  private getEffectiveOutletId(
+    user: User,
+    outletId?: string,
+  ): string | undefined {
+    const requestedOutletId =
+      outletId && outletId !== 'ALL' && outletId.trim() !== ''
+        ? outletId
+        : undefined;
+    return requestedOutletId ?? user.outletId ?? undefined;
+  }
+
   @Get()
   @Permissions('report.read')
   async getSummary(
     @CurrentUser() user: User,
     @Query() query: QuerySummaryReportDto,
   ) {
-    const data = await this.reportService.getSummary(user.tenantId, query);
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getSummary(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
     return {
       success: true,
       message: 'Summary report retrieved successfully',
@@ -34,7 +49,11 @@ export class ReportController {
     @CurrentUser() user: User,
     @Query() query: QuerySalesReportDto,
   ) {
-    const data = await this.reportService.getSalesReport(user.tenantId, query);
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getSalesReport(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
     return {
       success: true,
       message: 'Sales report retrieved successfully',
@@ -48,10 +67,11 @@ export class ReportController {
     @CurrentUser() user: User,
     @Query() query: QueryInventoryReportDto,
   ) {
-    const data = await this.reportService.getInventoryReport(
-      user.tenantId,
-      query,
-    );
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getInventoryReport(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
     return {
       success: true,
       message: 'Inventory report retrieved successfully',
@@ -65,9 +85,13 @@ export class ReportController {
     @CurrentUser() user: User,
     @Query() query: QueryInventoryMovementsReportDto,
   ) {
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
     const data = await this.reportService.getInventoryMovementsReport(
       user.tenantId,
-      query,
+      {
+        ...query,
+        outletId: effectiveOutletId,
+      },
     );
     return {
       success: true,
