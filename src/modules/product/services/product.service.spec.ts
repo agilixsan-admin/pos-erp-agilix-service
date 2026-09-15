@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, SelectQueryBuilder } from 'typeorm';
-import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ProductService } from './product.service';
 import { QueryProductsDto } from '../dto/product.dto';
 import { Product } from '../entities/product.entity';

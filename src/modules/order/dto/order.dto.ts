@@ -15,6 +15,10 @@ import {
 } from 'class-validator';
 
 export class CreateOrderItemDto {
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
   @IsUUID()
   variantId!: string;
 

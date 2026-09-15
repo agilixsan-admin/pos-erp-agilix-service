@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, SelectQueryBuilder } from 'typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { OrderService } from './order.service';
+import { CreateOrderDto } from '../dto/order.dto';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
@@ -785,6 +786,38 @@ describe('OrderService', () => {
           items: [{ variantId: 'var-invalid', quantity: 1 }],
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('passes ValidationPipe with items containing productId without throwing error', async () => {
+      const validator = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      });
+
+      const payload = {
+        outletId: '917450a5-0644-4f47-818f-545e023d150d',
+        orderType: 'DINE_IN',
+        items: [
+          {
+            productId: '917450a5-0644-4f47-818f-545e023d1501',
+            variantId: '917450a5-0644-4f47-818f-545e023d1502',
+            quantity: 1,
+          },
+        ],
+      };
+
+      const transformed = await validator.transform(payload, {
+        type: 'body',
+        metatype: CreateOrderDto,
+      });
+
+      expect(transformed.items[0].productId).toBe(
+        '917450a5-0644-4f47-818f-545e023d1501',
+      );
+      expect(transformed.items[0].variantId).toBe(
+        '917450a5-0644-4f47-818f-545e023d1502',
+      );
     });
   });
 
