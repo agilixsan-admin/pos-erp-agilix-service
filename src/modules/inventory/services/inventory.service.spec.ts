@@ -454,6 +454,53 @@ describe('InventoryService', () => {
       expect(result.summary.totalOut).toBe(1);
       expect(result.summary.totalLossValue).toBe(50000);
     });
+
+    it('filters adjustments and summary metrics by outletId when provided', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'adj-2',
+              outletId: 'outlet-cabang-b',
+              adjustmentNumber: 'ADJ-2026-002',
+              type: 'IN',
+              quantity: 15,
+            },
+          ],
+          1,
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({
+          totalAdjustments: 1,
+          totalIn: 1,
+          totalOut: 0,
+          totalLossValue: 0,
+        }),
+      };
+      mockAdjustmentRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAllAdjustments('tenant-1', {
+        outletId: 'outlet-cabang-b',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(qb.andWhere).toHaveBeenCalledWith('adj.outletId = :outletId', {
+        outletId: 'outlet-cabang-b',
+      });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].outletId).toBe('outlet-cabang-b');
+      expect(result.summary.totalIn).toBe(1);
+      expect(result.summary.totalOut).toBe(0);
+    });
   });
 
   describe('findAdjustmentById', () => {
