@@ -102,14 +102,15 @@ describe('StockOpnameService', () => {
     auditService = module.get(AuditService);
     dataSource = module.get(DataSource);
 
-    (dataSource.transaction as jest.Mock).mockImplementation((cb: (manager: any) => Promise<any>) =>
-      cb({
-        getRepository: (entity: any) => {
-          if (entity === StockOpname) return opnameRepo;
-          if (entity === StockOpnameItem) return opnameItemRepo;
-          return null;
-        },
-      }),
+    (dataSource.transaction as jest.Mock).mockImplementation(
+      (cb: (manager: any) => Promise<any>) =>
+        cb({
+          getRepository: (entity: any) => {
+            if (entity === StockOpname) return opnameRepo;
+            if (entity === StockOpnameItem) return opnameItemRepo;
+            return null;
+          },
+        }),
     );
   });
 
@@ -196,6 +197,7 @@ describe('StockOpnameService', () => {
           tenantId,
           actorId,
         }),
+        expect.anything(),
       );
     });
   });
