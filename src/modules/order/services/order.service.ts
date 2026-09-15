@@ -138,6 +138,13 @@ export class OrderService {
         tenantId,
         dto.discountId,
       );
+      if (discount.outletId && discount.outletId !== targetOutletId) {
+        throw new BadRequestException({
+          success: false,
+          message: 'Discount does not belong to this outlet',
+          code: 'DISCOUNT_OUTLET_MISMATCH',
+        });
+      }
       const activeCheck = this.discountService.isDiscountActive(
         discount,
         new Date(),

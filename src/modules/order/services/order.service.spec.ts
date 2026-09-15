@@ -204,6 +204,36 @@ describe('OrderService', () => {
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
+    it('throws BadRequestException if discount belongs to another outlet', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 25000,
+          tenantId: 'tenant-1',
+          product: { name: 'Americano' },
+        },
+      ]);
+      mockDiscountService.findById.mockResolvedValue({
+        id: 'disc-2',
+        name: 'Promo Branch 2',
+        outletId: 'outlet-other',
+        status: 'ACTIVE',
+      });
+
+      await expect(
+        service.create('tenant-1', 'user-1', 'outlet-1', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+          discountId: 'disc-2',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('deducts raw material recipe stocks and records SALE movements when sending order to station', async () => {
       mockOutletRepo.findOne.mockResolvedValue({
         id: 'outlet-1',
@@ -785,6 +815,45 @@ describe('OrderService', () => {
       await expect(service.findById('tenant-1', 'ord-invalid')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('findAll', () => {
+    it('returns paginated orders and filters by outletId when provided', async () => {
+      const mockOrder = {
+        id: 'ord-101',
+        orderNumber: 'ORD-2026-101',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-cabang-a',
+        totalAmount: 50000,
+      };
+
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockOrder], 1]),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-cabang-a',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(qb.where).toHaveBeenCalledWith('order.tenantId = :tenantId', {
+        tenantId: 'tenant-1',
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith('order.outletId = :outletId', {
+        outletId: 'outlet-cabang-a',
+      });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].outletId).toBe('outlet-cabang-a');
+      expect(result.meta.total).toBe(1);
     });
   });
 
