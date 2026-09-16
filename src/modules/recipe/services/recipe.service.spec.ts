@@ -10,11 +10,22 @@ import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 describe('RecipeService', () => {
   let service: RecipeService;
 
+  const mockQueryBuilder = {
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    getMany: jest.fn(),
+  };
+
   const mockRecipeRepo = {
     find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     softRemove: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
   const mockVariantRepo = {
@@ -23,6 +34,7 @@ describe('RecipeService', () => {
 
   const mockItemRepo = {
     find: jest.fn(),
+    findOne: jest.fn(),
   };
 
   const mockDataSource = {
@@ -83,6 +95,55 @@ describe('RecipeService', () => {
 
       await expect(
         service.findByVariantId('tenant-1', 'var-foreign'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findByInventoryItemId', () => {
+    it('returns formatted recipe list using the inventory item', async () => {
+      mockItemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        tenantId: 'tenant-1',
+        unitCost: 50,
+      });
+
+      mockQueryBuilder.getMany.mockResolvedValue([
+        {
+          id: 'rec-1',
+          quantity: 200,
+          unit: 'ml',
+          variantId: 'var-1',
+          variant: {
+            id: 'var-1',
+            name: 'Regular',
+            sku: 'VAR-REG',
+            price: 25000,
+            status: 'ACTIVE',
+            product: {
+              id: 'prod-1',
+              name: 'Kopi Latte',
+              description: 'Enak',
+              imageUrl: null,
+              status: 'ACTIVE',
+              category: { id: 'cat-1', name: 'Coffee' },
+            },
+          },
+        },
+      ]);
+
+      const result = await service.findByInventoryItemId('tenant-1', 'item-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('rec-1');
+      expect(result[0].portionCost).toBe(10000); // 200 * 50
+      expect(result[0].product.name).toBe('Kopi Latte');
+      expect(result[0].variant.name).toBe('Regular');
+    });
+
+    it('throws NotFoundException if inventory item does not exist or wrong tenant', async () => {
+      mockItemRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findByInventoryItemId('tenant-1', 'nonexistent'),
       ).rejects.toThrow(NotFoundException);
     });
   });

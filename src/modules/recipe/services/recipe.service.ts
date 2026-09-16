@@ -40,6 +40,69 @@ export class RecipeService {
     });
   }
 
+  async findByInventoryItemId(tenantId: string, inventoryItemId: string) {
+    const item = await this.itemRepository.findOne({
+      where: { id: inventoryItemId, tenantId },
+    });
+    if (!item) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Inventory item not found',
+        code: 'INVENTORY_ITEM_NOT_FOUND',
+      });
+    }
+
+    const recipes = await this.recipeRepository
+      .createQueryBuilder('recipe')
+      .innerJoinAndSelect('recipe.variant', 'variant')
+      .innerJoinAndSelect('variant.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('recipe.tenantId = :tenantId', { tenantId })
+      .andWhere('recipe.inventoryItemId = :inventoryItemId', {
+        inventoryItemId,
+      })
+      .andWhere('variant.deletedAt IS NULL')
+      .andWhere('product.deletedAt IS NULL')
+      .orderBy('product.name', 'ASC')
+      .addOrderBy('variant.name', 'ASC')
+      .getMany();
+
+    const unitCost = Number(item.unitCost || 0);
+
+    return recipes.map((recipe) => {
+      const quantity = Number(recipe.quantity || 0);
+      const portionCost = Math.round(quantity * unitCost * 100) / 100;
+
+      return {
+        id: recipe.id,
+        quantity,
+        unit: recipe.unit,
+        portionCost,
+        variantId: recipe.variantId,
+        variant: {
+          id: recipe.variant.id,
+          name: recipe.variant.name,
+          sku: recipe.variant.sku,
+          price: Number(recipe.variant.price || 0),
+          status: recipe.variant.status,
+        },
+        product: {
+          id: recipe.variant.product.id,
+          name: recipe.variant.product.name,
+          description: recipe.variant.product.description,
+          imageUrl: recipe.variant.product.imageUrl,
+          status: recipe.variant.product.status,
+          category: recipe.variant.product.category
+            ? {
+                id: recipe.variant.product.category.id,
+                name: recipe.variant.product.category.name,
+              }
+            : null,
+        },
+      };
+    });
+  }
+
   async setVariantRecipes(
     tenantId: string,
     variantId: string,

@@ -18,6 +18,23 @@ import { User } from '../../user/user.entity';
 export class RecipeController {
   constructor(private readonly recipeService: RecipeService) {}
 
+  @Get('materials/:inventoryItemId')
+  @Permissions('product.read')
+  async findByInventoryItemId(
+    @CurrentUser() user: User,
+    @Param('inventoryItemId', ParseUUIDPipe) inventoryItemId: string,
+  ) {
+    const data = await this.recipeService.findByInventoryItemId(
+      user.tenantId,
+      inventoryItemId,
+    );
+    return {
+      success: true,
+      message: 'Recipes using inventory item retrieved successfully',
+      data,
+    };
+  }
+
   @Get('variants/:variantId')
   @Permissions('product.read')
   async findByVariantId(
