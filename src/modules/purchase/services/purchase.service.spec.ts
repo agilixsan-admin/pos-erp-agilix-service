@@ -90,14 +90,29 @@ describe('PurchaseService', () => {
 
     outletRepo = { findOne: jest.fn() } as any;
     supplierRepo = { findOne: jest.fn() } as any;
-    inventoryItemRepo = { findOne: jest.fn(), update: jest.fn() } as any;
+    inventoryItemRepo = {
+      findOne: jest.fn(),
+      create: jest
+        .fn()
+        .mockImplementation((dto) => ({ id: 'mock-inv-id', ...dto })),
+      save: jest
+        .fn()
+        .mockImplementation((entity) =>
+          Promise.resolve({ id: 'mock-inv-id', ...entity }),
+        ),
+      update: jest.fn(),
+    } as any;
     stockRepo = {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
     } as any;
     movementRepo = { create: jest.fn(), save: jest.fn() } as any;
-    packagingRepo = { update: jest.fn() } as any;
+    packagingRepo = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+    } as any;
     auditService = { record: jest.fn().mockResolvedValue(undefined) } as any;
 
     dataSource = {
@@ -322,6 +337,75 @@ describe('PurchaseService', () => {
       expect(createdItemData.quantityOrdered).toBe(5000);
       expect(createdItemData.subtotal).toBe(12000);
       expect(createdItemData.unitCost).toBe(2.4);
+    });
+
+    it('resolves packaging ID when purchasing packaging and auto-creates backing inventory item', async () => {
+      outletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      } as any);
+      supplierRepo.findOne.mockResolvedValue({
+        id: 'supp-1',
+        tenantId: 'tenant-1',
+      } as any);
+      // First findOne for inventory item returns null, then finds Packaging
+      inventoryItemRepo.findOne.mockResolvedValueOnce(null);
+      packagingRepo.findOne.mockResolvedValue({
+        id: 'pkg-cup-123',
+        tenantId: 'tenant-1',
+        name: 'Paper Cup 16oz',
+        sku: 'PKG-CUP',
+        inventoryItemId: null,
+        costPrice: 500,
+        status: 'ACTIVE',
+      } as any);
+
+      inventoryItemRepo.create.mockReturnValue({
+        id: 'auto-inv-cup',
+        tenantId: 'tenant-1',
+        name: 'Paper Cup 16oz',
+        itemType: 'PACKAGING',
+      } as any);
+      inventoryItemRepo.save.mockResolvedValue({
+        id: 'auto-inv-cup',
+        tenantId: 'tenant-1',
+        name: 'Paper Cup 16oz',
+        itemType: 'PACKAGING',
+      } as any);
+
+      const qbNum = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      } as any;
+      purchaseRepo.createQueryBuilder.mockReturnValue(qbNum);
+
+      let savedPurchaseItem: any;
+      purchaseItemRepo.create.mockImplementation((d) => {
+        savedPurchaseItem = d;
+        return d as any;
+      });
+      purchaseRepo.create.mockReturnValue(mockPurchase);
+      purchaseRepo.save.mockResolvedValue(mockPurchase);
+      purchaseRepo.findOne.mockResolvedValue(mockPurchase);
+
+      await service.create('tenant-1', 'user-1', {
+        outletId: 'outlet-1',
+        supplierId: 'supp-1',
+        items: [
+          {
+            inventoryItemId: 'pkg-cup-123',
+            quantityOrdered: 100,
+            subtotal: 50000,
+          },
+        ],
+      });
+
+      expect(packagingRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ inventoryItemId: 'auto-inv-cup' }),
+      );
+      expect(savedPurchaseItem.inventoryItemId).toBe('auto-inv-cup');
     });
   });
 

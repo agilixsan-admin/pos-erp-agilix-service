@@ -196,6 +196,28 @@ export class PackagingService {
 
     const [data, total] = await qb.getManyAndCount();
 
+    for (const pkg of data) {
+      if (!pkg.inventoryItemId) {
+        const invItem = this.inventoryItems.create({
+          tenantId,
+          name: pkg.name,
+          sku: pkg.sku ?? null,
+          itemType: 'PACKAGING',
+          unit: 'pcs',
+          unitCost: pkg.costPrice || 0,
+          minimumStock: 0,
+          status: pkg.status || 'ACTIVE',
+        });
+        const savedInv = await this.inventoryItems.save(invItem);
+        pkg.inventoryItemId = savedInv.id;
+        pkg.inventoryItem = savedInv;
+        await this.packagings.update(
+          { id: pkg.id, tenantId },
+          { inventoryItemId: savedInv.id },
+        );
+      }
+    }
+
     return {
       data,
       meta: {
@@ -230,6 +252,26 @@ export class PackagingService {
       });
     }
 
+    if (!packaging.inventoryItemId) {
+      const invItem = this.inventoryItems.create({
+        tenantId,
+        name: packaging.name,
+        sku: packaging.sku ?? null,
+        itemType: 'PACKAGING',
+        unit: 'pcs',
+        unitCost: packaging.costPrice || 0,
+        minimumStock: 0,
+        status: packaging.status || 'ACTIVE',
+      });
+      const savedInv = await this.inventoryItems.save(invItem);
+      packaging.inventoryItemId = savedInv.id;
+      packaging.inventoryItem = savedInv;
+      await this.packagings.update(
+        { id: packaging.id, tenantId },
+        { inventoryItemId: savedInv.id },
+      );
+    }
+
     return packaging;
   }
 
@@ -258,9 +300,10 @@ export class PackagingService {
       await this.findCategoryById(tenantId, dto.categoryId);
     }
 
-    if (dto.inventoryItemId) {
+    let inventoryItemId = dto.inventoryItemId ?? null;
+    if (inventoryItemId) {
       const item = await this.inventoryItems.findOne({
-        where: { id: dto.inventoryItemId, tenantId },
+        where: { id: inventoryItemId, tenantId },
       });
       if (!item) {
         throw new BadRequestException({
@@ -269,6 +312,21 @@ export class PackagingService {
           code: 'INVENTORY_ITEM_NOT_FOUND',
         });
       }
+    } else {
+      // Auto-create backing InventoryItem of type PACKAGING so that inventory,
+      // stock tracking, purchases, and order deductions function seamlessly
+      const invItem = this.inventoryItems.create({
+        tenantId,
+        name: dto.name,
+        sku: dto.sku ?? null,
+        itemType: 'PACKAGING',
+        unit: dto.unit ?? 'pcs',
+        unitCost: dto.costPrice ?? 0,
+        minimumStock: dto.minimumStock ?? 0,
+        status: dto.status ?? 'ACTIVE',
+      });
+      const savedInv = await this.inventoryItems.save(invItem);
+      inventoryItemId = savedInv.id;
     }
 
     const packaging = this.packagings.create({
@@ -278,7 +336,7 @@ export class PackagingService {
       categoryId: dto.categoryId ?? null,
       description: dto.description ?? null,
       outletId: dto.outletId ?? null,
-      inventoryItemId: dto.inventoryItemId ?? null,
+      inventoryItemId,
       costPrice: dto.costPrice ?? 0,
       extraPrice: dto.extraPrice ?? 0,
       applyToOrderType: dto.applyToOrderType ?? 'TAKE_AWAY',
@@ -398,6 +456,22 @@ export class PackagingService {
     }
 
     await this.packagings.save(packaging);
+
+    if (packaging.inventoryItemId) {
+      await this.inventoryItems.update(
+        { id: packaging.inventoryItemId, tenantId },
+        {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
+          ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
+          ...(dto.minimumStock !== undefined
+            ? { minimumStock: dto.minimumStock }
+            : {}),
+          ...(dto.costPrice !== undefined ? { unitCost: dto.costPrice } : {}),
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
+        },
+      );
+    }
 
     await this.audit.record({
       action: 'PACKAGING_UPDATED',

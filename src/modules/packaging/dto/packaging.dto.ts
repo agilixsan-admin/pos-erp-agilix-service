@@ -54,6 +54,15 @@ export class CreatePackagingDto {
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: 'ACTIVE' | 'INACTIVE' = 'ACTIVE';
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minimumStock?: number;
 }
 
 export class UpdatePackagingDto {
@@ -99,6 +108,15 @@ export class UpdatePackagingDto {
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: 'ACTIVE' | 'INACTIVE';
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minimumStock?: number;
 }
 
 export class QueryPackagingDto {

@@ -211,18 +211,13 @@ export class PurchaseService {
       });
     }
 
-    // Validate inventory items
+    // Validate and resolve inventory items (supports both InventoryItem and Packaging IDs)
     for (const itemDto of dto.items) {
-      const item = await this.inventoryItemRepository.findOne({
-        where: { id: itemDto.inventoryItemId, tenantId },
-      });
-      if (!item) {
-        throw new BadRequestException({
-          success: false,
-          message: `Inventory item ${itemDto.inventoryItemId} not found or does not belong to this tenant`,
-          code: 'INVENTORY_ITEM_NOT_FOUND',
-        });
-      }
+      const item = await this.resolveInventoryItem(
+        tenantId,
+        itemDto.inventoryItemId,
+      );
+      itemDto.inventoryItemId = item.id;
     }
 
     const purchaseNumber =
@@ -357,6 +352,15 @@ export class PurchaseService {
     }
 
     if (dto.items && dto.items.length > 0) {
+      // Validate and resolve inventory items (supports both InventoryItem and Packaging IDs)
+      for (const itemDto of dto.items) {
+        const item = await this.resolveInventoryItem(
+          tenantId,
+          itemDto.inventoryItemId,
+        );
+        itemDto.inventoryItemId = item.id;
+      }
+
       // Remove old items
       await this.purchaseItemRepository.delete({ purchaseId: purchase.id });
 
@@ -606,5 +610,61 @@ export class PurchaseService {
     });
 
     return this.findById(tenantId, purchase.id);
+  }
+
+  /**
+   * Resolves an inventory item ID for purchases.
+   * If the ID belongs to a Packaging entity, resolves to its backing InventoryItem,
+   * auto-creating one if not yet linked.
+   */
+  private async resolveInventoryItem(
+    tenantId: string,
+    itemId: string,
+  ): Promise<InventoryItem> {
+    let item = await this.inventoryItemRepository.findOne({
+      where: { id: itemId, tenantId },
+    });
+
+    if (!item) {
+      // Check if itemId belongs to a Packaging
+      const packaging = await this.packagingRepository.findOne({
+        where: { id: itemId, tenantId },
+      });
+
+      if (packaging) {
+        if (packaging.inventoryItemId) {
+          item = await this.inventoryItemRepository.findOne({
+            where: { id: packaging.inventoryItemId, tenantId },
+          });
+        }
+
+        if (!item) {
+          // Auto-create backing InventoryItem of type PACKAGING
+          const newInv = this.inventoryItemRepository.create({
+            tenantId,
+            name: packaging.name,
+            sku: packaging.sku ?? null,
+            itemType: 'PACKAGING',
+            unit: 'pcs',
+            unitCost: packaging.costPrice || 0,
+            minimumStock: 0,
+            status: packaging.status || 'ACTIVE',
+          });
+          item = await this.inventoryItemRepository.save(newInv);
+          packaging.inventoryItemId = item.id;
+          await this.packagingRepository.save(packaging);
+        }
+      }
+    }
+
+    if (!item) {
+      throw new BadRequestException({
+        success: false,
+        message: `Inventory item ${itemId} not found or does not belong to this tenant`,
+        code: 'INVENTORY_ITEM_NOT_FOUND',
+      });
+    }
+
+    return item;
   }
 }

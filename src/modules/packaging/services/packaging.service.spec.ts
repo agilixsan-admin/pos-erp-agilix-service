@@ -17,6 +17,7 @@ describe('PackagingService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     softDelete: jest.fn(),
   };
 
@@ -34,6 +35,15 @@ describe('PackagingService', () => {
 
   const mockInventoryItemRepo = {
     findOne: jest.fn(),
+    create: jest
+      .fn()
+      .mockImplementation((dto) => ({ id: 'mock-inv-item-id', ...dto })),
+    save: jest
+      .fn()
+      .mockImplementation((entity) =>
+        Promise.resolve({ id: 'mock-inv-item-id', ...entity }),
+      ),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 
   const mockAuditService = {
