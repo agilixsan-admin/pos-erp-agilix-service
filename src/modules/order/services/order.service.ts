@@ -336,11 +336,13 @@ export class OrderService {
             movementType: 'SALE',
             quantity: deductionQty,
             referenceType: 'ORDER',
-            referenceId: savedOrder.id,
+            referenceId: savedOrder.orderNumber || savedOrder.id,
             notes: `Sent to station via Order ${savedOrder.orderNumber} (${item.productName} - ${item.variantName})`,
             movementDate: new Date(),
             createdBy: userId,
             metadata: {
+              orderId: savedOrder.id,
+              orderNumber: savedOrder.orderNumber,
               orderItemId: item.id,
               variantId: item.variantId,
             },
@@ -387,11 +389,13 @@ export class OrderService {
             movementType: 'SALE',
             quantity: 1,
             referenceType: 'ORDER',
-            referenceId: savedOrder.id,
+            referenceId: savedOrder.orderNumber || savedOrder.id,
             notes: `Takeaway packaging for Order ${savedOrder.orderNumber} (${pkg.name})`,
             movementDate: new Date(),
             createdBy: userId,
             metadata: {
+              orderId: savedOrder.id,
+              orderNumber: savedOrder.orderNumber,
               packagingId: pkg.id,
             },
           });
@@ -605,12 +609,20 @@ export class OrderService {
       // Raw materials were already deducted when the order was sent to the station,
       // so we do not deduct stock again or restore it. We update the movement record to WASTE.
       const movements = await movementRepo.find({
-        where: {
-          tenantId,
-          outletId: order.outletId,
-          referenceType: 'ORDER',
-          referenceId: order.id,
-        },
+        where: [
+          {
+            tenantId,
+            outletId: order.outletId,
+            referenceType: 'ORDER',
+            referenceId: order.id,
+          },
+          {
+            tenantId,
+            outletId: order.outletId,
+            referenceType: 'ORDER',
+            referenceId: order.orderNumber,
+          },
+        ],
       });
 
       for (const movement of movements) {
