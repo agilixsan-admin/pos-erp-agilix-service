@@ -246,6 +246,8 @@ export class InventoryService {
 
       return {
         ...item,
+        unitCost,
+        costPrice: unitCost,
         currentStock,
         stockValue,
         stockStatus,
@@ -355,6 +357,8 @@ export class InventoryService {
 
     return {
       ...item,
+      unitCost,
+      costPrice: unitCost,
       currentStock,
       stockValue,
       stockStatus,
