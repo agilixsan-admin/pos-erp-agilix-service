@@ -8,7 +8,7 @@ export class FixHttsSchemeInImageUrls1700000000027 implements MigrationInterface
       `UPDATE "products" SET "image_url" = REPLACE("image_url", 'htts://', 'https://') WHERE "image_url" LIKE 'htts://%'`,
     );
     await queryRunner.query(
-      `UPDATE "inventory_stock_adjustments" SET "image_url" = REPLACE("image_url", 'htts://', 'https://') WHERE "image_url" LIKE 'htts://%'`,
+      `UPDATE "stock_adjustments" SET "image_url" = REPLACE("image_url", 'htts://', 'https://') WHERE "image_url" LIKE 'htts://%'`,
     );
   }
 
