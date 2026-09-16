@@ -12,7 +12,7 @@ export class FixHttsSchemeInImageUrls1700000000027 implements MigrationInterface
     );
   }
 
-  public async down(_queryRunner: QueryRunner): Promise<void> {
+  public async down(): Promise<void> {
     // No-op: cannot easily revert sanitized URLs back to invalid scheme
   }
 }
