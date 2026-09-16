@@ -21,8 +21,16 @@ import {
   UpdatePackagingCategoryDto,
 } from '../dto/packaging-category.dto';
 
+export type PackagingWithStock = Packaging & {
+  currentStock: number;
+  minimumStock: number;
+  minStock: number;
+  unit: string;
+  unitCost: number;
+};
+
 export interface PaginatedPackagings {
-  data: Packaging[];
+  data: PackagingWithStock[];
   meta: {
     page: number;
     limit: number;
@@ -218,12 +226,12 @@ export class PackagingService {
       }
     }
 
-    const formattedData = data.map((pkg) =>
+    const formattedData: PackagingWithStock[] = data.map((pkg) =>
       this.formatPackaging(pkg, outletId),
     );
 
     return {
-      data: formattedData as any,
+      data: formattedData,
       meta: {
         page,
         limit,
@@ -236,7 +244,10 @@ export class PackagingService {
   /**
    * Helper to format packaging entity with flattened inventory stock fields
    */
-  private formatPackaging(pkg: Packaging, outletId?: string): any {
+  private formatPackaging(
+    pkg: Packaging,
+    outletId?: string,
+  ): PackagingWithStock {
     const stocks = pkg.inventoryItem?.stocks || [];
     const currentStock = outletId
       ? stocks
@@ -248,14 +259,13 @@ export class PackagingService {
     const unit = pkg.inventoryItem?.unit || 'pcs';
     const unitCost = Number(pkg.inventoryItem?.unitCost ?? pkg.costPrice ?? 0);
 
-    return {
-      ...pkg,
+    return Object.assign(pkg, {
       currentStock,
       minimumStock,
       minStock: minimumStock,
       unit,
       unitCost,
-    };
+    });
   }
 
   /**
@@ -265,7 +275,7 @@ export class PackagingService {
     tenantId: string,
     id: string,
     outletId?: string,
-  ): Promise<Packaging> {
+  ): Promise<PackagingWithStock> {
     const packaging = await this.packagings.findOne({
       where: { id, tenantId },
       relations: {
@@ -315,7 +325,7 @@ export class PackagingService {
     tenantId: string,
     actorId: string,
     dto: CreatePackagingDto,
-  ): Promise<Packaging> {
+  ): Promise<PackagingWithStock> {
     if (dto.outletId) {
       const outlet = await this.outlets.findOne({
         where: { id: dto.outletId, tenantId },
@@ -403,7 +413,7 @@ export class PackagingService {
     id: string,
     actorId: string,
     dto: UpdatePackagingDto,
-  ): Promise<Packaging> {
+  ): Promise<PackagingWithStock> {
     const packaging = await this.packagings.findOne({
       where: { id, tenantId },
     });
