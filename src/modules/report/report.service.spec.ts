@@ -222,14 +222,17 @@ describe('ReportService', () => {
   // ─── getInventoryReport ───────────────────────────────────────────────────
 
   describe('getInventoryReport', () => {
-    it('returns stock per item with low stock flag', async () => {
+    it('returns stock per item with low stock flag, items, and summary', async () => {
       const qb = buildQb({
         getMany: jest.fn().mockResolvedValue([
           {
             id: 'item-1',
             name: 'Coffee Beans',
+            sku: 'CB-01',
             unit: 'gram',
+            unitCost: 100,
             minimumStock: '500',
+            category: { name: 'Bahan Baku' },
             stocks: [
               {
                 outletId: 'outlet-1',
@@ -245,9 +248,17 @@ describe('ReportService', () => {
       const result = await service.getInventoryReport('tenant-1', {});
 
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].itemName).toBe('Coffee Beans');
-      expect(result.data[0].outlets[0].currentStock).toBe(300);
-      expect(result.data[0].outlets[0].isLow).toBe(true);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].name).toBe('Coffee Beans');
+      expect(result.items[0].sku).toBe('CB-01');
+      expect(result.items[0].category).toBe('Bahan Baku');
+      expect(result.items[0].currentStock).toBe(300);
+      expect(result.items[0].valuation).toBe(30000); // 300 * 100
+      expect(result.items[0].isLowStock).toBe(true);
+
+      expect(result.summary.totalItems).toBe(1);
+      expect(result.summary.lowStockItems).toBe(1);
+      expect(result.summary.totalValuation).toBe(30000);
     });
 
     it('applies search filter when provided', async () => {
@@ -256,9 +267,10 @@ describe('ReportService', () => {
 
       await service.getInventoryReport('tenant-1', { search: 'coffee' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('item.name ILIKE :search', {
-        search: '%coffee%',
-      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        '(item.name ILIKE :search OR item.sku ILIKE :search)',
+        { search: '%coffee%' },
+      );
     });
 
     it('applies outletId filter when provided', async () => {
@@ -267,9 +279,12 @@ describe('ReportService', () => {
 
       await service.getInventoryReport('tenant-1', { outletId: 'outlet-1' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('stock.outlet_id = :outletId', {
-        outletId: 'outlet-1',
-      });
+      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith(
+        'item.stocks',
+        'stock',
+        'stock.outlet_id = :outletId',
+        { outletId: 'outlet-1' },
+      );
     });
 
     it('marks item as not low when stock exceeds minimumStock', async () => {
@@ -279,6 +294,7 @@ describe('ReportService', () => {
             id: 'item-1',
             name: 'Milk',
             unit: 'ml',
+            unitCost: 15,
             minimumStock: '100',
             stocks: [
               {
@@ -294,7 +310,9 @@ describe('ReportService', () => {
 
       const result = await service.getInventoryReport('tenant-1', {});
 
-      expect(result.data[0].outlets[0].isLow).toBe(false);
+      expect(result.items[0].isLowStock).toBe(false);
+      expect(result.summary.lowStockItems).toBe(0);
+      expect(result.summary.totalValuation).toBe(15000); // 1000 * 15
     });
   });
 

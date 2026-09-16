@@ -263,38 +263,76 @@ export class ReportService {
 
     const qb = this.itemRepo
       .createQueryBuilder('item')
-      .leftJoinAndSelect('item.stocks', 'stock')
-      .leftJoinAndSelect('stock.outlet', 'outlet')
+      .leftJoinAndSelect('item.category', 'category');
+
+    if (outletId) {
+      qb.leftJoinAndSelect(
+        'item.stocks',
+        'stock',
+        'stock.outlet_id = :outletId',
+        { outletId },
+      );
+    } else {
+      qb.leftJoinAndSelect('item.stocks', 'stock');
+    }
+
+    qb.leftJoinAndSelect('stock.outlet', 'outlet')
       .where('item.tenant_id = :tenantId', { tenantId })
       .andWhere('item.deleted_at IS NULL')
       .orderBy('item.name', 'ASC');
 
     if (search) {
-      qb.andWhere('item.name ILIKE :search', { search: `%${search}%` });
-    }
-
-    if (outletId) {
-      qb.andWhere('stock.outlet_id = :outletId', { outletId });
+      qb.andWhere('(item.name ILIKE :search OR item.sku ILIKE :search)', {
+        search: `%${search}%`,
+      });
     }
 
     const items = await qb.getMany();
 
-    const data = items.map((item) => ({
-      itemId: item.id,
-      itemName: item.name,
-      unit: item.unit,
-      minimumStock: Number(item.minimumStock),
-      outlets: item.stocks.map((s) => ({
-        outletId: s.outletId,
-        outletName: s.outlet?.name ?? null,
-        currentStock: Number(s.quantity),
-        isLow: Number(s.quantity) <= Number(item.minimumStock),
-      })),
-      totalStock: item.stocks.reduce((sum, s) => sum + Number(s.quantity), 0),
-    }));
+    const mappedItems = items.map((item) => {
+      const stocks = item.stocks || [];
+      const currentStock = stocks.reduce(
+        (sum, s) => sum + Number(s.quantity || 0),
+        0,
+      );
+      const minimumStock = Number(item.minimumStock || 0);
+      const unitCost = Number(item.unitCost || 0);
+      const valuation = currentStock * unitCost;
+      const isLowStock = currentStock <= minimumStock;
+
+      return {
+        id: item.id,
+        itemId: item.id,
+        name: item.name,
+        itemName: item.name,
+        sku: item.sku ?? null,
+        category: item.category?.name ?? 'Umum',
+        unit: item.unit,
+        unitCost,
+        minimumStock,
+        currentStock,
+        totalStock: currentStock,
+        isLowStock,
+        valuation,
+        outlets: stocks.map((s) => ({
+          outletId: s.outletId,
+          outletName: s.outlet?.name ?? null,
+          currentStock: Number(s.quantity || 0),
+          isLow: Number(s.quantity || 0) <= minimumStock,
+        })),
+      };
+    });
+
+    const summary = {
+      totalItems: mappedItems.length,
+      lowStockItems: mappedItems.filter((i) => i.isLowStock).length,
+      totalValuation: mappedItems.reduce((sum, i) => sum + i.valuation, 0),
+    };
 
     return {
-      data,
+      summary,
+      items: mappedItems,
+      data: mappedItems,
       meta: { outletId: outletId ?? null },
     };
   }
