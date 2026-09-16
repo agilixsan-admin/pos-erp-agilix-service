@@ -149,7 +149,14 @@ describe('PackagingService', () => {
 
       const result = await service.findById('tenant-1', 'pkg-1');
 
-      expect(result).toEqual(mockPkg);
+      expect(result).toEqual(
+        expect.objectContaining({
+          ...mockPkg,
+          currentStock: 0,
+          minimumStock: 0,
+          unit: 'pcs',
+        }),
+      );
       expect(mockPackagingRepo.findOne).toHaveBeenCalledWith({
         where: { id: 'pkg-1', tenantId: 'tenant-1' },
         relations: {
@@ -199,7 +206,14 @@ describe('PackagingService', () => {
         inventoryItemId: 'item-1',
       });
 
-      expect(result).toEqual(createdEntity);
+      expect(result).toEqual(
+        expect.objectContaining({
+          ...createdEntity,
+          currentStock: 0,
+          minimumStock: 0,
+          unit: 'pcs',
+        }),
+      );
       expect(mockAuditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'PACKAGING_CREATED',

@@ -218,8 +218,12 @@ export class PackagingService {
       }
     }
 
+    const formattedData = data.map((pkg) =>
+      this.formatPackaging(pkg, outletId),
+    );
+
     return {
-      data,
+      data: formattedData as any,
       meta: {
         page,
         limit,
@@ -230,9 +234,38 @@ export class PackagingService {
   }
 
   /**
+   * Helper to format packaging entity with flattened inventory stock fields
+   */
+  private formatPackaging(pkg: Packaging, outletId?: string): any {
+    const stocks = pkg.inventoryItem?.stocks || [];
+    const currentStock = outletId
+      ? stocks
+          .filter((s) => s.outletId === outletId)
+          .reduce((sum, s) => sum + Number(s.quantity || 0), 0)
+      : stocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+
+    const minimumStock = Number(pkg.inventoryItem?.minimumStock ?? 0);
+    const unit = pkg.inventoryItem?.unit || 'pcs';
+    const unitCost = Number(pkg.inventoryItem?.unitCost ?? pkg.costPrice ?? 0);
+
+    return {
+      ...pkg,
+      currentStock,
+      minimumStock,
+      minStock: minimumStock,
+      unit,
+      unitCost,
+    };
+  }
+
+  /**
    * Get detail packaging by ID
    */
-  async findById(tenantId: string, id: string): Promise<Packaging> {
+  async findById(
+    tenantId: string,
+    id: string,
+    outletId?: string,
+  ): Promise<Packaging> {
     const packaging = await this.packagings.findOne({
       where: { id, tenantId },
       relations: {
@@ -272,7 +305,7 @@ export class PackagingService {
       );
     }
 
-    return packaging;
+    return this.formatPackaging(packaging, outletId);
   }
 
   /**
@@ -457,7 +490,25 @@ export class PackagingService {
 
     await this.packagings.save(packaging);
 
-    if (packaging.inventoryItemId) {
+    if (!packaging.inventoryItemId) {
+      const invItem = this.inventoryItems.create({
+        tenantId,
+        name: dto.name ?? packaging.name,
+        sku: dto.sku ?? packaging.sku ?? null,
+        itemType: 'PACKAGING',
+        unit: dto.unit ?? 'pcs',
+        unitCost: dto.costPrice ?? packaging.costPrice ?? 0,
+        minimumStock: dto.minimumStock ?? 0,
+        status: dto.status ?? packaging.status ?? 'ACTIVE',
+      });
+      const savedInv = await this.inventoryItems.save(invItem);
+      packaging.inventoryItemId = savedInv.id;
+      packaging.inventoryItem = savedInv;
+      await this.packagings.update(
+        { id: packaging.id, tenantId },
+        { inventoryItemId: savedInv.id },
+      );
+    } else {
       await this.inventoryItems.update(
         { id: packaging.inventoryItemId, tenantId },
         {
