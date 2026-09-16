@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  PutBucketPolicyCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -61,6 +62,7 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
   }
 
   async ensureBucket(): Promise<void> {
+    let isBucketAvailable = false;
     try {
       await this.client.send(
         new HeadBucketCommand({
@@ -70,6 +72,7 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
       this.logger.log(
         `S3/MinIO Storage connected: Bucket "${this.bucket}" ready at ${this.endpoint}`,
       );
+      isBucketAvailable = true;
     } catch {
       try {
         await this.client.send(
@@ -80,6 +83,7 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
         this.logger.log(
           `S3/MinIO Storage connected: Bucket "${this.bucket}" created and ready at ${this.endpoint}`,
         );
+        isBucketAvailable = true;
       } catch (createErr: unknown) {
         this.logger.warn(
           `Could not connect to S3/MinIO bucket "${this.bucket}" at ${this.endpoint}: ${
@@ -87,6 +91,43 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
           }`,
         );
       }
+    }
+
+    if (isBucketAvailable) {
+      await this.ensureBucketPolicy();
+    }
+  }
+
+  private async ensureBucketPolicy(): Promise<void> {
+    try {
+      const publicReadPolicy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Sid: 'PublicReadGetObject',
+            Effect: 'Allow',
+            Principal: '*',
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${this.bucket}/*`],
+          },
+        ],
+      };
+
+      await this.client.send(
+        new PutBucketPolicyCommand({
+          Bucket: this.bucket,
+          Policy: JSON.stringify(publicReadPolicy),
+        }),
+      );
+      this.logger.log(
+        `S3/MinIO public read policy successfully ensured for bucket "${this.bucket}"`,
+      );
+    } catch (policyErr: unknown) {
+      this.logger.warn(
+        `Could not apply public read policy to bucket "${this.bucket}": ${
+          policyErr instanceof Error ? policyErr.message : String(policyErr)
+        }`,
+      );
     }
   }
 
