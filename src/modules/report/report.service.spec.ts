@@ -8,6 +8,7 @@ import { OrderItem } from '../order/entities/order-item.entity';
 import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { Recipe } from '../recipe/entities/recipe.entity';
 
 describe('ReportService', () => {
   let service: ReportService;
@@ -19,6 +20,7 @@ describe('ReportService', () => {
   const mockStockRepo = { createQueryBuilder: jest.fn() };
   const mockMovementRepo = { createQueryBuilder: jest.fn() };
   const mockItemRepo = { createQueryBuilder: jest.fn() };
+  const mockRecipeRepo = { createQueryBuilder: jest.fn() };
 
   const buildQb = (overrides: Record<string, jest.Mock> = {}) => ({
     select: jest.fn().mockReturnThis(),
@@ -61,6 +63,7 @@ describe('ReportService', () => {
           useValue: mockMovementRepo,
         },
         { provide: getRepositoryToken(InventoryItem), useValue: mockItemRepo },
+        { provide: getRepositoryToken(Recipe), useValue: mockRecipeRepo },
       ],
     }).compile();
 
@@ -176,11 +179,20 @@ describe('ReportService', () => {
           .fn()
           .mockResolvedValue([{ method: 'CASH', total: '80000', count: '2' }]),
       });
+      const recipeQb = buildQb({
+        getRawMany: jest.fn().mockResolvedValue([
+          {
+            variantId: 'var-1',
+            unitCogs: '5000',
+          },
+        ]),
+      });
 
       mockTransactionRepo.createQueryBuilder.mockReturnValue(txQb);
       mockOrderRepo.createQueryBuilder.mockReturnValue(orderQb);
       mockOrderItemRepo.createQueryBuilder.mockReturnValue(itemQb);
       mockPaymentRepo.createQueryBuilder.mockReturnValue(paymentQb);
+      mockRecipeRepo.createQueryBuilder.mockReturnValue(recipeQb);
 
       const result = await service.getSalesReport('tenant-1', {
         startDate: '2026-09-01T00:00:00Z',
@@ -192,6 +204,10 @@ describe('ReportService', () => {
       expect(result.byDate[0].orders).toBe(2);
       expect(result.byProduct).toHaveLength(1);
       expect(result.byProduct[0].productName).toBe('Americano');
+      expect(result.byProduct[0].unitCogs).toBe(5000);
+      expect(result.byProduct[0].totalCogs).toBe(20000); // 4 * 5000
+      expect(result.byProduct[0].profit).toBe(60000); // 80000 - 20000
+      expect(result.byProduct[0].marginPercentage).toBe(75); // ((80000 - 20000) / 80000) * 100
       expect(result.byPaymentMethod[0].method).toBe('CASH');
     });
 
@@ -202,11 +218,13 @@ describe('ReportService', () => {
       const paymentQb = buildQb({
         getRawMany: jest.fn().mockResolvedValue([]),
       });
+      const recipeQb = buildQb({ getRawMany: jest.fn().mockResolvedValue([]) });
 
       mockTransactionRepo.createQueryBuilder.mockReturnValue(txQb);
       mockOrderRepo.createQueryBuilder.mockReturnValue(orderQb);
       mockOrderItemRepo.createQueryBuilder.mockReturnValue(itemQb);
       mockPaymentRepo.createQueryBuilder.mockReturnValue(paymentQb);
+      mockRecipeRepo.createQueryBuilder.mockReturnValue(recipeQb);
 
       await service.getSalesReport('tenant-1', {
         startDate: '2026-09-01T00:00:00Z',

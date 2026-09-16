@@ -9,6 +9,7 @@ import { OrderItem } from '../order/entities/order-item.entity';
 import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { Recipe } from '../recipe/entities/recipe.entity';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { InventoryItem } from '../inventory/entities/inventory-item.entity';
       InventoryStock,
       InventoryMovement,
       InventoryItem,
+      Recipe,
     ]),
   ],
   controllers: [ReportController],

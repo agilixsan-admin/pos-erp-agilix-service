@@ -8,6 +8,7 @@ import { OrderItem } from '../order/entities/order-item.entity';
 import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { Recipe } from '../recipe/entities/recipe.entity';
 import {
   QuerySalesReportDto,
   QuerySummaryReportDto,
@@ -32,6 +33,8 @@ export class ReportService {
     private readonly movementRepo: Repository<InventoryMovement>,
     @InjectRepository(InventoryItem)
     private readonly itemRepo: Repository<InventoryItem>,
+    @InjectRepository(Recipe)
+    private readonly recipeRepo: Repository<Recipe>,
   ) {}
 
   // ─── Summary ──────────────────────────────────────────────────────────────
@@ -193,6 +196,30 @@ export class ReportService {
       revenue: string;
     }>();
 
+    // calculate COGS per sold variant from recipes
+    const variantIds = byProduct
+      .map((r) => r.variantId)
+      .filter((id): id is string => Boolean(id));
+
+    let cogsMap = new Map<string, number>();
+    if (variantIds.length > 0) {
+      const cogsRaw = await this.recipeRepo
+        .createQueryBuilder('r')
+        .innerJoin('r.inventoryItem', 'ii')
+        .select('r.variant_id', 'variantId')
+        .addSelect('COALESCE(SUM(r.quantity * ii.unit_cost), 0)', 'unitCogs')
+        .where('r.tenant_id = :tenantId', { tenantId })
+        .andWhere('r.deleted_at IS NULL')
+        .andWhere('ii.deleted_at IS NULL')
+        .andWhere('r.variant_id IN (:...variantIds)', { variantIds })
+        .groupBy('r.variant_id')
+        .getRawMany<{ variantId: string; unitCogs: string }>();
+
+      cogsMap = new Map(
+        cogsRaw.map((row) => [row.variantId, Number(row.unitCogs || 0)]),
+      );
+    }
+
     // by payment method
     const byPaymentQb = this.paymentRepo
       .createQueryBuilder('p')
@@ -239,14 +266,30 @@ export class ReportService {
         transactions: Number(r.transactions),
         orders: ordersMap.get(r.date) ?? 0,
       })),
-      byProduct: byProduct.map((r) => ({
-        productId: r.productId,
-        variantId: r.variantId,
-        productName: r.productName,
-        variantName: r.variantName,
-        quantitySold: Number(r.quantitySold),
-        revenue: Number(r.revenue),
-      })),
+      byProduct: byProduct.map((r) => {
+        const quantitySold = Number(r.quantitySold);
+        const revenue = Number(r.revenue);
+        const unitCogs = cogsMap.get(r.variantId) ?? 0;
+        const totalCogs = Math.round(quantitySold * unitCogs * 100) / 100;
+        const profit = Math.round((revenue - totalCogs) * 100) / 100;
+        const marginPercentage =
+          revenue > 0
+            ? Math.round(((revenue - totalCogs) / revenue) * 100 * 10) / 10
+            : 0;
+
+        return {
+          productId: r.productId,
+          variantId: r.variantId,
+          productName: r.productName,
+          variantName: r.variantName,
+          quantitySold,
+          revenue,
+          unitCogs,
+          totalCogs,
+          profit,
+          marginPercentage,
+        };
+      }),
       byPaymentMethod: byPaymentMethod.map((r) => ({
         method: r.method,
         total: Number(r.total),
