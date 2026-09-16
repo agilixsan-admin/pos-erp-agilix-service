@@ -232,16 +232,37 @@ export class PurchaseService {
     const purchaseItems: PurchaseItem[] = [];
 
     for (const itemDto of dto.items) {
-      const itemSubtotal = itemDto.quantityOrdered * itemDto.unitCost;
-      subtotal += itemSubtotal;
+      let unitCost =
+        itemDto.unitCost !== undefined ? Number(itemDto.unitCost) : undefined;
+      let itemSubtotal =
+        (itemDto.subtotal !== undefined
+          ? Number(itemDto.subtotal)
+          : undefined) ??
+        (itemDto.totalPrice !== undefined
+          ? Number(itemDto.totalPrice)
+          : undefined);
+
+      if (itemSubtotal !== undefined && unitCost === undefined) {
+        unitCost =
+          itemDto.quantityOrdered > 0
+            ? itemSubtotal / itemDto.quantityOrdered
+            : 0;
+      } else if (unitCost !== undefined && itemSubtotal === undefined) {
+        itemSubtotal = itemDto.quantityOrdered * unitCost;
+      } else if (unitCost === undefined && itemSubtotal === undefined) {
+        unitCost = 0;
+        itemSubtotal = 0;
+      }
+
+      subtotal += itemSubtotal!;
 
       const item = this.purchaseItemRepository.create({
         tenantId,
         inventoryItemId: itemDto.inventoryItemId,
         quantityOrdered: itemDto.quantityOrdered,
         quantityReceived: 0,
-        unitCost: itemDto.unitCost,
-        subtotal: itemSubtotal,
+        unitCost: unitCost!,
+        subtotal: itemSubtotal!,
       });
       purchaseItems.push(item);
     }
@@ -343,8 +364,29 @@ export class PurchaseService {
       const newItems: PurchaseItem[] = [];
 
       for (const itemDto of dto.items) {
-        const itemSubtotal = itemDto.quantityOrdered * itemDto.unitCost;
-        subtotal += itemSubtotal;
+        let unitCost =
+          itemDto.unitCost !== undefined ? Number(itemDto.unitCost) : undefined;
+        let itemSubtotal =
+          (itemDto.subtotal !== undefined
+            ? Number(itemDto.subtotal)
+            : undefined) ??
+          (itemDto.totalPrice !== undefined
+            ? Number(itemDto.totalPrice)
+            : undefined);
+
+        if (itemSubtotal !== undefined && unitCost === undefined) {
+          unitCost =
+            itemDto.quantityOrdered > 0
+              ? itemSubtotal / itemDto.quantityOrdered
+              : 0;
+        } else if (unitCost !== undefined && itemSubtotal === undefined) {
+          itemSubtotal = itemDto.quantityOrdered * unitCost;
+        } else if (unitCost === undefined && itemSubtotal === undefined) {
+          unitCost = 0;
+          itemSubtotal = 0;
+        }
+
+        subtotal += itemSubtotal!;
 
         const item = this.purchaseItemRepository.create({
           tenantId,
@@ -352,8 +394,8 @@ export class PurchaseService {
           inventoryItemId: itemDto.inventoryItemId,
           quantityOrdered: itemDto.quantityOrdered,
           quantityReceived: 0,
-          unitCost: itemDto.unitCost,
-          subtotal: itemSubtotal,
+          unitCost: unitCost!,
+          subtotal: itemSubtotal!,
         });
         newItems.push(item);
       }

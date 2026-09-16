@@ -274,6 +274,55 @@ describe('PurchaseService', () => {
         expect.objectContaining({ action: 'PURCHASE_CREATED' }),
       );
     });
+
+    it('creates a new purchase with subtotal input and automatically computes unitCost', async () => {
+      outletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      } as any);
+      supplierRepo.findOne.mockResolvedValue({
+        id: 'supp-1',
+        tenantId: 'tenant-1',
+      } as any);
+      inventoryItemRepo.findOne.mockResolvedValue({
+        id: 'inv-susu',
+        tenantId: 'tenant-1',
+      } as any);
+
+      const qbNum = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      } as any;
+      purchaseRepo.createQueryBuilder.mockReturnValue(qbNum);
+
+      let createdItemData: any;
+      purchaseItemRepo.create.mockImplementation((d) => {
+        createdItemData = d;
+        return d as any;
+      });
+      purchaseRepo.create.mockReturnValue(mockPurchase);
+      purchaseRepo.save.mockResolvedValue(mockPurchase);
+      purchaseRepo.findOne.mockResolvedValue(mockPurchase);
+
+      await service.create('tenant-1', 'user-1', {
+        outletId: 'outlet-1',
+        supplierId: 'supp-1',
+        items: [
+          {
+            inventoryItemId: 'inv-susu',
+            quantityOrdered: 5000,
+            subtotal: 12000,
+          },
+        ],
+      });
+
+      expect(createdItemData).toBeDefined();
+      expect(createdItemData.quantityOrdered).toBe(5000);
+      expect(createdItemData.subtotal).toBe(12000);
+      expect(createdItemData.unitCost).toBe(2.4);
+    });
   });
 
   describe('receive', () => {

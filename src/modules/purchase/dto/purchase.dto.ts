@@ -26,10 +26,23 @@ export class CreatePurchaseItemDto {
   @Type(() => Number)
   quantityOrdered!: number;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)
-  unitCost!: number;
+  unitCost?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  subtotal?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  totalPrice?: number;
 }
 
 export class CreatePurchaseDto {
