@@ -22,6 +22,10 @@ export class CreatePaymentDto {
   amount!: number;
 
   @IsOptional()
+  @IsNumber()
+  cashGiven?: number;
+
+  @IsOptional()
   @IsString()
   referenceNumber?: string;
 }

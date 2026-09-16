@@ -158,16 +158,21 @@ export class PaymentService {
     }
 
     const orderTotal = Number(order.totalAmount);
-    if (dto.amount < orderTotal) {
+    const paidAmount =
+      dto.paymentMethod === 'CASH' && dto.cashGiven !== undefined
+        ? Number(dto.cashGiven)
+        : Number(dto.amount);
+
+    if (paidAmount < orderTotal) {
       throw new BadRequestException({
         success: false,
-        message: `Payment amount (${dto.amount}) is less than order total (${orderTotal})`,
+        message: `Payment amount (${paidAmount}) is less than order total (${orderTotal})`,
         code: 'INSUFFICIENT_PAYMENT',
       });
     }
 
     const changeAmount =
-      dto.paymentMethod === 'CASH' ? dto.amount - orderTotal : 0;
+      dto.paymentMethod === 'CASH' ? paidAmount - orderTotal : 0;
 
     return this.dataSource.transaction(async (manager) => {
       const paymentRepo = manager.getRepository(Payment);
@@ -177,7 +182,7 @@ export class PaymentService {
         outletId: order.outletId,
         orderId: order.id,
         paymentMethod: dto.paymentMethod,
-        amount: dto.amount,
+        amount: paidAmount,
         changeAmount,
         status: 'SUCCESS',
         referenceNumber: dto.referenceNumber ?? null,

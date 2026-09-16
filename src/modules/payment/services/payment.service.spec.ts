@@ -195,6 +195,64 @@ describe('PaymentService', () => {
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
+    it('calculates changeAmount and sets payment amount correctly when cashGiven is provided', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        orderNumber: 'ORD-123',
+        status: 'PENDING',
+        totalAmount: 73000,
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(order);
+
+      const managerPaymentRepo = {
+        create: jest.fn((p: Record<string, unknown>) => ({
+          ...p,
+          id: 'pay-1',
+        })),
+        save: jest.fn((p: Record<string, unknown>) => Promise.resolve(p)),
+      };
+      const managerTrxRepo = {
+        create: jest.fn((t: Record<string, unknown>) => ({
+          ...t,
+          id: 'trx-1',
+        })),
+        save: jest.fn((t: Record<string, unknown>) => Promise.resolve(t)),
+      };
+      const managerOrderRepo = {
+        save: jest.fn().mockResolvedValue(order),
+      };
+      const managerAuditRepo = {
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Payment) return managerPaymentRepo;
+              if (entityClass === Transaction) return managerTrxRepo;
+              if (entityClass === Order) return managerOrderRepo;
+              return managerAuditRepo;
+            },
+          });
+        },
+      );
+
+      const result = await service.create('tenant-1', 'user-1', {
+        orderId: 'ord-1',
+        paymentMethod: 'CASH',
+        amount: 73000,
+        cashGiven: 100000,
+      });
+
+      expect(result.payment.amount).toBe(100000);
+      expect(result.payment.changeAmount).toBe(27000);
+      expect(result.order.status).toBe('COMPLETED');
+    });
+
     it('releases occupied table when payment completes for order with tableId', async () => {
       const order = {
         id: 'ord-1',
