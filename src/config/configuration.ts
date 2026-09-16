@@ -53,10 +53,11 @@ export default () => ({
       bucket: process.env.S3_BUCKET ?? process.env.MINIO_BUCKET ?? 'aglix-pos',
       forcePathStyle:
         process.env.S3_FORCE_PATH_STYLE === 'false' ? false : true,
-      publicUrl:
+      publicUrl: (
         process.env.S3_PUBLIC_URL ??
         process.env.MINIO_PUBLIC_URL ??
-        'http://localhost:9000/aglix-pos',
+        'http://localhost:9000/aglix-pos'
+      ).replace(/^htts:\/\//, 'https://'),
     },
   },
   payment: {

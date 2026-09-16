@@ -81,7 +81,10 @@ export class ProductService {
       ? Number(primaryVariant.price || 0)
       : minPrice || 0;
     const sku = primaryVariant?.sku ?? null;
-    const image = product.imageUrl ?? null;
+    let image = product.imageUrl ?? null;
+    if (image && image.startsWith('htts://')) {
+      image = image.replace(/^htts:\/\//, 'https://');
+    }
 
     return {
       ...product,
@@ -454,11 +457,14 @@ export class ProductService {
       await this.storageService.deleteProductImage(tenantId, product.imageUrl);
     }
 
-    const imageUrl = await this.storageService.uploadProductImage(
+    let imageUrl = await this.storageService.uploadProductImage(
       tenantId,
       productId,
       file,
     );
+    if (imageUrl && imageUrl.startsWith('htts://')) {
+      imageUrl = imageUrl.replace(/^htts:\/\//, 'https://');
+    }
 
     product.imageUrl = imageUrl;
     await this.productRepository.save(product);

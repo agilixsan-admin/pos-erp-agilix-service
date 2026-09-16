@@ -118,9 +118,12 @@ export class S3StorageDriver implements IStorageDriver, OnModuleInit {
   }
 
   getFileUrl(filePath: string): string {
-    const baseUrl = this.publicUrl.endsWith('/')
+    let baseUrl = this.publicUrl.endsWith('/')
       ? this.publicUrl.slice(0, -1)
       : this.publicUrl;
+    if (baseUrl.startsWith('htts://')) {
+      baseUrl = baseUrl.replace(/^htts:\/\//, 'https://');
+    }
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
     return `${baseUrl}/${cleanPath}`;
   }
