@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import {
+  ChangePasswordDto,
   LoginDto,
   RefreshTokenDto,
   SetPasswordDto,
@@ -67,6 +68,19 @@ export class AuthController {
       success: true,
       message: 'User retrieved successfully',
       data: user,
+    };
+  }
+
+  @Post('change-password')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body() body: ChangePasswordDto,
+  ) {
+    await this.auth.changePassword(user.id, user.tenantId, body.newPassword);
+    return {
+      success: true,
+      message: 'Password successfully updated',
     };
   }
 }

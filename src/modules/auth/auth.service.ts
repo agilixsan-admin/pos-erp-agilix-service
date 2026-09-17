@@ -187,6 +187,13 @@ export class AuthService {
     };
   }
 
+  /**
+   * Change user password for an authenticated session
+   */
+  async changePassword(userId: string, tenantId: string, newPassword: string) {
+    return this.users.update(tenantId, userId, userId, { password: newPassword });
+  }
+
   validateUser(id: string) {
     return this.users.findById(id);
   }

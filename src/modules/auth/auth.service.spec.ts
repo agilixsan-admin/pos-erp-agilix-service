@@ -33,6 +33,7 @@ describe('AuthService', () => {
 
   const findByEmail = jest.fn();
   const findById = jest.fn();
+  const updateUser = jest.fn().mockResolvedValue(mockUser);
   const signAsync = jest.fn().mockResolvedValue('signed-token');
   const verifyAsync = jest.fn();
   const auditRecord = jest.fn().mockResolvedValue(undefined);
@@ -46,7 +47,7 @@ describe('AuthService', () => {
     save: jest.fn().mockResolvedValue({}),
   } as unknown as Repository<UserInvitation>;
 
-  const mockUserService = { findByEmail, findById } as unknown as UserService;
+  const mockUserService = { findByEmail, findById, update: updateUser } as unknown as UserService;
   const mockJwtService = {
     signAsync,
     verifyAsync,
@@ -362,6 +363,21 @@ describe('AuthService', () => {
       const result = await service.validateUser('unknown');
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ─── changePassword ───────────────────────────────────────────────────────
+
+  describe('changePassword', () => {
+    it('delegates to userService.update with new password', async () => {
+      updateUser.mockResolvedValue(mockUser);
+
+      const result = await service.changePassword('user-1', 'tenant-1', 'NewPassword123!');
+
+      expect(result).toEqual(mockUser);
+      expect(updateUser).toHaveBeenCalledWith('tenant-1', 'user-1', 'user-1', {
+        password: 'NewPassword123!',
+      });
     });
   });
 });
