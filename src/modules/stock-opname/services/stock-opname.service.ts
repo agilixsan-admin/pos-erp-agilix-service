@@ -203,6 +203,58 @@ export class StockOpnameService {
       });
     }
 
+    // Validation 1: Ensure there is no unfinished (DRAFT or IN_PROGRESS) opname in this outlet
+    const unfinishedOpname = await this.stockOpnameRepository.findOne({
+      where: {
+        tenantId,
+        outletId: dto.outletId,
+        status: In(['DRAFT', 'IN_PROGRESS']),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (unfinishedOpname) {
+      throw new BadRequestException({
+        success: false,
+        message: `Cabang ini masih memiliki sesi Stock Opname yang belum final (${unfinishedOpname.opnameNumber}). Selesaikan atau batalkan sesi tersebut terlebih dahulu sebelum membuat sesi baru.`,
+        code: 'UNFINISHED_STOCK_OPNAME_EXISTS',
+        details: {
+          unfinishedOpnameId: unfinishedOpname.id,
+          opnameNumber: unfinishedOpname.opnameNumber,
+          status: unfinishedOpname.status,
+        },
+      });
+    }
+
+    // Validation 2: Ensure no other non-cancelled stock opname exists on the same date for this outlet
+    const targetDateStr = dto.opnameDate
+      ? (dto.opnameDate.includes('T') ? dto.opnameDate.split('T')[0] : dto.opnameDate)
+      : new Date().toISOString().split('T')[0];
+
+    const existingOnDate = await this.stockOpnameRepository
+      .createQueryBuilder('opname')
+      .where('opname.tenantId = :tenantId', { tenantId })
+      .andWhere('opname.outletId = :outletId', { outletId: dto.outletId })
+      .andWhere('opname.status != :cancelledStatus', { cancelledStatus: 'CANCELLED' })
+      .andWhere(
+        '(DATE(opname.opnameDate) = :targetDateStr OR DATE(opname.opnameDate AT TIME ZONE \'Asia/Jakarta\') = :targetDateStr)',
+        { targetDateStr },
+      )
+      .getOne();
+
+    if (existingOnDate) {
+      throw new BadRequestException({
+        success: false,
+        message: `Cabang ini sudah memiliki sesi Stock Opname pada tanggal ${targetDateStr} (${existingOnDate.opnameNumber}). Setiap outlet tidak boleh membuat lebih dari satu sesi Stock Opname di tanggal yang sama.`,
+        code: 'STOCK_OPNAME_DUPLICATE_DATE',
+        details: {
+          existingOpnameId: existingOnDate.id,
+          opnameNumber: existingOnDate.opnameNumber,
+          status: existingOnDate.status,
+        },
+      });
+    }
+
     const scope = dto.scope || 'ALL';
     let category: InventoryCategory | null = null;
 

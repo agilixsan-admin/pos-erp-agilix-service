@@ -128,6 +128,13 @@ describe('StockOpnameService', () => {
 
     it('should throw BadRequestException if category scope specified without valid category', async () => {
       outletRepo.findOne.mockResolvedValue({ id: outletId } as Outlet);
+      opnameRepo.findOne.mockResolvedValue(null);
+      const existingDateQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      opnameRepo.createQueryBuilder.mockReturnValue(existingDateQb);
       categoryRepo.findOne.mockResolvedValue(null);
 
       await expect(
@@ -139,8 +146,114 @@ describe('StockOpnameService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('should throw BadRequestException if an unfinished stock opname exists in the outlet', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: outletId } as Outlet);
+      opnameRepo.findOne.mockResolvedValue({
+        id: 'so-unfinished',
+        opnameNumber: 'SO-2026-001',
+        status: 'IN_PROGRESS',
+      } as any);
+
+      await expect(
+        service.create(tenantId, actorId, {
+          outletId,
+          scope: 'ALL',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'UNFINISHED_STOCK_OPNAME_EXISTS',
+          }),
+        }),
+      );
+    });
+
+    it('should throw BadRequestException if a stock opname already exists on the same date for the outlet', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: outletId } as Outlet);
+      opnameRepo.findOne.mockResolvedValue(null); // no unfinished
+      const existingDateQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'so-completed-today',
+          opnameNumber: 'SO-2026-002',
+          status: 'COMPLETED',
+        }),
+      };
+      opnameRepo.createQueryBuilder.mockReturnValue(existingDateQb);
+
+      await expect(
+        service.create(tenantId, actorId, {
+          outletId,
+          scope: 'ALL',
+          opnameDate: '2026-09-17',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'STOCK_OPNAME_DUPLICATE_DATE',
+          }),
+        }),
+      );
+    });
+
+    it('should allow creating stock opname if previous session on the same date was CANCELLED', async () => {
+      outletRepo.findOne.mockResolvedValue({ id: outletId } as Outlet);
+      opnameRepo.findOne
+        .mockResolvedValueOnce(null) // no unfinished
+        .mockResolvedValueOnce({
+          id: 'so-new',
+          opnameNumber: 'SO-2026-003',
+          items: [],
+        } as any);
+
+      const qbMock: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: 'item-1', name: 'Coffee Beans', unitCost: 50 },
+        ]),
+      };
+      inventoryItemRepo.createQueryBuilder.mockReturnValue(qbMock);
+      inventoryStockRepo.find.mockResolvedValue([]);
+
+      const existingDateQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null), // CANCELLED is filtered out, returns null
+      };
+      const lastOpnameQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({ opnameNumber: 'SO-2026-002' }),
+      };
+      opnameRepo.createQueryBuilder
+        .mockReturnValueOnce(existingDateQb)
+        .mockReturnValueOnce(lastOpnameQb);
+
+      opnameItemRepo.create.mockImplementation((dto) => dto as any);
+      opnameRepo.create.mockImplementation((dto) => dto as any);
+      opnameRepo.save.mockResolvedValue({ id: 'so-new', opnameNumber: 'SO-2026-003' } as any);
+
+      const result = await service.create(tenantId, actorId, {
+        outletId,
+        scope: 'ALL',
+        opnameDate: '2026-09-17',
+      });
+
+      expect(result).toBeDefined();
+    });
+
     it('should create a stock opname session snapshotting current stocks', async () => {
       outletRepo.findOne.mockResolvedValue({ id: outletId } as Outlet);
+      opnameRepo.findOne
+        .mockResolvedValueOnce(null) // unfinished check
+        .mockResolvedValueOnce({
+          id: 'so-1',
+          opnameNumber: 'SO-2026-006',
+          items: [],
+        } as any); // findById after transaction
 
       const qbMock: any = {
         where: jest.fn().mockReturnThis(),
@@ -156,24 +269,28 @@ describe('StockOpnameService', () => {
         { inventoryItemId: 'item-1', quantity: 10 } as InventoryStock,
       ]);
 
+      // Call 1: existingOnDate check (null)
+      // Call 2: lastOpname for sequence number
+      const existingDateQb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
       const lastOpnameQb: any = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue({ opnameNumber: 'SO-2026-005' }),
       };
-      opnameRepo.createQueryBuilder.mockReturnValue(lastOpnameQb);
+      opnameRepo.createQueryBuilder
+        .mockReturnValueOnce(existingDateQb)
+        .mockReturnValueOnce(lastOpnameQb);
 
       opnameItemRepo.create.mockImplementation((dto) => dto as any);
       opnameRepo.create.mockImplementation((dto) => dto as any);
       opnameRepo.save.mockResolvedValue({
         id: 'so-1',
         opnameNumber: 'SO-2026-006',
-      } as any);
-      opnameRepo.findOne.mockResolvedValue({
-        id: 'so-1',
-        opnameNumber: 'SO-2026-006',
-        items: [],
       } as any);
 
       const result = await service.create(tenantId, actorId, {
