@@ -165,10 +165,11 @@ export class EscPosBuilderService {
     if (data.order.items && data.order.items.length > 0) {
       for (const item of data.order.items) {
         const prodName = item.productName || 'Produk';
-        const variantSuffix =
-          item.variantName && item.variantName !== prodName
-            ? ` (${item.variantName})`
-            : '';
+        const isDefaultVariant =
+          !item.variantName ||
+          item.variantName.trim().toLowerCase() === 'default' ||
+          item.variantName.trim().toLowerCase() === prodName.trim().toLowerCase();
+        const variantSuffix = !isDefaultVariant ? ` (${item.variantName})` : '';
         append(prodName + variantSuffix);
 
         const qtyPrice = `${item.quantity} x ${this.formatCurrency(Number(item.unitPrice))}`;
@@ -357,10 +358,11 @@ export class EscPosBuilderService {
     if (itemsToPrint.length > 0) {
       for (const item of itemsToPrint) {
         const prodName = item.productName || 'Item';
-        const variantSuffix =
-          item.variantName && item.variantName !== prodName
-            ? ` (${item.variantName})`
-            : '';
+        const isDefaultVariant =
+          !item.variantName ||
+          item.variantName.trim().toLowerCase() === 'default' ||
+          item.variantName.trim().toLowerCase() === prodName.trim().toLowerCase();
+        const variantSuffix = !isDefaultVariant ? ` (${item.variantName})` : '';
         append(`${item.quantity}x ${prodName}${variantSuffix}`, {
           bold: true,
           doubleHeight: true,
