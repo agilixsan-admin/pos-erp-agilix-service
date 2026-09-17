@@ -1162,6 +1162,12 @@ describe('OrderService', () => {
                     savedOrder = o;
                     return Promise.resolve(o);
                   }),
+                  update: jest.fn(
+                    (_where: unknown, data: Record<string, unknown>) => {
+                      savedOrder = { ...savedOrder, ...data };
+                      return Promise.resolve({ affected: 1 });
+                    },
+                  ),
                   findOne: jest.fn().mockResolvedValue({
                     ...existingOrder,
                     subtotal: 75000,

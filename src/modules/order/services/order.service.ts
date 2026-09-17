@@ -898,11 +898,13 @@ export class OrderService {
             movementType: 'SALE',
             quantity: deductionQty,
             referenceType: 'ORDER',
-            referenceId: order.id,
+            referenceId: order.orderNumber || order.id,
             notes: `Additional item sent to station via Order ${order.orderNumber} (${item.productName} - ${item.variantName})`,
             movementDate: new Date(),
             createdBy: userId,
             metadata: {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
               orderItemId: item.id,
               variantId: item.variantId,
             },
@@ -992,13 +994,23 @@ export class OrderService {
         0,
       );
 
+      order.items = allActiveItems;
       order.subtotal = calculatedSubtotal;
       order.discountAmount = discountAmount;
       order.taxAmount = taxAmount;
       order.packagingFee = packagingFee;
       order.totalAmount = totalAmount;
 
-      await orderRepo.save(order);
+      await orderRepo.update(
+        { id: order.id, tenantId },
+        {
+          subtotal: calculatedSubtotal,
+          discountAmount,
+          taxAmount,
+          packagingFee,
+          totalAmount,
+        },
+      );
 
       await this.audit.record(
         {
