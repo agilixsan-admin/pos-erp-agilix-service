@@ -111,6 +111,11 @@ export class PaymentService {
       manager,
     );
 
+    (order as unknown as Record<string, unknown>).paidAmount = Number(payment.amount);
+    (order as unknown as Record<string, unknown>).changeAmount = Number(payment.changeAmount);
+    (order as unknown as Record<string, unknown>).paymentMethod = payment.paymentMethod;
+    (order as unknown as Record<string, unknown>).transaction = savedTrx;
+
     return {
       payment,
       transaction: savedTrx,
