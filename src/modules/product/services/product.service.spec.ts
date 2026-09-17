@@ -11,6 +11,7 @@ import { QueryProductsDto } from '../dto/product.dto';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
+import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 
@@ -30,6 +31,10 @@ describe('ProductService', () => {
     softRemove: jest.fn(),
   };
   const mockCategoryRepo = {
+    findOne: jest.fn(),
+  };
+  const mockInventoryStockRepo = {
+    find: jest.fn(),
     findOne: jest.fn(),
   };
   const mockDataSource = {
@@ -59,6 +64,10 @@ describe('ProductService', () => {
         {
           provide: getRepositoryToken(Category),
           useValue: mockCategoryRepo,
+        },
+        {
+          provide: getRepositoryToken(InventoryStock),
+          useValue: mockInventoryStockRepo,
         },
         {
           provide: DataSource,
@@ -131,6 +140,98 @@ describe('ProductService', () => {
 
       expect(result.data).toEqual([]);
       expect(result.meta.total).toBe(0);
+    });
+
+    it('calculates isOutOfStock = true when raw materials are exhausted in the specified outlet', async () => {
+      const mockProduct: any = {
+        id: 'prod-1',
+        name: 'Coffee Latte',
+        variants: [
+          {
+            id: 'var-1',
+            name: 'Regular',
+            price: 25000,
+            recipes: [
+              {
+                inventoryItemId: 'item-milk',
+                quantity: 200,
+                inventoryItem: { name: 'Fresh Milk', unitCost: 20 },
+              },
+            ],
+          },
+        ],
+      };
+
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockProduct], 1]),
+      } as unknown as SelectQueryBuilder<Product>;
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
+
+      // Stock is 0 (exhausted)
+      mockInventoryStockRepo.find.mockResolvedValue([
+        { inventoryItemId: 'item-milk', quantity: 0 },
+      ]);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-1',
+      });
+
+      expect(result.data[0].isOutOfStock).toBe(true);
+      expect(result.data[0].isAvailable).toBe(false);
+      expect(result.data[0].variants[0].isOutOfStock).toBe(true);
+      expect(result.data[0].variants[0].availableStock).toBe(0);
+    });
+
+    it('calculates isAvailable = true when raw materials are sufficient in the specified outlet', async () => {
+      const mockProduct: any = {
+        id: 'prod-1',
+        name: 'Coffee Latte',
+        variants: [
+          {
+            id: 'var-1',
+            name: 'Regular',
+            price: 25000,
+            recipes: [
+              {
+                inventoryItemId: 'item-milk',
+                quantity: 200,
+                inventoryItem: { name: 'Fresh Milk', unitCost: 20 },
+              },
+            ],
+          },
+        ],
+      };
+
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockProduct], 1]),
+      } as unknown as SelectQueryBuilder<Product>;
+      mockProductRepo.createQueryBuilder.mockReturnValue(qb);
+
+      // Stock is 1000 ml (sufficient for 5 portions)
+      mockInventoryStockRepo.find.mockResolvedValue([
+        { inventoryItemId: 'item-milk', quantity: 1000 },
+      ]);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-1',
+      });
+
+      expect(result.data[0].isOutOfStock).toBe(false);
+      expect(result.data[0].isAvailable).toBe(true);
+      expect(result.data[0].variants[0].isOutOfStock).toBe(false);
+      expect(result.data[0].variants[0].availableStock).toBe(5);
     });
 
     it('passes ValidationPipe with outletId without throwing error', async () => {

@@ -43,8 +43,13 @@ export class ProductController {
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('outletId') outletId?: string,
   ) {
-    const data = await this.productService.findById(user.tenantId, id);
+    const data = await this.productService.findById(
+      user.tenantId,
+      id,
+      outletId,
+    );
     return {
       success: true,
       message: 'Product retrieved successfully',

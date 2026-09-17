@@ -317,17 +317,17 @@ export class OrderService {
             },
           });
 
-          if (!stock) {
-            stock = stockRepo.create({
-              tenantId,
-              outletId: targetOutletId,
-              inventoryItemId: recipe.inventoryItemId,
-              quantity: -deductionQty,
+          const currentQty = stock ? Number(stock.quantity) : 0;
+          if (currentQty < deductionQty) {
+            throw new BadRequestException({
+              success: false,
+              message: `Stok bahan baku tidak mencukupi untuk menu "${item.productName || 'Menu'}" (${item.variantName || 'Varian'}). Dibutuhkan: ${deductionQty}, tersedia: ${currentQty}.`,
+              code: 'INSUFFICIENT_RAW_MATERIAL_STOCK',
             });
-          } else {
-            stock.quantity = Number(stock.quantity) - deductionQty;
           }
-          await stockRepo.save(stock);
+
+          stock!.quantity = currentQty - deductionQty;
+          await stockRepo.save(stock!);
 
           const movement = movementRepo.create({
             tenantId,
@@ -879,17 +879,17 @@ export class OrderService {
             },
           });
 
-          if (!stock) {
-            stock = stockRepo.create({
-              tenantId,
-              outletId: order.outletId,
-              inventoryItemId: recipe.inventoryItemId,
-              quantity: -deductionQty,
+          const currentQty = stock ? Number(stock.quantity) : 0;
+          if (currentQty < deductionQty) {
+            throw new BadRequestException({
+              success: false,
+              message: `Stok bahan baku tidak mencukupi untuk menu "${item.productName || 'Menu'}" (${item.variantName || 'Varian'}). Dibutuhkan: ${deductionQty}, tersedia: ${currentQty}.`,
+              code: 'INSUFFICIENT_RAW_MATERIAL_STOCK',
             });
-          } else {
-            stock.quantity = Number(stock.quantity) - deductionQty;
           }
-          await stockRepo.save(stock);
+
+          stock!.quantity = currentQty - deductionQty;
+          await stockRepo.save(stock!);
 
           const movement = movementRepo.create({
             tenantId,

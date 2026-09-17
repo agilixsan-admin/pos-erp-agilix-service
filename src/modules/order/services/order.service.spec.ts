@@ -338,6 +338,84 @@ describe('OrderService', () => {
       );
     });
 
+    it('throws BadRequestException if raw material stock is insufficient when creating order', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 25000,
+          tenantId: 'tenant-1',
+          product: { name: 'Americano' },
+        },
+      ]);
+
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => ({ ...o, id: 'ord-1' })),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => ({ ...i, id: 'item-1' })),
+        save: jest.fn((items: any[]) => Promise.resolve(items)),
+      };
+      const managerRecipeRepo = {
+        find: jest.fn().mockResolvedValue([
+          {
+            inventoryItemId: 'inv-coffee-beans',
+            quantity: 18,
+          },
+        ]),
+      };
+      const managerStockRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          inventoryItemId: 'inv-coffee-beans',
+          quantity: 5, // Needed: 36 (2 * 18), available: 5 -> insufficient!
+        }),
+        save: jest.fn(),
+      };
+
+      mockDataSource.transaction.mockImplementation(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              if (entityClass === Recipe) return managerRecipeRepo;
+              if (entityClass === InventoryStock) return managerStockRepo;
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                create: jest.fn((x: any) => x),
+                save: jest.fn((x: any) => Promise.resolve(x)),
+              };
+            },
+          });
+        },
+      );
+
+      await expect(
+        service.create('tenant-1', 'user-1', 'outlet-1', {
+          orderType: 'TAKE_AWAY',
+          items: [
+            {
+              variantId: 'var-1',
+              quantity: 2,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'INSUFFICIENT_RAW_MATERIAL_STOCK',
+          }),
+        }),
+      );
+    });
+
     it('applies tax and discount automatically according to operational settings', async () => {
       mockSettingsService.getSettings.mockResolvedValueOnce({
         taxEnabled: true,

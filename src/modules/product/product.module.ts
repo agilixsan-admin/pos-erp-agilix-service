@@ -4,6 +4,7 @@ import { Category } from './entities/category.entity';
 import { Product } from './entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { Recipe } from '../recipe/entities/recipe.entity';
+import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { AuditModule } from '../audit/audit.module';
 import { StorageModule } from '../storage/storage.module';
 import { CategoryService } from './services/category.service';
@@ -13,7 +14,13 @@ import { ProductController } from './controllers/product.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Category, Product, ProductVariant, Recipe]),
+    TypeOrmModule.forFeature([
+      Category,
+      Product,
+      ProductVariant,
+      Recipe,
+      InventoryStock,
+    ]),
     AuditModule,
     StorageModule,
   ],

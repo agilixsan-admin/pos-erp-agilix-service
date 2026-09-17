@@ -4,11 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
+import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 import {
@@ -26,15 +27,23 @@ export class ProductService {
     private readonly variantRepository: Repository<ProductVariant>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(InventoryStock)
+    private readonly inventoryStockRepository: Repository<InventoryStock>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly storageService: StorageService,
   ) {}
 
-  private mapProductWithMetrics(product: Product) {
+  private mapProductWithMetrics(
+    product: Product,
+    stockMap?: Map<string, number>,
+  ) {
     const variants = (product.variants || []).map((variant) => {
       let cogsRawMaterial = 0;
       let cogsPackaging = 0;
+      let isVariantOutOfStock = false;
+      let availableStock = Infinity;
+      const missingIngredients: string[] = [];
 
       if (variant.recipes && variant.recipes.length > 0) {
         for (const recipe of variant.recipes) {
@@ -47,8 +56,31 @@ export class ProductService {
           } else {
             cogsRawMaterial += itemCost;
           }
+
+          if (stockMap) {
+            const currentStock = stockMap.get(recipe.inventoryItemId) ?? 0;
+            if (currentStock <= 0 || currentStock < quantity) {
+              isVariantOutOfStock = true;
+              missingIngredients.push(
+                recipe.inventoryItem?.name || recipe.inventoryItemId,
+              );
+              availableStock = 0;
+            } else if (quantity > 0) {
+              const possiblePortions = Math.floor(currentStock / quantity);
+              if (possiblePortions < availableStock) {
+                availableStock = possiblePortions;
+              }
+            }
+          }
         }
       }
+
+      if (availableStock === Infinity) {
+        availableStock = 999;
+      }
+
+      const isAvailable = stockMap ? !isVariantOutOfStock : true;
+      const isOutOfStock = stockMap ? isVariantOutOfStock : false;
 
       cogsRawMaterial = Math.round(cogsRawMaterial * 100) / 100;
       cogsPackaging = Math.round(cogsPackaging * 100) / 100;
@@ -70,6 +102,13 @@ export class ProductService {
         totalCogs,
         profitMargin,
         profitMarginPercentage,
+        isAvailable,
+        isOutOfStock,
+        availableStock: stockMap ? availableStock : undefined,
+        missingIngredients:
+          stockMap && missingIngredients.length > 0
+            ? missingIngredients
+            : undefined,
       };
     });
 
@@ -86,6 +125,22 @@ export class ProductService {
       image = image.replace(/^htts:\/\//, 'https://');
     }
 
+    let isProductOutOfStock = false;
+    let isProductAvailable = true;
+    let productAvailableStock: number | undefined;
+
+    if (stockMap) {
+      if (variants.length > 0) {
+        const hasAnyAvailableVariant = variants.some((v) => v.isAvailable);
+        isProductOutOfStock = !hasAnyAvailableVariant;
+        isProductAvailable = hasAnyAvailableVariant;
+        productAvailableStock = Math.max(
+          ...variants.map((v) => v.availableStock ?? 0),
+          0,
+        );
+      }
+    }
+
     return {
       ...product,
       image,
@@ -97,6 +152,9 @@ export class ProductService {
       maxPrice,
       totalCogs: primaryVariant?.totalCogs || 0,
       profitMarginPercentage: primaryVariant?.profitMarginPercentage || 0,
+      isAvailable: isProductAvailable,
+      isOutOfStock: isProductOutOfStock,
+      availableStock: productAvailableStock,
     };
   }
 
@@ -140,7 +198,38 @@ export class ProductService {
 
     const [items, total] = await qb.getManyAndCount();
 
-    const data = items.map((product) => this.mapProductWithMetrics(product));
+    let stockMap: Map<string, number> | undefined;
+
+    if (query.outletId) {
+      const itemIds = new Set<string>();
+      for (const product of items) {
+        for (const variant of product.variants || []) {
+          for (const recipe of variant.recipes || []) {
+            if (recipe.inventoryItemId) {
+              itemIds.add(recipe.inventoryItemId);
+            }
+          }
+        }
+      }
+
+      stockMap = new Map<string, number>();
+      if (itemIds.size > 0) {
+        const stocks = await this.inventoryStockRepository.find({
+          where: {
+            tenantId,
+            outletId: query.outletId,
+            inventoryItemId: In(Array.from(itemIds)),
+          },
+        });
+        for (const s of stocks) {
+          stockMap.set(s.inventoryItemId, Number(s.quantity || 0));
+        }
+      }
+    }
+
+    const data = items.map((product) =>
+      this.mapProductWithMetrics(product, stockMap),
+    );
 
     return {
       data,
@@ -153,7 +242,7 @@ export class ProductService {
     };
   }
 
-  async findById(tenantId: string, id: string) {
+  async findById(tenantId: string, id: string, outletId?: string) {
     const product = await this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -174,7 +263,33 @@ export class ProductService {
       });
     }
 
-    return this.mapProductWithMetrics(product);
+    let stockMap: Map<string, number> | undefined;
+    if (outletId) {
+      const itemIds = new Set<string>();
+      for (const variant of product.variants || []) {
+        for (const recipe of variant.recipes || []) {
+          if (recipe.inventoryItemId) {
+            itemIds.add(recipe.inventoryItemId);
+          }
+        }
+      }
+
+      stockMap = new Map<string, number>();
+      if (itemIds.size > 0) {
+        const stocks = await this.inventoryStockRepository.find({
+          where: {
+            tenantId,
+            outletId,
+            inventoryItemId: In(Array.from(itemIds)),
+          },
+        });
+        for (const s of stocks) {
+          stockMap.set(s.inventoryItemId, Number(s.quantity || 0));
+        }
+      }
+    }
+
+    return this.mapProductWithMetrics(product, stockMap);
   }
 
   async create(tenantId: string, userId: string, dto: CreateProductDto) {
