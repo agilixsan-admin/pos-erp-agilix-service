@@ -70,7 +70,13 @@ export class PaymentService {
 
     order.status = 'COMPLETED';
     order.completedAt = new Date();
-    await orderRepo.save(order);
+    await orderRepo.update(
+      { id: order.id, tenantId: order.tenantId },
+      {
+        status: 'COMPLETED',
+        completedAt: order.completedAt,
+      },
+    );
 
     // Release table if order was assigned to a table
     if (order.tableId) {
@@ -88,7 +94,7 @@ export class PaymentService {
         action: 'PAYMENT_PROCESSED',
         tenantId: order.tenantId,
         actorType: userId ? 'USER' : 'SYSTEM',
-        actorId: userId ?? 'SYSTEM',
+        actorId: userId ?? null,
         metadata: {
           orderId: order.id,
           paymentId: payment.id,

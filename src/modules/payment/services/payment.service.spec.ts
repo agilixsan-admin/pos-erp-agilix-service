@@ -132,6 +132,7 @@ describe('PaymentService', () => {
       };
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const managerRecipeRepo = {
         find: jest.fn().mockResolvedValue([
@@ -223,6 +224,7 @@ describe('PaymentService', () => {
       };
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const managerAuditRepo = {
         save: jest.fn().mockResolvedValue({}),
@@ -282,6 +284,7 @@ describe('PaymentService', () => {
       };
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const managerRecipeRepo = {
         find: jest.fn().mockResolvedValue([]),
@@ -366,6 +369,7 @@ describe('PaymentService', () => {
       };
       const managerOrderRepo = {
         save: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const managerTableRepo = {
         findOne: jest.fn(),
