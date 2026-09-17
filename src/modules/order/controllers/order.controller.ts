@@ -11,6 +11,7 @@ import {
 import { OrderService } from '../services/order.service';
 import {
   AddOrderItemsDto,
+  ApplyOrderDiscountDto,
   CreateOrderDto,
   QueryOrderDto,
   UpdateOrderDto,
@@ -89,6 +90,26 @@ export class OrderController {
     return {
       success: true,
       message: 'Order updated successfully',
+      data,
+    };
+  }
+
+  @Put(':id/discount')
+  @Permissions('order.update')
+  async applyDiscount(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ApplyOrderDiscountDto,
+  ) {
+    const data = await this.orderService.applyDiscount(
+      user.tenantId,
+      user.id,
+      id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Discount applied to order successfully',
       data,
     };
   }

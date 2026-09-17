@@ -107,6 +107,17 @@ export class UpdateOrderDto {
   notes?: string;
 }
 
+export class ApplyOrderDiscountDto {
+  @IsOptional()
+  @IsUUID()
+  discountId?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number;
+}
+
 export class QueryOrderDto {
   @IsOptional()
   @Type(() => Number)

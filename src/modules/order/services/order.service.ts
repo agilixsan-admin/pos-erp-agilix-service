@@ -20,6 +20,7 @@ import { DiscountService } from '../../settings/services/discount.service';
 import { PackagingService } from '../../packaging/services/packaging.service';
 import {
   AddOrderItemsDto,
+  ApplyOrderDiscountDto,
   CreateOrderDto,
   QueryOrderDto,
   UpdateOrderDto,
@@ -562,6 +563,173 @@ export class OrderService {
     if (dto.notes !== undefined) order.notes = dto.notes;
 
     return this.orderRepository.save(order);
+  }
+
+  async applyDiscount(
+    tenantId: string,
+    userId: string,
+    orderId: string,
+    dto: ApplyOrderDiscountDto,
+  ): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, tenantId },
+      relations: { items: true, table: true, outlet: true, creator: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Order not found',
+        code: 'ORDER_NOT_FOUND',
+      });
+    }
+
+    if (order.status === 'COMPLETED' || order.status === 'PAID') {
+      throw new BadRequestException({
+        success: false,
+        message: 'Cannot apply discount to a paid/completed order',
+        code: 'ORDER_LOCKED',
+      });
+    }
+
+    if (order.status === 'VOID' || order.status === 'CANCELLED') {
+      throw new BadRequestException({
+        success: false,
+        message: `Cannot apply discount to an order with status ${order.status}`,
+        code: 'ORDER_INACTIVE',
+      });
+    }
+
+    const activeItems = (order.items || []).filter(
+      (item) => item.status !== 'VOID',
+    );
+
+    const calculatedSubtotal = activeItems.reduce(
+      (sum, item) => sum + Number(item.subtotal),
+      0,
+    );
+
+    let appliedDiscountId: string | null = null;
+    let discountAmount = 0;
+
+    if (dto.discountId) {
+      const discount = await this.discountService.findById(
+        tenantId,
+        dto.discountId,
+      );
+      if (discount.outletId && discount.outletId !== order.outletId) {
+        throw new BadRequestException({
+          success: false,
+          message: 'Discount does not belong to this outlet',
+          code: 'DISCOUNT_OUTLET_MISMATCH',
+        });
+      }
+      const activeCheck = this.discountService.isDiscountActive(
+        discount,
+        new Date(),
+        calculatedSubtotal,
+      );
+      if (!activeCheck.isValid) {
+        throw new BadRequestException({
+          success: false,
+          message: `Discount "${discount.name}" is not applicable: ${activeCheck.reason}`,
+          code: 'DISCOUNT_NOT_APPLICABLE',
+        });
+      }
+      appliedDiscountId = discount.id;
+      discountAmount = this.discountService.calculateDiscount(
+        discount,
+        activeItems.map((item) => ({
+          productId: item.productId,
+          unitPrice: Number(item.unitPrice || item.price || 0),
+          quantity: Number(item.quantity),
+        })),
+        calculatedSubtotal,
+      );
+    } else if (
+      dto.discountAmount !== undefined &&
+      Number(dto.discountAmount) > 0
+    ) {
+      appliedDiscountId = null;
+      discountAmount = Math.min(Number(dto.discountAmount), calculatedSubtotal);
+    } else {
+      appliedDiscountId = null;
+      discountAmount = 0;
+    }
+
+    const settings = await this.settingsService.getSettings(
+      tenantId,
+      order.outletId,
+    );
+
+    const packagingFee = Number(order.packagingFee ?? 0);
+    const baseDiscounted = Math.max(calculatedSubtotal - discountAmount, 0);
+
+    let serviceCharge = 0;
+    const isServiceApplicable =
+      Boolean(settings.serviceChargeEnabled) &&
+      (settings.serviceChargeApplicableTo !== 'DINE_IN' ||
+        order.orderType === 'DINE_IN');
+
+    if (
+      isServiceApplicable &&
+      Number(settings.serviceChargeRate || 0) > 0 &&
+      calculatedSubtotal > 0
+    ) {
+      serviceCharge = Math.round(
+        (baseDiscounted * Number(settings.serviceChargeRate)) / 100,
+      );
+    }
+
+    let taxAmount = 0;
+    let isInclusiveTax = false;
+    if (settings.taxEnabled && calculatedSubtotal > 0) {
+      const taxableBase = Math.max(baseDiscounted + serviceCharge, 0);
+      const activeTax = settings.defaultGlobalTax;
+      const rate = activeTax
+        ? Number(activeTax.rate)
+        : Number(settings.taxRate || 0);
+      const taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+
+      if (taxType === 'INCLUSIVE' && rate > 0) {
+        isInclusiveTax = true;
+        taxAmount = Math.round(taxableBase - taxableBase / (1 + rate / 100));
+      } else if (rate > 0) {
+        taxAmount = Math.round((taxableBase * rate) / 100);
+      }
+    }
+
+    const totalAmount = Math.max(
+      baseDiscounted +
+        serviceCharge +
+        packagingFee +
+        (isInclusiveTax ? 0 : taxAmount),
+      0,
+    );
+
+    order.discountId = appliedDiscountId;
+    order.discountAmount = discountAmount;
+    order.serviceCharge = serviceCharge;
+    order.taxAmount = taxAmount;
+    order.totalAmount = totalAmount;
+
+    await this.orderRepository.save(order);
+
+    await this.audit.record({
+      action: 'ORDER_DISCOUNT_APPLIED',
+      tenantId,
+      actorType: 'USER',
+      actorId: userId,
+      metadata: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        discountId: appliedDiscountId,
+        discountAmount,
+        totalAmount,
+      },
+    });
+
+    return order;
   }
 
   async void(

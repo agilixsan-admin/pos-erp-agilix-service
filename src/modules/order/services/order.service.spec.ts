@@ -1517,4 +1517,78 @@ describe('OrderService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('applyDiscount', () => {
+    it('applies discount to pending order and recalculates totals', async () => {
+      const order = {
+        id: 'ord-disc-test',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        orderType: 'DINE_IN',
+        subtotal: 100000,
+        discountAmount: 0,
+        serviceCharge: 5000,
+        taxAmount: 10500,
+        totalAmount: 115500,
+        items: [
+          {
+            id: 'it-1',
+            productId: 'p-1',
+            quantity: 1,
+            unitPrice: 100000,
+            subtotal: 100000,
+            status: 'ACTIVE',
+          },
+        ],
+      };
+
+      mockOrderRepo.findOne.mockResolvedValueOnce(order);
+      mockDiscountService.findById.mockResolvedValueOnce({
+        id: 'disc-10',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        name: 'Diskon 10rb',
+      });
+      mockDiscountService.isDiscountActive.mockReturnValueOnce({ isValid: true });
+      mockDiscountService.calculateDiscount.mockReturnValueOnce(10000);
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        serviceChargeEnabled: true,
+        serviceChargeRate: 5,
+        serviceChargeApplicableTo: 'DINE_IN',
+        taxEnabled: true,
+        taxRate: 10,
+        defaultGlobalTax: { name: 'PB1', rate: 10, type: 'EXCLUSIVE' },
+      });
+      mockOrderRepo.save.mockImplementationOnce((o) => Promise.resolve(o));
+
+      const updated = await service.applyDiscount('tenant-1', 'user-1', 'ord-disc-test', {
+        discountId: 'disc-10',
+      });
+
+      expect(updated.discountId).toBe('disc-10');
+      expect(updated.discountAmount).toBe(10000);
+      // Base discounted = 100000 - 10000 = 90000
+      // Service charge = 5% of 90000 = 4500
+      expect(updated.serviceCharge).toBe(4500);
+      // Taxable base = 90000 + 4500 = 94500 -> 10% tax = 9450
+      expect(updated.taxAmount).toBe(9450);
+      // Total = 90000 + 4500 + 9450 = 103950
+      expect(updated.totalAmount).toBe(103950);
+    });
+
+    it('throws BadRequestException if order is COMPLETED', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce({
+        id: 'ord-comp',
+        tenantId: 'tenant-1',
+        status: 'COMPLETED',
+      });
+
+      await expect(
+        service.applyDiscount('tenant-1', 'user-1', 'ord-comp', {
+          discountAmount: 5000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });
