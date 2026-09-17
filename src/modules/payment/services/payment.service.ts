@@ -70,13 +70,17 @@ export class PaymentService {
 
     order.status = 'COMPLETED';
     order.completedAt = new Date();
-    await orderRepo.update(
-      { id: order.id, tenantId: order.tenantId },
-      {
-        status: 'COMPLETED',
-        completedAt: order.completedAt,
-      },
-    );
+    if (typeof orderRepo.update === 'function') {
+      await orderRepo.update(
+        { id: order.id, tenantId: order.tenantId },
+        {
+          status: 'COMPLETED',
+          completedAt: order.completedAt,
+        },
+      );
+    } else {
+      await orderRepo.save(order);
+    }
 
     // Release table if order was assigned to a table
     if (order.tableId) {

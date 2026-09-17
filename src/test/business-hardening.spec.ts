@@ -451,6 +451,11 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         };
         const fakeOrderRepo = {
           save: jest.fn().mockImplementation((o) => Promise.resolve(o)),
+          update: jest
+            .fn()
+            .mockImplementation((_where, data) =>
+              Promise.resolve({ affected: 1, ...data }),
+            ),
         };
         const fakeTableRepo = {
           findOne: jest.fn().mockResolvedValue(availableTable),

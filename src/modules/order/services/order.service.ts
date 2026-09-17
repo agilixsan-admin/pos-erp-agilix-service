@@ -1001,16 +1001,20 @@ export class OrderService {
       order.packagingFee = packagingFee;
       order.totalAmount = totalAmount;
 
-      await orderRepo.update(
-        { id: order.id, tenantId },
-        {
-          subtotal: calculatedSubtotal,
-          discountAmount,
-          taxAmount,
-          packagingFee,
-          totalAmount,
-        },
-      );
+      if (typeof orderRepo.update === 'function') {
+        await orderRepo.update(
+          { id: order.id, tenantId },
+          {
+            subtotal: calculatedSubtotal,
+            discountAmount,
+            taxAmount,
+            packagingFee,
+            totalAmount,
+          },
+        );
+      } else {
+        await orderRepo.save(order);
+      }
 
       await this.audit.record(
         {
