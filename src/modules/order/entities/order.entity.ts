@@ -76,6 +76,30 @@ export class Order {
   taxAmount!: number;
 
   @Column({
+    name: 'service_charge',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
+  serviceCharge!: number;
+
+  @Column({ name: 'tax_name', type: 'varchar', length: 100, nullable: true })
+  taxName!: string | null;
+
+  @Column({
+    name: 'tax_rate',
+    type: 'numeric',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  taxRate!: number | null;
+
+  @Column({ name: 'tax_type', type: 'varchar', length: 20, nullable: true })
+  taxType!: string | null;
+
+  @Column({
     name: 'packaging_fee',
     type: 'decimal',
     precision: 12,

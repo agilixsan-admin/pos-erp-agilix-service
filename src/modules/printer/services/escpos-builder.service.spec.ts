@@ -108,6 +108,30 @@ describe('EscPosBuilderService', () => {
       expect(result.rawText).toContain('TAKE AWAY');
       expect(result.buffer.length).toBeGreaterThan(0);
     });
+
+    it('prints service charge and dynamic tax name on receipt', () => {
+      const order = {
+        id: 'order-sc-tax',
+        orderNumber: 'ORD-2026-SC',
+        orderType: 'DINE_IN',
+        subtotal: 100000,
+        serviceCharge: 5000,
+        taxAmount: 10500,
+        taxName: 'PBJT Resto',
+        totalAmount: 115500,
+        createdAt: new Date(),
+        items: [],
+      } as unknown as Order;
+
+      const result = service.buildReceipt({
+        order,
+        paperSize: '58mm',
+      });
+
+      expect(result.rawText).toContain('Service Charge');
+      expect(result.rawText).toContain('PBJT Resto');
+      expect(result.rawText).toContain('115.500');
+    });
   });
 
   describe('buildKitchenTicket', () => {

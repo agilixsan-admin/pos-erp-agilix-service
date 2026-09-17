@@ -300,6 +300,10 @@ export class TaxService {
       enableTaxCalculation: settings.taxEnabled,
       defaultGlobalTaxId: settings.defaultGlobalTaxId,
       defaultGlobalTax: settings.defaultGlobalTax ?? null,
+      serviceChargeEnabled: settings.serviceChargeEnabled ?? false,
+      serviceChargeRate: Number(settings.serviceChargeRate ?? 0),
+      serviceChargeName: settings.serviceChargeName ?? 'Service Charge',
+      serviceChargeApplicableTo: settings.serviceChargeApplicableTo ?? 'ALL',
     };
   }
 
@@ -342,6 +346,19 @@ export class TaxService {
 
     settings.taxEnabled = dto.enableTaxCalculation;
     settings.defaultGlobalTaxId = dto.defaultGlobalTaxId ?? null;
+
+    if (dto.serviceChargeEnabled !== undefined) {
+      settings.serviceChargeEnabled = dto.serviceChargeEnabled;
+    }
+    if (dto.serviceChargeRate !== undefined) {
+      settings.serviceChargeRate = dto.serviceChargeRate;
+    }
+    if (dto.serviceChargeName !== undefined) {
+      settings.serviceChargeName = dto.serviceChargeName;
+    }
+    if (dto.serviceChargeApplicableTo !== undefined) {
+      settings.serviceChargeApplicableTo = dto.serviceChargeApplicableTo;
+    }
 
     if (selectedTax) {
       settings.taxRate = Number(selectedTax.rate);

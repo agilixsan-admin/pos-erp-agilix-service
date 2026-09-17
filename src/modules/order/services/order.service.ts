@@ -204,27 +204,47 @@ export class OrderService {
       );
     }
 
+    const baseDiscounted = Math.max(calculatedSubtotal - discountAmount, 0);
+
+    let serviceCharge = 0;
+    const isServiceApplicable =
+      Boolean(settings.serviceChargeEnabled) &&
+      (settings.serviceChargeApplicableTo !== 'DINE_IN' || orderType === 'DINE_IN');
+
+    if (isServiceApplicable && Number(settings.serviceChargeRate || 0) > 0) {
+      serviceCharge = Math.round(
+        (baseDiscounted * Number(settings.serviceChargeRate)) / 100,
+      );
+    }
+
     let taxAmount = 0;
     let isInclusiveTax = false;
+    let taxName: string | null = null;
+    let taxRate: number | null = null;
+    let taxType: 'INCLUSIVE' | 'EXCLUSIVE' | null = null;
+
     if (settings.taxEnabled) {
-      const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+      const taxableBase = Math.max(baseDiscounted + serviceCharge, 0);
       const activeTax = settings.defaultGlobalTax;
-      const rate = activeTax
+      taxRate = activeTax
         ? Number(activeTax.rate)
         : Number(settings.taxRate || 0);
-      const taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+      taxType = activeTax
+        ? (activeTax.type as 'INCLUSIVE' | 'EXCLUSIVE')
+        : 'EXCLUSIVE';
+      taxName = activeTax ? activeTax.name : (settings.taxName || 'Pajak');
 
-      if (taxType === 'INCLUSIVE' && rate > 0) {
+      if (taxType === 'INCLUSIVE' && taxRate > 0) {
         isInclusiveTax = true;
-        taxAmount = Math.round(taxableBase - taxableBase / (1 + rate / 100));
-      } else if (rate > 0) {
-        taxAmount = Math.round((taxableBase * rate) / 100);
+        taxAmount = Math.round(taxableBase - taxableBase / (1 + taxRate / 100));
+      } else if (taxRate > 0) {
+        taxAmount = Math.round((taxableBase * taxRate) / 100);
       }
     }
 
     const totalAmount = Math.max(
-      calculatedSubtotal -
-        discountAmount +
+      baseDiscounted +
+        serviceCharge +
         packagingFee +
         (isInclusiveTax ? 0 : taxAmount),
       0,
@@ -278,7 +298,11 @@ export class OrderService {
         subtotal: calculatedSubtotal,
         discountAmount,
         discountId: appliedDiscountId,
+        serviceCharge,
         taxAmount,
+        taxName,
+        taxRate,
+        taxType,
         packagingFee,
         totalAmount,
         notes: dto.notes ?? null,
@@ -697,10 +721,28 @@ export class OrderService {
         packagingFee = 0;
       }
 
+      const baseDiscounted = Math.max(calculatedSubtotal - discountAmount, 0);
+
+      let serviceCharge = 0;
+      const isServiceApplicable =
+        Boolean(settings.serviceChargeEnabled) &&
+        (settings.serviceChargeApplicableTo !== 'DINE_IN' ||
+          order.orderType === 'DINE_IN');
+
+      if (
+        isServiceApplicable &&
+        Number(settings.serviceChargeRate || 0) > 0 &&
+        calculatedSubtotal > 0
+      ) {
+        serviceCharge = Math.round(
+          (baseDiscounted * Number(settings.serviceChargeRate)) / 100,
+        );
+      }
+
       let taxAmount = 0;
       let isInclusiveTax = false;
       if (settings.taxEnabled && calculatedSubtotal > 0) {
-        const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+        const taxableBase = Math.max(baseDiscounted + serviceCharge, 0);
         const activeTax = settings.defaultGlobalTax;
         const rate = activeTax
           ? Number(activeTax.rate)
@@ -716,8 +758,8 @@ export class OrderService {
       }
 
       const totalAmount = Math.max(
-        calculatedSubtotal -
-          discountAmount +
+        baseDiscounted +
+          serviceCharge +
           packagingFee +
           (isInclusiveTax ? 0 : taxAmount),
         0,
@@ -725,6 +767,7 @@ export class OrderService {
 
       order.subtotal = calculatedSubtotal;
       order.discountAmount = discountAmount;
+      order.serviceCharge = serviceCharge;
       order.taxAmount = taxAmount;
       order.packagingFee = packagingFee;
       order.totalAmount = totalAmount;
@@ -968,10 +1011,28 @@ export class OrderService {
 
       const packagingFee = Number(order.packagingFee ?? 0);
 
+      const baseDiscounted = Math.max(calculatedSubtotal - discountAmount, 0);
+
+      let serviceCharge = 0;
+      const isServiceApplicable =
+        Boolean(settings.serviceChargeEnabled) &&
+        (settings.serviceChargeApplicableTo !== 'DINE_IN' ||
+          order.orderType === 'DINE_IN');
+
+      if (
+        isServiceApplicable &&
+        Number(settings.serviceChargeRate || 0) > 0 &&
+        calculatedSubtotal > 0
+      ) {
+        serviceCharge = Math.round(
+          (baseDiscounted * Number(settings.serviceChargeRate)) / 100,
+        );
+      }
+
       let taxAmount = 0;
       let isInclusiveTax = false;
       if (settings.taxEnabled && calculatedSubtotal > 0) {
-        const taxableBase = Math.max(calculatedSubtotal - discountAmount, 0);
+        const taxableBase = Math.max(baseDiscounted + serviceCharge, 0);
         const activeTax = settings.defaultGlobalTax;
         const rate = activeTax
           ? Number(activeTax.rate)
@@ -987,8 +1048,8 @@ export class OrderService {
       }
 
       const totalAmount = Math.max(
-        calculatedSubtotal -
-          discountAmount +
+        baseDiscounted +
+          serviceCharge +
           packagingFee +
           (isInclusiveTax ? 0 : taxAmount),
         0,
@@ -997,6 +1058,7 @@ export class OrderService {
       order.items = allActiveItems;
       order.subtotal = calculatedSubtotal;
       order.discountAmount = discountAmount;
+      order.serviceCharge = serviceCharge;
       order.taxAmount = taxAmount;
       order.packagingFee = packagingFee;
       order.totalAmount = totalAmount;
@@ -1007,6 +1069,7 @@ export class OrderService {
           {
             subtotal: calculatedSubtotal,
             discountAmount,
+            serviceCharge,
             taxAmount,
             packagingFee,
             totalAmount,

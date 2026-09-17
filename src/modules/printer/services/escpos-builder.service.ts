@@ -212,8 +212,18 @@ export class EscPosBuilderService {
         ),
       );
     }
+    const serviceCharge = Number(data.order.serviceCharge || 0);
+    if (serviceCharge > 0) {
+      append(
+        this.padTwoColumns(
+          'Service Charge',
+          this.formatCurrency(serviceCharge),
+          width,
+        ),
+      );
+    }
     if (taxAmount > 0) {
-      const taxLabel = data.taxName || 'Pajak';
+      const taxLabel = data.order.taxName || data.taxName || 'Pajak';
       append(
         this.padTwoColumns(taxLabel, this.formatCurrency(taxAmount), width),
       );

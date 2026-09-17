@@ -303,6 +303,29 @@ describe('TaxService', () => {
       expect(result.enableTaxCalculation).toBe(true);
     });
 
+    it('updates service charge configuration', async () => {
+      mockSettingsRepo.findOne.mockResolvedValue({
+        tenantId: 'tenant-1',
+        taxEnabled: false,
+      });
+      mockSettingsRepo.save.mockImplementation((s) => Promise.resolve(s));
+
+      const result = await service.updateGlobalConfig('tenant-1', 'user-1', {
+        serviceChargeEnabled: true,
+        serviceChargeRate: 5,
+        serviceChargeName: 'Biaya Layanan',
+        serviceChargeApplicableTo: 'DINE_IN',
+      });
+
+      expect(mockAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'GLOBAL_TAX_CONFIG_UPDATED' }),
+      );
+      expect(result.serviceChargeEnabled).toBe(true);
+      expect(result.serviceChargeRate).toBe(5);
+      expect(result.serviceChargeName).toBe('Biaya Layanan');
+      expect(result.serviceChargeApplicableTo).toBe('DINE_IN');
+    });
+
     it('throws BadRequestException when trying to set an INACTIVE tax as active global tax', async () => {
       mockSettingsRepo.findOne.mockResolvedValue({ tenantId: 'tenant-1' });
       mockTaxRepo.findOne.mockResolvedValue({

@@ -45,6 +45,34 @@ export class PosSettings {
   @Column({ name: 'tax_name', type: 'varchar', length: 50, default: 'PB1' })
   taxName!: string;
 
+  @Column({ name: 'service_charge_enabled', default: false })
+  serviceChargeEnabled!: boolean;
+
+  @Column({
+    name: 'service_charge_rate',
+    type: 'numeric',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
+  serviceChargeRate!: number;
+
+  @Column({
+    name: 'service_charge_name',
+    type: 'varchar',
+    length: 100,
+    default: 'Service Charge',
+  })
+  serviceChargeName!: string;
+
+  @Column({
+    name: 'service_charge_applicable_to',
+    type: 'varchar',
+    length: 20,
+    default: 'ALL',
+  })
+  serviceChargeApplicableTo!: 'ALL' | 'DINE_IN';
+
   @Column({ name: 'discount_enabled', default: false })
   discountEnabled!: boolean;
 

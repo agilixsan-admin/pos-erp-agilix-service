@@ -629,6 +629,160 @@ describe('OrderService', () => {
       expect(createdOrder?.['totalAmount']).toBe(111000);
     });
 
+    it('calculates service charge and tax on subtotal + service charge for DINE_IN', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        serviceChargeEnabled: true,
+        serviceChargeRate: 5,
+        serviceChargeApplicableTo: 'DINE_IN',
+        taxEnabled: true,
+        taxRate: 10,
+        taxName: 'PB1',
+        defaultGlobalTax: { name: 'PB1 Resto', rate: 10, type: 'EXCLUSIVE' },
+        discountEnabled: false,
+      });
+
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 100000,
+          tenantId: 'tenant-1',
+          product: { name: 'Pizza' },
+        },
+      ]);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      mockDataSource.transaction.mockImplementationOnce(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entity: unknown) => {
+              if (entity === Order) {
+                return {
+                  create: jest.fn((o: Record<string, unknown>) => {
+                    createdOrder = o;
+                    return { ...o, id: 'ord-sc-1' };
+                  }),
+                  save: jest.fn((o: Record<string, unknown>) =>
+                    Promise.resolve(o),
+                  ),
+                  findOne: jest.fn().mockResolvedValue({ id: 'ord-sc-1' }),
+                };
+              }
+              if (entity === OrderItem) {
+                return {
+                  create: jest.fn((i: Record<string, unknown>) => i),
+                  save: jest.fn((i: Record<string, unknown>[]) =>
+                    Promise.resolve(i),
+                  ),
+                };
+              }
+              return {
+                findOne: jest.fn().mockResolvedValue(null),
+                find: jest.fn().mockResolvedValue([]),
+                save: jest.fn().mockResolvedValue({}),
+              };
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        orderType: 'DINE_IN',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(100000);
+      // Service charge = 5% of 100000 = 5000
+      expect(createdOrder?.['serviceCharge']).toBe(5000);
+      // Taxable base = 100000 + 5000 = 105000 -> 10% tax = 10500
+      expect(createdOrder?.['taxAmount']).toBe(10500);
+      expect(createdOrder?.['taxName']).toBe('PB1 Resto');
+      expect(createdOrder?.['taxRate']).toBe(10);
+      expect(createdOrder?.['taxType']).toBe('EXCLUSIVE');
+      // Total = 100000 + 5000 + 10500 = 115500
+      expect(createdOrder?.['totalAmount']).toBe(115500);
+    });
+
+    it('skips service charge for TAKE_AWAY when applicableTo is DINE_IN', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        serviceChargeEnabled: true,
+        serviceChargeRate: 5,
+        serviceChargeApplicableTo: 'DINE_IN',
+        taxEnabled: true,
+        defaultGlobalTax: { name: 'PPN', rate: 10, type: 'EXCLUSIVE' },
+        discountEnabled: false,
+      });
+
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 100000,
+          tenantId: 'tenant-1',
+          product: { name: 'Burger' },
+        },
+      ]);
+
+      let createdOrder: Record<string, unknown> | null = null;
+      mockDataSource.transaction.mockImplementationOnce(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entity: unknown) => {
+              if (entity === Order) {
+                return {
+                  create: jest.fn((o: Record<string, unknown>) => {
+                    createdOrder = o;
+                    return { ...o, id: 'ord-sc-2' };
+                  }),
+                  save: jest.fn((o: Record<string, unknown>) =>
+                    Promise.resolve(o),
+                  ),
+                  findOne: jest.fn().mockResolvedValue({ id: 'ord-sc-2' }),
+                };
+              }
+              if (entity === OrderItem) {
+                return {
+                  create: jest.fn((i: Record<string, unknown>) => i),
+                  save: jest.fn((i: Record<string, unknown>[]) =>
+                    Promise.resolve(i),
+                  ),
+                };
+              }
+              return {
+                findOne: jest.fn().mockResolvedValue(null),
+                find: jest.fn().mockResolvedValue([]),
+                save: jest.fn().mockResolvedValue({}),
+              };
+            },
+          });
+        },
+      );
+
+      await service.create('tenant-1', 'user-1', 'outlet-1', {
+        orderType: 'TAKE_AWAY',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(createdOrder).not.toBeNull();
+      expect(createdOrder?.['subtotal']).toBe(100000);
+      expect(createdOrder?.['serviceCharge']).toBe(0);
+      // Taxable base = 100000 -> 10% tax = 10000
+      expect(createdOrder?.['taxAmount']).toBe(10000);
+      expect(createdOrder?.['taxName']).toBe('PPN');
+      expect(createdOrder?.['totalAmount']).toBe(110000);
+    });
+
     it('creates TAKE_AWAY order with automatically calculated packaging fee', async () => {
       mockOutletRepo.findOne.mockResolvedValue({
         id: 'outlet-1',

@@ -117,6 +117,26 @@ export class UpdateGlobalTaxConfigDto {
   defaultGlobalTaxId?: string | null;
 
   @IsOptional()
+  @IsBoolean()
+  serviceChargeEnabled?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  serviceChargeRate?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  serviceChargeName?: string;
+
+  @IsOptional()
+  @IsIn(['ALL', 'DINE_IN'])
+  serviceChargeApplicableTo?: 'ALL' | 'DINE_IN';
+
+  @IsOptional()
   @IsUUID()
   outletId?: string;
 }

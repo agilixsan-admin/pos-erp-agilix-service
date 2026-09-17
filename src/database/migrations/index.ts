@@ -26,6 +26,7 @@ import { CreateEmailTemplatesAndUserInvitations1700000000024 } from './170000000
 import { FixCategorySoftDeleteUniqueConstraint1700000000025 } from './1700000000025-FixCategorySoftDeleteUniqueConstraint';
 import { AddSectionToTables1700000000026 } from './1700000000026-AddSectionToTables';
 import { FixHttsSchemeInImageUrls1700000000027 } from './1700000000027-FixHttsSchemeInImageUrls';
+import { AddServiceChargeAndTaxDetails1700000000028 } from './1700000000028-AddServiceChargeAndTaxDetails';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -56,4 +57,5 @@ export const ALL_MIGRATIONS = [
   FixCategorySoftDeleteUniqueConstraint1700000000025,
   AddSectionToTables1700000000026,
   FixHttsSchemeInImageUrls1700000000027,
+  AddServiceChargeAndTaxDetails1700000000028,
 ];

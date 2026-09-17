@@ -70,6 +70,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  serviceCharge?: number = 0;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   taxAmount?: number = 0;
 
   @IsOptional()
