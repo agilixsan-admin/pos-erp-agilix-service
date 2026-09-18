@@ -13,6 +13,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
+import { OutletProduct } from '../../product/entities/outlet-product.entity';
 import { Table } from '../../table/entities/table.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
@@ -43,6 +44,8 @@ export class OrderService {
     private readonly outletRepository: Repository<Outlet>,
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
+    @InjectRepository(OutletProduct)
+    private readonly outletProductRepository: Repository<OutletProduct>,
     @InjectRepository(Table)
     private readonly tableRepository: Repository<Table>,
     private readonly dataSource: DataSource,
@@ -97,6 +100,31 @@ export class OrderService {
         message:
           'One or more product variants do not exist or belong to another tenant',
         code: 'INVALID_VARIANTS',
+      });
+    }
+
+    const productIds = Array.from(new Set(variants.map((v) => v.productId)));
+    const inactiveOutletProducts = await this.outletProductRepository.find({
+      where: {
+        tenantId,
+        outletId: targetOutletId,
+        productId: In(productIds),
+        isActive: false,
+      },
+    });
+
+    if (inactiveOutletProducts.length > 0) {
+      const inactiveProductIds = new Set(
+        inactiveOutletProducts.map((op) => op.productId),
+      );
+      const inactiveVariant = variants.find((v) =>
+        inactiveProductIds.has(v.productId),
+      );
+      const productName = inactiveVariant?.product?.name || 'Produk';
+      throw new BadRequestException({
+        success: false,
+        message: `Menu "${productName}" sedang dinonaktifkan di outlet ini`,
+        code: 'PRODUCT_INACTIVE_IN_OUTLET',
       });
     }
 
@@ -1166,6 +1194,31 @@ export class OrderService {
         message:
           'One or more product variants do not exist or belong to another tenant',
         code: 'INVALID_VARIANTS',
+      });
+    }
+
+    const productIds = Array.from(new Set(variants.map((v) => v.productId)));
+    const inactiveOutletProducts = await this.outletProductRepository.find({
+      where: {
+        tenantId,
+        outletId: order.outletId,
+        productId: In(productIds),
+        isActive: false,
+      },
+    });
+
+    if (inactiveOutletProducts.length > 0) {
+      const inactiveProductIds = new Set(
+        inactiveOutletProducts.map((op) => op.productId),
+      );
+      const inactiveVariant = variants.find((v) =>
+        inactiveProductIds.has(v.productId),
+      );
+      const productName = inactiveVariant?.product?.name || 'Produk';
+      throw new BadRequestException({
+        success: false,
+        message: `Menu "${productName}" sedang dinonaktifkan di outlet ini`,
+        code: 'PRODUCT_INACTIVE_IN_OUTLET',
       });
     }
 

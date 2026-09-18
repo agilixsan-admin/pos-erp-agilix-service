@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
@@ -189,4 +190,25 @@ export class QueryProductsDto {
   @IsString()
   @IsIn(['ASC', 'DESC', 'asc', 'desc'])
   sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC';
+}
+
+export class UpdateProductOutletAvailabilityDto {
+  @IsUUID()
+  outletId!: string;
+
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+export class BatchUpdateOutletProductAvailabilityDto {
+  @IsUUID()
+  outletId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('all', { each: true })
+  productIds!: string[];
+
+  @IsBoolean()
+  isActive!: boolean;
 }

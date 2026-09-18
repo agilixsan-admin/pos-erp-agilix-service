@@ -15,9 +15,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 
 import { ProductService } from '../services/product.service';
 import {
+  BatchUpdateOutletProductAvailabilityDto,
   CreateProductDto,
   QueryProductsDto,
   UpdateProductDto,
+  UpdateProductOutletAvailabilityDto,
 } from '../dto/product.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -64,6 +66,61 @@ export class ProductController {
     return {
       success: true,
       message: 'Product created successfully',
+      data,
+    };
+  }
+
+  @Put('outlet-availability/batch')
+  @Permissions('product.update')
+  async batchUpdateOutletAvailability(
+    @CurrentUser() user: User,
+    @Body() dto: BatchUpdateOutletProductAvailabilityDto,
+  ) {
+    const data = await this.productService.batchUpdateOutletAvailability(
+      user.tenantId,
+      dto,
+      user.id,
+    );
+    return {
+      success: true,
+      message: 'Batch outlet availability updated successfully',
+      data,
+    };
+  }
+
+  @Get(':id/outlet-availability')
+  @Permissions('product.read')
+  async getOutletAvailability(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.productService.getOutletAvailability(
+      user.tenantId,
+      id,
+    );
+    return {
+      success: true,
+      message: 'Product outlet availability retrieved successfully',
+      data,
+    };
+  }
+
+  @Put(':id/outlet-availability')
+  @Permissions('product.update')
+  async updateOutletAvailability(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductOutletAvailabilityDto,
+  ) {
+    const data = await this.productService.updateOutletAvailability(
+      user.tenantId,
+      id,
+      dto,
+      user.id,
+    );
+    return {
+      success: true,
+      message: 'Product outlet availability updated successfully',
       data,
     };
   }

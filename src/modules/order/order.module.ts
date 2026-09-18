@@ -5,6 +5,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { Void } from './entities/void.entity';
 import { Outlet } from '../outlet/outlet.entity';
 import { ProductVariant } from '../product/entities/product-variant.entity';
+import { OutletProduct } from '../product/entities/outlet-product.entity';
 import { Table } from '../table/entities/table.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
@@ -20,6 +21,7 @@ import { OrderController } from './controllers/order.controller';
       Void,
       Outlet,
       ProductVariant,
+      OutletProduct,
       Table,
     ]),
     AuditModule,

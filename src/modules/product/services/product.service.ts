@@ -10,12 +10,16 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { Category } from '../entities/category.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
+import { OutletProduct } from '../entities/outlet-product.entity';
+import { Outlet } from '../../outlet/outlet.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 import {
+  BatchUpdateOutletProductAvailabilityDto,
   CreateProductDto,
   QueryProductsDto,
   UpdateProductDto,
+  UpdateProductOutletAvailabilityDto,
 } from '../dto/product.dto';
 
 @Injectable()
@@ -29,6 +33,10 @@ export class ProductService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(InventoryStock)
     private readonly inventoryStockRepository: Repository<InventoryStock>,
+    @InjectRepository(OutletProduct)
+    private readonly outletProductRepository: Repository<OutletProduct>,
+    @InjectRepository(Outlet)
+    private readonly outletRepository: Repository<Outlet>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly storageService: StorageService,
@@ -37,6 +45,7 @@ export class ProductService {
   private mapProductWithMetrics(
     product: Product,
     stockMap?: Map<string, number>,
+    isOutletActive?: boolean,
   ) {
     const variants = (product.variants || []).map((variant) => {
       let cogsRawMaterial = 0;
@@ -152,9 +161,10 @@ export class ProductService {
       maxPrice,
       totalCogs: primaryVariant?.totalCogs || 0,
       profitMarginPercentage: primaryVariant?.profitMarginPercentage || 0,
-      isAvailable: isProductAvailable,
+      isAvailable: isOutletActive === false ? false : isProductAvailable,
       isOutOfStock: isProductOutOfStock,
       availableStock: productAvailableStock,
+      isOutletActive: isOutletActive ?? true,
     };
   }
 
@@ -199,6 +209,7 @@ export class ProductService {
     const [items, total] = await qb.getManyAndCount();
 
     let stockMap: Map<string, number> | undefined;
+    let outletActiveMap: Map<string, boolean> | undefined;
 
     if (query.outletId) {
       const itemIds = new Set<string>();
@@ -225,10 +236,33 @@ export class ProductService {
           stockMap.set(s.inventoryItemId, Number(s.quantity || 0));
         }
       }
+
+      outletActiveMap = new Map<string, boolean>();
+      const productIds = items.map((p) => p.id);
+      if (productIds.length > 0) {
+        const ops = await this.outletProductRepository.find({
+          where: {
+            tenantId,
+            outletId: query.outletId,
+            productId: In(productIds),
+          },
+        });
+        for (const op of ops) {
+          outletActiveMap.set(op.productId, op.isActive);
+        }
+      }
     }
 
     const data = items.map((product) =>
-      this.mapProductWithMetrics(product, stockMap),
+      this.mapProductWithMetrics(
+        product,
+        stockMap,
+        outletActiveMap
+          ? (outletActiveMap.has(product.id)
+            ? outletActiveMap.get(product.id)
+            : true)
+          : undefined,
+      ),
     );
 
     return {
@@ -264,6 +298,7 @@ export class ProductService {
     }
 
     let stockMap: Map<string, number> | undefined;
+    let isOutletActive: boolean | undefined;
     if (outletId) {
       const itemIds = new Set<string>();
       for (const variant of product.variants || []) {
@@ -287,9 +322,14 @@ export class ProductService {
           stockMap.set(s.inventoryItemId, Number(s.quantity || 0));
         }
       }
+
+      const op = await this.outletProductRepository.findOne({
+        where: { tenantId, outletId, productId: id },
+      });
+      isOutletActive = op ? op.isActive : true;
     }
 
-    return this.mapProductWithMetrics(product, stockMap);
+    return this.mapProductWithMetrics(product, stockMap, isOutletActive);
   }
 
   async create(tenantId: string, userId: string, dto: CreateProductDto) {
@@ -634,5 +674,172 @@ export class ProductService {
     return {
       product,
     };
+  }
+
+  async getOutletAvailability(tenantId: string, productId: string) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, tenantId },
+    });
+    if (!product) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND',
+      });
+    }
+
+    const outlets = await this.outletRepository.find({
+      where: { tenantId },
+      order: { name: 'ASC' },
+    });
+
+    const overrides = await this.outletProductRepository.find({
+      where: { tenantId, productId },
+    });
+
+    const overrideMap = new Map<string, boolean>();
+    for (const op of overrides) {
+      overrideMap.set(op.outletId, op.isActive);
+    }
+
+    return outlets.map((outlet) => ({
+      outletId: outlet.id,
+      outletName: outlet.name,
+      outletCode: outlet.code,
+      isActive: overrideMap.has(outlet.id) ? overrideMap.get(outlet.id)! : true,
+    }));
+  }
+
+  async updateOutletAvailability(
+    tenantId: string,
+    productId: string,
+    dto: UpdateProductOutletAvailabilityDto,
+    actorId?: string,
+  ) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, tenantId },
+    });
+    if (!product) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Product not found',
+        code: 'PRODUCT_NOT_FOUND',
+      });
+    }
+
+    const outlet = await this.outletRepository.findOne({
+      where: { id: dto.outletId, tenantId },
+    });
+    if (!outlet) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Outlet not found',
+        code: 'OUTLET_NOT_FOUND',
+      });
+    }
+
+    let outletProduct = await this.outletProductRepository.findOne({
+      where: { tenantId, outletId: dto.outletId, productId },
+    });
+
+    if (outletProduct) {
+      outletProduct.isActive = dto.isActive;
+    } else {
+      outletProduct = this.outletProductRepository.create({
+        tenantId,
+        outletId: dto.outletId,
+        productId,
+        isActive: dto.isActive,
+      });
+    }
+
+    const saved = await this.outletProductRepository.save(outletProduct);
+
+    await this.audit.record({
+      action: 'PRODUCT_OUTLET_AVAILABILITY_UPDATE',
+      tenantId,
+      actorType: 'USER',
+      actorId,
+      metadata: {
+        productId,
+        productName: product.name,
+        outletId: dto.outletId,
+        outletName: outlet.name,
+        isActive: dto.isActive,
+      },
+    });
+
+    return {
+      productId,
+      outletId: dto.outletId,
+      isActive: saved.isActive,
+    };
+  }
+
+  async batchUpdateOutletAvailability(
+    tenantId: string,
+    dto: BatchUpdateOutletProductAvailabilityDto,
+    actorId?: string,
+  ) {
+    const outlet = await this.outletRepository.findOne({
+      where: { id: dto.outletId, tenantId },
+    });
+    if (!outlet) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Outlet not found',
+        code: 'OUTLET_NOT_FOUND',
+      });
+    }
+
+    if (!dto.productIds || dto.productIds.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    const products = await this.productRepository.find({
+      where: { id: In(dto.productIds), tenantId },
+      select: ['id', 'name'],
+    });
+
+    const validProductIds = products.map((p) => p.id);
+    if (validProductIds.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const opRepo = manager.getRepository(OutletProduct);
+      for (const pId of validProductIds) {
+        let op = await opRepo.findOne({
+          where: { tenantId, outletId: dto.outletId, productId: pId },
+        });
+        if (op) {
+          op.isActive = dto.isActive;
+          await opRepo.save(op);
+        } else {
+          op = opRepo.create({
+            tenantId,
+            outletId: dto.outletId,
+            productId: pId,
+            isActive: dto.isActive,
+          });
+          await opRepo.save(op);
+        }
+      }
+    });
+
+    await this.audit.record({
+      action: 'PRODUCT_OUTLET_AVAILABILITY_BATCH_UPDATE',
+      tenantId,
+      actorType: 'USER',
+      actorId,
+      metadata: {
+        outletId: dto.outletId,
+        outletName: outlet.name,
+        productCount: validProductIds.length,
+        isActive: dto.isActive,
+      },
+    });
+
+    return { updatedCount: validProductIds.length };
   }
 }

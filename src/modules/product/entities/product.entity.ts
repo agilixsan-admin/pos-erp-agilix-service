@@ -63,4 +63,7 @@ export class Product {
     cascade: true,
   })
   variants!: ProductVariant[];
+
+  @OneToMany('OutletProduct', (op: any) => op.product)
+  outletProducts!: any[];
 }

@@ -14,6 +14,8 @@ import { Category } from '../entities/category.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
+import { OutletProduct } from '../entities/outlet-product.entity';
+import { Outlet } from '../../outlet/outlet.entity';
 
 describe('ProductService', () => {
   let service: ProductService;
@@ -23,6 +25,7 @@ describe('ProductService', () => {
     create: jest.fn(),
     save: jest.fn(),
     softRemove: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
   };
   const mockVariantRepo = {
     create: jest.fn(),
@@ -35,6 +38,16 @@ describe('ProductService', () => {
   };
   const mockInventoryStockRepo = {
     find: jest.fn(),
+    findOne: jest.fn(),
+  };
+  const mockOutletProductRepo = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn(),
+    create: jest.fn((dto: any) => dto),
+    save: jest.fn((dto: any) => Promise.resolve({ id: 'op-1', ...dto })),
+  };
+  const mockOutletRepo = {
+    find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn(),
   };
   const mockDataSource = {
@@ -68,6 +81,14 @@ describe('ProductService', () => {
         {
           provide: getRepositoryToken(InventoryStock),
           useValue: mockInventoryStockRepo,
+        },
+        {
+          provide: getRepositoryToken(OutletProduct),
+          useValue: mockOutletProductRepo,
+        },
+        {
+          provide: getRepositoryToken(Outlet),
+          useValue: mockOutletRepo,
         },
         {
           provide: DataSource,
@@ -530,4 +551,110 @@ describe('ProductService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('Outlet Availability', () => {
+    it('getOutletAvailability returns list of outlets with active status', async () => {
+      mockProductRepo.findOne.mockResolvedValue({
+        id: 'prod-1',
+        tenantId: 'tenant-1',
+      });
+      mockOutletRepo.find.mockResolvedValue([
+        { id: 'outlet-1', name: 'Outlet A', code: 'OUT-A' },
+        { id: 'outlet-2', name: 'Outlet B', code: 'OUT-B' },
+      ]);
+      mockOutletProductRepo.find.mockResolvedValue([
+        { outletId: 'outlet-2', isActive: false },
+      ]);
+
+      const result = await service.getOutletAvailability('tenant-1', 'prod-1');
+
+      expect(result).toEqual([
+        {
+          outletId: 'outlet-1',
+          outletName: 'Outlet A',
+          outletCode: 'OUT-A',
+          isActive: true,
+        },
+        {
+          outletId: 'outlet-2',
+          outletName: 'Outlet B',
+          outletCode: 'OUT-B',
+          isActive: false,
+        },
+      ]);
+    });
+
+    it('updateOutletAvailability updates or creates outlet product record and records audit', async () => {
+      mockProductRepo.findOne.mockResolvedValue({
+        id: 'prod-1',
+        name: 'Coffee',
+        tenantId: 'tenant-1',
+      });
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        name: 'Outlet A',
+        tenantId: 'tenant-1',
+      });
+      mockOutletProductRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.updateOutletAvailability(
+        'tenant-1',
+        'prod-1',
+        {
+          outletId: 'outlet-1',
+          isActive: false,
+        },
+        'user-1',
+      );
+
+      expect(result).toEqual({
+        productId: 'prod-1',
+        outletId: 'outlet-1',
+        isActive: false,
+      });
+      expect(mockOutletProductRepo.save).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PRODUCT_OUTLET_AVAILABILITY_UPDATE',
+        }),
+      );
+    });
+
+    it('batchUpdateOutletAvailability updates multiple products in an outlet', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        name: 'Outlet A',
+        tenantId: 'tenant-1',
+      });
+      mockProductRepo.find.mockResolvedValue([
+        { id: 'prod-1', name: 'Coffee' },
+        { id: 'prod-2', name: 'Tea' },
+      ]);
+      mockDataSource.transaction.mockImplementation(
+        (cb: (m: any) => Promise<any>) => {
+          return cb({
+            getRepository: () => mockOutletProductRepo,
+          });
+        },
+      );
+
+      const result = await service.batchUpdateOutletAvailability(
+        'tenant-1',
+        {
+          outletId: 'outlet-1',
+          productIds: ['prod-1', 'prod-2'],
+          isActive: false,
+        },
+        'user-1',
+      );
+
+      expect(result).toEqual({ updatedCount: 2 });
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PRODUCT_OUTLET_AVAILABILITY_BATCH_UPDATE',
+        }),
+      );
+    });
+  });
 });
+

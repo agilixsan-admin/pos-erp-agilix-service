@@ -16,6 +16,7 @@ import { Void } from '../entities/void.entity';
 import { User } from '../../user/user.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
+import { OutletProduct } from '../../product/entities/outlet-product.entity';
 import { Table } from '../../table/entities/table.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
@@ -53,6 +54,11 @@ describe('OrderService', () => {
     find: jest.fn(),
   };
 
+  const mockOutletProductRepo = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn(),
+  };
+
   const mockTableRepo = {
     findOne: jest.fn(),
     save: jest.fn(),
@@ -83,6 +89,7 @@ describe('OrderService', () => {
       discountEnabled: false,
       discountType: 'PERCENTAGE',
       discountValue: 0,
+      voidVerificationMode: 'NONE',
     }),
   };
 
@@ -125,6 +132,10 @@ describe('OrderService', () => {
         {
           provide: getRepositoryToken(Table),
           useValue: mockTableRepo,
+        },
+        {
+          provide: getRepositoryToken(OutletProduct),
+          useValue: mockOutletProductRepo,
         },
         {
           provide: DataSource,
@@ -219,6 +230,36 @@ describe('OrderService', () => {
 
       expect(result).toBeDefined();
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException if product is inactive in the target outlet', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockVariantRepo.find.mockResolvedValue([
+        {
+          id: 'var-1',
+          productId: 'prod-inactive-1',
+          name: 'Regular',
+          price: 25000,
+          tenantId: 'tenant-1',
+          product: { name: 'Espresso Blend' },
+        },
+      ]);
+      mockOutletProductRepo.find.mockResolvedValueOnce([
+        {
+          productId: 'prod-inactive-1',
+          outletId: 'outlet-1',
+          isActive: false,
+        },
+      ]);
+
+      await expect(
+        service.create('tenant-1', 'user-1', 'outlet-1', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if discount belongs to another outlet', async () => {

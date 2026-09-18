@@ -5,6 +5,8 @@ import { Product } from './entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { Recipe } from '../recipe/entities/recipe.entity';
 import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
+import { OutletProduct } from './entities/outlet-product.entity';
+import { Outlet } from '../outlet/outlet.entity';
 import { AuditModule } from '../audit/audit.module';
 import { StorageModule } from '../storage/storage.module';
 import { CategoryService } from './services/category.service';
@@ -20,6 +22,8 @@ import { ProductController } from './controllers/product.controller';
       ProductVariant,
       Recipe,
       InventoryStock,
+      OutletProduct,
+      Outlet,
     ]),
     AuditModule,
     StorageModule,
