@@ -162,6 +162,9 @@ export class Order {
   @OneToOne(() => Transaction, (transaction) => transaction.order)
   transaction!: Transaction | null;
 
-  @OneToMany(() => Void, (v) => v.order)
+  // persistence: false — voids is a read-only audit trail here; without this,
+  // TypeORM tries to reconcile this eagerly-loaded collection whenever the
+  // order is saved and nullifies voids.order_id (NOT NULL), crashing void().
+  @OneToMany(() => Void, (v) => v.order, { persistence: false })
   voids!: Void[];
 }
