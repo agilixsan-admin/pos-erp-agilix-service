@@ -13,6 +13,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import type { TaxStatus, TaxType } from '../entities/tax.entity';
+import type { VoidVerificationMode } from '../entities/pos-settings.entity';
 
 export class CreateTaxDto {
   @IsString()
@@ -135,6 +136,11 @@ export class UpdateGlobalTaxConfigDto {
   @IsOptional()
   @IsIn(['ALL', 'DINE_IN'])
   serviceChargeApplicableTo?: 'ALL' | 'DINE_IN';
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['NONE', 'SELF_PASSWORD', 'SUPERVISOR_APPROVAL'])
+  voidVerificationMode?: VoidVerificationMode;
 
   @IsOptional()
   @IsUUID()

@@ -9,6 +9,7 @@ export interface PermissionItem {
     | 'delete'
     | 'adjust'
     | 'void'
+    | 'approve'
     | 'receive'
     | 'finalize'
     | 'cancel'

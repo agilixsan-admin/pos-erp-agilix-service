@@ -96,6 +96,8 @@ export class SettingsService {
         discountValue: dto.discountValue ?? 0,
         cashEnabled: dto.cashEnabled ?? true,
         qrisEnabled: dto.qrisEnabled ?? true,
+        voidVerificationMode:
+          dto.voidVerificationMode ?? 'SUPERVISOR_APPROVAL',
         billLogoUrl: dto.billLogoUrl ?? null,
         billFooterText:
           dto.billFooterText ?? 'Terima kasih atas kunjungan Anda!',
@@ -112,6 +114,8 @@ export class SettingsService {
         settings.discountValue = dto.discountValue;
       if (dto.cashEnabled !== undefined) settings.cashEnabled = dto.cashEnabled;
       if (dto.qrisEnabled !== undefined) settings.qrisEnabled = dto.qrisEnabled;
+      if (dto.voidVerificationMode !== undefined)
+        settings.voidVerificationMode = dto.voidVerificationMode;
       if (dto.billLogoUrl !== undefined) settings.billLogoUrl = dto.billLogoUrl;
       if (dto.billFooterText !== undefined)
         settings.billFooterText = dto.billFooterText;

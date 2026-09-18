@@ -304,6 +304,8 @@ export class TaxService {
       serviceChargeRate: Number(settings.serviceChargeRate ?? 0),
       serviceChargeName: settings.serviceChargeName ?? 'Service Charge',
       serviceChargeApplicableTo: settings.serviceChargeApplicableTo ?? 'ALL',
+      voidVerificationMode:
+        settings.voidVerificationMode ?? 'SUPERVISOR_APPROVAL',
     };
   }
 
@@ -358,6 +360,9 @@ export class TaxService {
     }
     if (dto.serviceChargeApplicableTo !== undefined) {
       settings.serviceChargeApplicableTo = dto.serviceChargeApplicableTo;
+    }
+    if (dto.voidVerificationMode !== undefined) {
+      settings.voidVerificationMode = dto.voidVerificationMode;
     }
 
     if (selectedTax) {
