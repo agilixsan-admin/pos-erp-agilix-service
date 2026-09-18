@@ -27,6 +27,7 @@ import { FixCategorySoftDeleteUniqueConstraint1700000000025 } from './1700000000
 import { AddSectionToTables1700000000026 } from './1700000000026-AddSectionToTables';
 import { FixHttsSchemeInImageUrls1700000000027 } from './1700000000027-FixHttsSchemeInImageUrls';
 import { AddServiceChargeAndTaxDetails1700000000028 } from './1700000000028-AddServiceChargeAndTaxDetails';
+import { AddVoidVerificationSettingsAndApprovedBy1700000000029 } from './1700000000029-AddVoidVerificationSettingsAndApprovedBy';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -58,4 +59,5 @@ export const ALL_MIGRATIONS = [
   AddSectionToTables1700000000026,
   FixHttsSchemeInImageUrls1700000000027,
   AddServiceChargeAndTaxDetails1700000000028,
+  AddVoidVerificationSettingsAndApprovedBy1700000000029,
 ];

@@ -170,6 +170,10 @@ export class VoidOrderDto {
   @IsOptional()
   @IsUUID()
   reasonCategoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 
 export class AddOrderItemsDto {

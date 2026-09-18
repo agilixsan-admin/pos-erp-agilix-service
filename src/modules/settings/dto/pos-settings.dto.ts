@@ -9,7 +9,10 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import type { DiscountType } from '../entities/pos-settings.entity';
+import type {
+  DiscountType,
+  VoidVerificationMode,
+} from '../entities/pos-settings.entity';
 
 export class UpdatePosSettingsDto {
   @IsUUID()
@@ -51,6 +54,10 @@ export class UpdatePosSettingsDto {
   @IsBoolean()
   @IsOptional()
   qrisEnabled?: boolean;
+
+  @IsIn(['NONE', 'SELF_PASSWORD', 'SUPERVISOR_APPROVAL'])
+  @IsOptional()
+  voidVerificationMode?: VoidVerificationMode;
 
   @IsString()
   @MaxLength(500)

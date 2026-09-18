@@ -64,6 +64,13 @@ export const SYSTEM_PERMISSIONS_GROUPS: PermissionGroup[] = [
               'Membatalkan item atau transaksi pesanan (memerlukan hak akses khusus)',
             action: 'void',
           },
+          {
+            code: 'order.void.approve',
+            name: 'Otorisasi Persetujuan Void',
+            description:
+              'Menyetujui dan memasukkan password untuk otorisasi pembatalan menu',
+            action: 'approve',
+          },
         ],
       },
       {

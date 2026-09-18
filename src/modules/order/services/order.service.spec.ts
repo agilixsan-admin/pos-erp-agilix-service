@@ -4,13 +4,16 @@ import { DataSource, SelectQueryBuilder } from 'typeorm';
 import {
   BadRequestException,
   NotFoundException,
+  UnauthorizedException,
   ValidationPipe,
 } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from '../dto/order.dto';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
+import { User } from '../../user/user.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { Table } from '../../table/entities/table.entity';
@@ -55,8 +58,17 @@ describe('OrderService', () => {
     save: jest.fn(),
   };
 
+  const mockUserRepo = {
+    findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
+  };
+
   const mockDataSource = {
     transaction: jest.fn(),
+    getRepository: jest.fn((entityClass: unknown) => {
+      if (entityClass === User) return mockUserRepo;
+      return null;
+    }),
   };
 
   const mockAuditService = {
@@ -1288,6 +1300,401 @@ describe('OrderService', () => {
           reason: 'Cancel',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if voidVerificationMode is SELF_PASSWORD and password is not provided', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SELF_PASSWORD',
+      });
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        items: [{ id: 'item-1', status: 'ACTIVE' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.void('tenant-1', 'user-1', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Customer cancelled',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws UnauthorizedException if voidVerificationMode is SELF_PASSWORD and password does not match', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SELF_PASSWORD',
+      });
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        items: [{ id: 'item-1', status: 'ACTIVE' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const hashed = bcrypt.hashSync('correct-pass', 4);
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'user-1',
+        passwordHash: hashed,
+        name: 'Kasir',
+      });
+
+      await expect(
+        service.void('tenant-1', 'user-1', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Customer cancelled',
+          password: 'wrong-pass',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('successfully voids with SELF_PASSWORD when correct password is provided', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SELF_PASSWORD',
+      });
+      const item1 = {
+        id: 'item-1',
+        orderId: 'ord-1',
+        status: 'ACTIVE',
+        unitPrice: 20000,
+        quantity: 1,
+        subtotal: 20000,
+      };
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        orderType: 'TAKE_AWAY',
+        items: [item1],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const hashed = bcrypt.hashSync('kasir123', 4);
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'user-1',
+        passwordHash: hashed,
+        name: 'Kasir Satu',
+        role: { name: 'Cashier' },
+      });
+
+      const managerVoidRepo = {
+        create: jest.fn((v: Record<string, unknown>) => ({ ...v, id: 'void-1' })),
+        save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
+      };
+      mockDataSource.transaction.mockImplementationOnce((callback: (m: unknown) => Promise<unknown>) => {
+        return callback({
+          getRepository: (entityClass: unknown) => {
+            if (entityClass === Order) return { save: jest.fn().mockResolvedValue(order) };
+            if (entityClass === OrderItem) return { save: jest.fn().mockResolvedValue(item1) };
+            if (entityClass === Void) return managerVoidRepo;
+            if (entityClass === Table) return { findOne: jest.fn().mockResolvedValue(null), save: jest.fn() };
+            if (entityClass === InventoryMovement) return { find: jest.fn().mockResolvedValue([]), save: jest.fn() };
+            return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), create: jest.fn(), save: jest.fn() };
+          },
+        });
+      });
+
+      const result = await service.void(
+        'tenant-1',
+        'user-1',
+        'outlet-1',
+        'ord-1',
+        {
+          orderItemId: 'item-1',
+          reason: 'Salah pencet',
+          password: 'kasir123',
+        },
+      );
+
+      expect(result.voidedItem.status).toBe('VOID');
+      expect(managerVoidRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voidedBy: 'user-1',
+          approvedBy: 'user-1',
+        }),
+      );
+    });
+
+    it('automatically approves SUPERVISOR_APPROVAL without extra password if current user is already supervisor/approver', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SUPERVISOR_APPROVAL',
+      });
+      const item1 = {
+        id: 'item-1',
+        orderId: 'ord-1',
+        status: 'ACTIVE',
+        unitPrice: 20000,
+        quantity: 1,
+        subtotal: 20000,
+      };
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        orderType: 'TAKE_AWAY',
+        items: [item1],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'spv-user',
+        name: 'Manager Toni',
+        isSuperAdmin: false,
+        role: { name: 'Outlet Manager', menuAccess: ['order.void.approve'] },
+      });
+
+      const managerVoidRepo = {
+        create: jest.fn((v: Record<string, unknown>) => ({ ...v, id: 'void-1' })),
+        save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
+      };
+      mockDataSource.transaction.mockImplementationOnce((callback: (m: unknown) => Promise<unknown>) => {
+        return callback({
+          getRepository: (entityClass: unknown) => {
+            if (entityClass === Order) return { save: jest.fn().mockResolvedValue(order) };
+            if (entityClass === OrderItem) return { save: jest.fn().mockResolvedValue(item1) };
+            if (entityClass === Void) return managerVoidRepo;
+            if (entityClass === Table) return { findOne: jest.fn().mockResolvedValue(null), save: jest.fn() };
+            if (entityClass === InventoryMovement) return { find: jest.fn().mockResolvedValue([]), save: jest.fn() };
+            return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), create: jest.fn(), save: jest.fn() };
+          },
+        });
+      });
+
+      const result = await service.void(
+        'tenant-1',
+        'spv-user',
+        'outlet-1',
+        'ord-1',
+        {
+          orderItemId: 'item-1',
+          reason: 'Approval langsung dari manager',
+        },
+      );
+
+      expect(result.voidedItem.status).toBe('VOID');
+      expect(managerVoidRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voidedBy: 'spv-user',
+          approvedBy: 'spv-user',
+        }),
+      );
+    });
+
+    it('throws BadRequestException if SUPERVISOR_APPROVAL and cashier does not input password', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SUPERVISOR_APPROVAL',
+      });
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        items: [{ id: 'item-1', status: 'ACTIVE' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'cashier-user',
+        name: 'Kasir',
+        isSuperAdmin: false,
+        role: { name: 'Cashier', menuAccess: ['pos.order'] },
+      });
+
+      await expect(
+        service.void('tenant-1', 'cashier-user', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Batal',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws UnauthorizedException if supervisor password does not match any approver', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SUPERVISOR_APPROVAL',
+      });
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        items: [{ id: 'item-1', status: 'ACTIVE' }],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'cashier-user',
+        name: 'Kasir',
+        isSuperAdmin: false,
+        role: { name: 'Cashier', menuAccess: ['pos.order'] },
+      });
+
+      const spvPass = bcrypt.hashSync('spv-secret', 4);
+      const userCandidateQb = {
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValueOnce([
+          {
+            id: 'spv-1',
+            name: 'Supervisor',
+            passwordHash: spvPass,
+            role: { name: 'Supervisor', menuAccess: ['order.void.approve'] },
+          },
+        ]),
+      };
+      mockUserRepo.createQueryBuilder.mockReturnValueOnce(userCandidateQb);
+
+      await expect(
+        service.void('tenant-1', 'cashier-user', 'outlet-1', 'ord-1', {
+          orderItemId: 'item-1',
+          reason: 'Batal',
+          password: 'wrong-supervisor-password',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('matches supervisor password, sets approvedBy to supervisor ID, and logs approver info in audit', async () => {
+      mockSettingsService.getSettings.mockResolvedValueOnce({
+        voidVerificationMode: 'SUPERVISOR_APPROVAL',
+      });
+      const item1 = {
+        id: 'item-1',
+        orderId: 'ord-1',
+        status: 'ACTIVE',
+        unitPrice: 20000,
+        quantity: 1,
+        subtotal: 20000,
+      };
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        orderType: 'TAKE_AWAY',
+        items: [item1],
+      };
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+
+      mockUserRepo.findOne.mockResolvedValueOnce({
+        id: 'cashier-user',
+        name: 'Kasir',
+        isSuperAdmin: false,
+        role: { name: 'Cashier', menuAccess: ['pos.order'] },
+      });
+
+      const spvPass = bcrypt.hashSync('spv-secret', 4);
+      const userCandidateQb = {
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValueOnce([
+          {
+            id: 'spv-1',
+            name: 'Supervisor Budi',
+            passwordHash: spvPass,
+            role: { name: 'Supervisor', menuAccess: ['order.void.approve'] },
+          },
+        ]),
+      };
+      mockUserRepo.createQueryBuilder.mockReturnValueOnce(userCandidateQb);
+
+      const managerVoidRepo = {
+        create: jest.fn((v: Record<string, unknown>) => ({ ...v, id: 'void-1' })),
+        save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
+      };
+      mockDataSource.transaction.mockImplementationOnce((callback: (m: unknown) => Promise<unknown>) => {
+        return callback({
+          getRepository: (entityClass: unknown) => {
+            if (entityClass === Order) return { save: jest.fn().mockResolvedValue(order) };
+            if (entityClass === OrderItem) return { save: jest.fn().mockResolvedValue(item1) };
+            if (entityClass === Void) return managerVoidRepo;
+            if (entityClass === Table) return { findOne: jest.fn().mockResolvedValue(null), save: jest.fn() };
+            if (entityClass === InventoryMovement) return { find: jest.fn().mockResolvedValue([]), save: jest.fn() };
+            return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), create: jest.fn(), save: jest.fn() };
+          },
+        });
+      });
+
+      const result = await service.void(
+        'tenant-1',
+        'cashier-user',
+        'outlet-1',
+        'ord-1',
+        {
+          orderItemId: 'item-1',
+          reason: 'Customer cancelled',
+          password: 'spv-secret',
+        },
+      );
+
+      expect(result.voidedItem.status).toBe('VOID');
+      expect(managerVoidRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          voidedBy: 'cashier-user',
+          approvedBy: 'spv-1',
+        }),
+      );
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ORDER_ITEM_VOIDED',
+          metadata: expect.objectContaining({
+            approvedBy: 'spv-1',
+            approvedByName: 'Supervisor Budi',
+            approvedByRole: 'Supervisor',
+          }),
+        }),
+        expect.anything(),
+      );
     });
   });
 

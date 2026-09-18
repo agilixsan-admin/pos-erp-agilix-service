@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
+import { User } from '../../user/user.entity';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { Void } from '../entities/void.entity';
@@ -774,6 +777,136 @@ export class OrderService {
       });
     }
 
+    const settings = await this.settingsService.getSettings(
+      tenantId,
+      order.outletId,
+    );
+
+    const verificationMode =
+      settings.voidVerificationMode || 'SUPERVISOR_APPROVAL';
+    let approvedById: string | null = null;
+    let approvedByName: string | null = null;
+    let approvedByRole: string | null = null;
+
+    if (verificationMode === 'SELF_PASSWORD') {
+      if (!dto.password) {
+        throw new BadRequestException({
+          success: false,
+          message: 'Password kasir wajib diisi untuk verifikasi pembatalan menu',
+          code: 'PASSWORD_REQUIRED',
+        });
+      }
+
+      const userRepo = this.dataSource.getRepository(User);
+      const currentUser = await userRepo.findOne({
+        where: { id: userId, tenantId },
+        select: ['id', 'name', 'passwordHash', 'isSuperAdmin'],
+        relations: ['role'],
+      });
+
+      if (!currentUser || !currentUser.passwordHash) {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Pengguna tidak ditemukan',
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      const isMatch = await bcrypt.compare(
+        dto.password,
+        currentUser.passwordHash,
+      );
+      if (!isMatch) {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Password verifikasi salah',
+          code: 'INVALID_CREDENTIALS',
+        });
+      }
+
+      approvedById = currentUser.id;
+      approvedByName = currentUser.name;
+      approvedByRole =
+        currentUser.role?.name ||
+        (currentUser.isSuperAdmin ? 'SUPER_ADMIN' : 'USER');
+    } else if (verificationMode === 'SUPERVISOR_APPROVAL') {
+      const userRepo = this.dataSource.getRepository(User);
+      const currentUser = await userRepo.findOne({
+        where: { id: userId, tenantId },
+        select: ['id', 'name', 'isSuperAdmin'],
+        relations: ['role'],
+      });
+
+      const isAlreadyApprover =
+        currentUser?.isSuperAdmin ||
+        currentUser?.role?.menuAccess?.includes('*') ||
+        currentUser?.role?.menuAccess?.includes('order.void.approve');
+
+      if (isAlreadyApprover && currentUser) {
+        approvedById = currentUser.id;
+        approvedByName = currentUser.name;
+        approvedByRole =
+          currentUser.role?.name ||
+          (currentUser.isSuperAdmin ? 'SUPER_ADMIN' : 'SUPERVISOR');
+      } else {
+        if (!dto.password) {
+          throw new BadRequestException({
+            success: false,
+            message: 'Password otorisasi supervisor / atasan wajib diisi',
+            code: 'SUPERVISOR_PASSWORD_REQUIRED',
+          });
+        }
+
+        const candidateUsers = await userRepo
+          .createQueryBuilder('user')
+          .addSelect('user.passwordHash')
+          .leftJoinAndSelect('user.role', 'role')
+          .where('user.tenantId = :tenantId', { tenantId })
+          .andWhere('user.status = :status', { status: 'ACTIVE' })
+          .andWhere('(user.outletId = :outletId OR user.outletId IS NULL)', {
+            outletId: order.outletId,
+          })
+          .getMany();
+
+        let matchedSupervisor: User | null = null;
+
+        for (const candidate of candidateUsers) {
+          const hasApprovePermission =
+            candidate.isSuperAdmin ||
+            candidate.role?.menuAccess?.includes('*') ||
+            candidate.role?.menuAccess?.includes('order.void.approve');
+
+          if (hasApprovePermission && candidate.passwordHash) {
+            const match = await bcrypt.compare(
+              dto.password,
+              candidate.passwordHash,
+            );
+            if (match) {
+              matchedSupervisor = candidate;
+              break;
+            }
+          }
+        }
+
+        if (!matchedSupervisor) {
+          throw new UnauthorizedException({
+            success: false,
+            message:
+              'Password otorisasi salah atau akun tidak memiliki wewenang approval',
+            code: 'INVALID_SUPERVISOR_CREDENTIALS',
+          });
+        }
+
+        approvedById = matchedSupervisor.id;
+        approvedByName = matchedSupervisor.name;
+        approvedByRole =
+          matchedSupervisor.role?.name ||
+          (matchedSupervisor.isSuperAdmin ? 'SUPER_ADMIN' : 'SUPERVISOR');
+      }
+    } else {
+      approvedById = userId;
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const itemRepo = manager.getRepository(OrderItem);
@@ -794,6 +927,7 @@ export class OrderService {
         reasonCategoryId: dto.reasonCategoryId ?? null,
         reason: dto.reason,
         voidedBy: userId,
+        approvedBy: approvedById,
       });
       const savedVoid = await voidRepo.save(voidRecord);
 
@@ -969,6 +1103,9 @@ export class OrderService {
             variantName: targetItem.variantName,
             voidId: savedVoid.id,
             reason: dto.reason,
+            approvedBy: approvedById,
+            approvedByName,
+            approvedByRole,
             newTotalAmount: order.totalAmount,
             isWholeOrderVoided: activeItems.length === 0,
           },

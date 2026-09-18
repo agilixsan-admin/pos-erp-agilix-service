@@ -13,6 +13,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { Tax } from './tax.entity';
 
 export type DiscountType = 'PERCENTAGE' | 'FIXED';
+export type VoidVerificationMode = 'NONE' | 'SELF_PASSWORD' | 'SUPERVISOR_APPROVAL';
 
 @Entity('pos_settings')
 @Index(['tenantId'])
@@ -98,6 +99,14 @@ export class PosSettings {
 
   @Column({ name: 'qris_enabled', default: true })
   qrisEnabled!: boolean;
+
+  @Column({
+    name: 'void_verification_mode',
+    type: 'varchar',
+    length: 30,
+    default: 'SUPERVISOR_APPROVAL',
+  })
+  voidVerificationMode!: VoidVerificationMode;
 
   @Column({
     name: 'bill_logo_url',

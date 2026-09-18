@@ -39,6 +39,9 @@ export class Void {
   @Column({ name: 'voided_by', type: 'uuid', nullable: true })
   voidedBy!: string | null;
 
+  @Column({ name: 'approved_by', type: 'uuid', nullable: true })
+  approvedBy!: string | null;
+
   @CreateDateColumn({ name: 'voided_at', type: 'timestamptz' })
   voidedAt!: Date;
 
@@ -68,4 +71,8 @@ export class Void {
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'voided_by' })
   voider!: User | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'approved_by' })
+  approver!: User | null;
 }
