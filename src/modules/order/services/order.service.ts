@@ -496,6 +496,7 @@ export class OrderService {
       .leftJoinAndSelect('order.payments', 'payment')
       .leftJoinAndSelect('order.transaction', 'transaction')
       .leftJoinAndSelect('order.table', 'table')
+      .leftJoinAndSelect('order.voids', 'void')
       .where('order.tenantId = :tenantId', { tenantId });
 
     if (query.outletId) {
@@ -556,6 +557,7 @@ export class OrderService {
       .leftJoinAndSelect('order.payments', 'payment')
       .leftJoinAndSelect('order.transaction', 'transaction')
       .leftJoinAndSelect('order.table', 'table')
+      .leftJoinAndSelect('order.voids', 'void')
       .where('order.id = :id AND order.tenantId = :tenantId', {
         id,
         tenantId,

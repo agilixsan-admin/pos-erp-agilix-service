@@ -18,6 +18,7 @@ import { Discount } from '../../settings/entities/discount.entity';
 import { OrderItem } from './order-item.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { Transaction } from '../../payment/entities/transaction.entity';
+import { Void } from './void.entity';
 
 @Entity('orders')
 @Index(['tenantId', 'outletId'])
@@ -160,4 +161,7 @@ export class Order {
 
   @OneToOne(() => Transaction, (transaction) => transaction.order)
   transaction!: Transaction | null;
+
+  @OneToMany(() => Void, (v) => v.order)
+  voids!: Void[];
 }

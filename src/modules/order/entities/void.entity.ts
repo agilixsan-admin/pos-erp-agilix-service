@@ -56,7 +56,7 @@ export class Void {
   @JoinColumn({ name: 'outlet_id' })
   outlet!: Outlet;
 
-  @ManyToOne(() => Order, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Order, (order) => order.voids, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'order_id' })
   order!: Order;
 
