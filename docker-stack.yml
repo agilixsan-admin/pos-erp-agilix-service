@@ -1,5 +1,5 @@
 services:
-  pos-iniabadi-service:
+  pos-service:
     image: ${APP_IMAGE}
     environment:
       NODE_ENV: ${NODE_ENV:-production}
