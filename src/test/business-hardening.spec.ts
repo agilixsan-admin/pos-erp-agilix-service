@@ -28,6 +28,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
     const mockVoidRepo = { create: jest.fn(), save: jest.fn() };
     const mockOutletRepo = { findOne: jest.fn() };
     const mockVariantRepo = { find: jest.fn() };
+    const mockOutletProductRepo = { find: jest.fn().mockResolvedValue([]) };
     const mockTableRepo = { findOne: jest.fn(), save: jest.fn() };
     const mockDataSource = { transaction: jest.fn() };
     const mockAuditService = { record: jest.fn().mockResolvedValue(undefined) };
@@ -46,6 +47,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockVoidRepo as any,
         mockOutletRepo as any,
         mockVariantRepo as any,
+        mockOutletProductRepo as any,
         mockTableRepo as any,
         mockDataSource as any,
         mockAuditService as any,
@@ -167,6 +169,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     };
     const mockVoidRepo = { create: jest.fn(), save: jest.fn() };
+    const mockOutletProductRepo = { find: jest.fn().mockResolvedValue([]) };
     const mockTableRepo = { findOne: jest.fn(), save: jest.fn() };
     const mockDataSource = { transaction: jest.fn() };
     const mockAuditService = { record: jest.fn().mockResolvedValue(undefined) };
@@ -176,6 +179,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         taxEnabled: false,
         taxRate: 0,
         discountEnabled: false,
+        voidVerificationMode: 'NONE',
       }),
     };
     const mockDiscountService = {
@@ -195,6 +199,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockVoidRepo as any,
         {} as any,
         {} as any,
+        mockOutletProductRepo as any,
         mockTableRepo as any,
         mockDataSource as any,
         mockAuditService as any,

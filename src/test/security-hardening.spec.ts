@@ -123,6 +123,7 @@ describe('Security & Hardening Tests (Phase 18)', () => {
         {} as any,
         {} as any,
         {} as any,
+        {} as any,
       );
 
       await expect(service.findById(tenantA, 'order-b')).rejects.toThrow(
