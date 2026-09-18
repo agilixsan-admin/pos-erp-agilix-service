@@ -258,9 +258,9 @@ export class ProductService {
         product,
         stockMap,
         outletActiveMap
-          ? (outletActiveMap.has(product.id)
+          ? outletActiveMap.has(product.id)
             ? outletActiveMap.get(product.id)
-            : true)
+            : true
           : undefined,
       ),
     );

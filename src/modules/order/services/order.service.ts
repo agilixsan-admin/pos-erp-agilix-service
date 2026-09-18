@@ -241,7 +241,8 @@ export class OrderService {
     let serviceCharge = 0;
     const isServiceApplicable =
       Boolean(settings.serviceChargeEnabled) &&
-      (settings.serviceChargeApplicableTo !== 'DINE_IN' || orderType === 'DINE_IN');
+      (settings.serviceChargeApplicableTo !== 'DINE_IN' ||
+        orderType === 'DINE_IN');
 
     if (isServiceApplicable && Number(settings.serviceChargeRate || 0) > 0) {
       serviceCharge = Math.round(
@@ -261,10 +262,8 @@ export class OrderService {
       taxRate = activeTax
         ? Number(activeTax.rate)
         : Number(settings.taxRate || 0);
-      taxType = activeTax
-        ? (activeTax.type as 'INCLUSIVE' | 'EXCLUSIVE')
-        : 'EXCLUSIVE';
-      taxName = activeTax ? activeTax.name : (settings.taxName || 'Pajak');
+      taxType = activeTax ? activeTax.type : 'EXCLUSIVE';
+      taxName = activeTax ? activeTax.name : settings.taxName || 'Pajak';
 
       if (taxType === 'INCLUSIVE' && taxRate > 0) {
         isInclusiveTax = true;
@@ -365,7 +364,7 @@ export class OrderService {
         for (const recipe of recipes) {
           const deductionQty = Number(item.quantity) * Number(recipe.quantity);
 
-          let stock = await stockRepo.findOne({
+          const stock = await stockRepo.findOne({
             where: {
               tenantId,
               outletId: targetOutletId,
@@ -820,7 +819,8 @@ export class OrderService {
       if (!dto.password) {
         throw new BadRequestException({
           success: false,
-          message: 'Password kasir wajib diisi untuk verifikasi pembatalan menu',
+          message:
+            'Password kasir wajib diisi untuk verifikasi pembatalan menu',
           code: 'PASSWORD_REQUIRED',
         });
       }
@@ -1272,7 +1272,7 @@ export class OrderService {
         for (const recipe of recipes) {
           const deductionQty = Number(item.quantity) * Number(recipe.quantity);
 
-          let stock = await stockRepo.findOne({
+          const stock = await stockRepo.findOne({
             where: {
               tenantId,
               outletId: order.outletId,

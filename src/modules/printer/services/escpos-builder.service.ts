@@ -168,7 +168,8 @@ export class EscPosBuilderService {
         const isDefaultVariant =
           !item.variantName ||
           item.variantName.trim().toLowerCase() === 'default' ||
-          item.variantName.trim().toLowerCase() === prodName.trim().toLowerCase();
+          item.variantName.trim().toLowerCase() ===
+            prodName.trim().toLowerCase();
         const variantSuffix = !isDefaultVariant ? ` (${item.variantName})` : '';
         append(prodName + variantSuffix);
 
@@ -371,7 +372,8 @@ export class EscPosBuilderService {
         const isDefaultVariant =
           !item.variantName ||
           item.variantName.trim().toLowerCase() === 'default' ||
-          item.variantName.trim().toLowerCase() === prodName.trim().toLowerCase();
+          item.variantName.trim().toLowerCase() ===
+            prodName.trim().toLowerCase();
         const variantSuffix = !isDefaultVariant ? ` (${item.variantName})` : '';
         append(`${item.quantity}x ${prodName}${variantSuffix}`, {
           bold: true,

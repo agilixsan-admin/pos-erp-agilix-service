@@ -30,4 +30,3 @@ export class CreateOutletProductsTable1700000000030 implements MigrationInterfac
     `);
   }
 }
-

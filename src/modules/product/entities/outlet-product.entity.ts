@@ -52,4 +52,3 @@ export class OutletProduct {
   @JoinColumn({ name: 'product_id' })
   product!: Product;
 }
-

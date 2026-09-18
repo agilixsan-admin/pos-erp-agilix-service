@@ -41,4 +41,3 @@ export class AddServiceChargeAndTaxDetails1700000000028 implements MigrationInte
     `);
   }
 }
-

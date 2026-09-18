@@ -228,16 +228,20 @@ export class StockOpnameService {
 
     // Validation 2: Ensure no other non-cancelled stock opname exists on the same date for this outlet
     const targetDateStr = dto.opnameDate
-      ? (dto.opnameDate.includes('T') ? dto.opnameDate.split('T')[0] : dto.opnameDate)
+      ? dto.opnameDate.includes('T')
+        ? dto.opnameDate.split('T')[0]
+        : dto.opnameDate
       : new Date().toISOString().split('T')[0];
 
     const existingOnDate = await this.stockOpnameRepository
       .createQueryBuilder('opname')
       .where('opname.tenantId = :tenantId', { tenantId })
       .andWhere('opname.outletId = :outletId', { outletId: dto.outletId })
-      .andWhere('opname.status != :cancelledStatus', { cancelledStatus: 'CANCELLED' })
+      .andWhere('opname.status != :cancelledStatus', {
+        cancelledStatus: 'CANCELLED',
+      })
       .andWhere(
-        '(DATE(opname.opnameDate) = :targetDateStr OR DATE(opname.opnameDate AT TIME ZONE \'Asia/Jakarta\') = :targetDateStr)',
+        "(DATE(opname.opnameDate) = :targetDateStr OR DATE(opname.opnameDate AT TIME ZONE 'Asia/Jakarta') = :targetDateStr)",
         { targetDateStr },
       )
       .getOne();

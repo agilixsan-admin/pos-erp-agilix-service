@@ -13,6 +13,7 @@ import {
 import { Tenant } from '../../tenant/tenant.entity';
 import { Category } from './category.entity';
 import { ProductVariant } from './product-variant.entity';
+import { OutletProduct } from './outlet-product.entity';
 
 @Entity('products')
 @Index(['tenantId'])
@@ -64,6 +65,6 @@ export class Product {
   })
   variants!: ProductVariant[];
 
-  @OneToMany('OutletProduct', (op: any) => op.product)
-  outletProducts!: any[];
+  @OneToMany(() => OutletProduct, (op) => op.product)
+  outletProducts!: OutletProduct[];
 }

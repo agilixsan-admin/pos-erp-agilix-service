@@ -210,9 +210,11 @@ describe('StockOpnameService', () => {
       const qbMock: any = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          { id: 'item-1', name: 'Coffee Beans', unitCost: 50 },
-        ]),
+        getMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'item-1', name: 'Coffee Beans', unitCost: 50 },
+          ]),
       };
       inventoryItemRepo.createQueryBuilder.mockReturnValue(qbMock);
       inventoryStockRepo.find.mockResolvedValue([]);
@@ -234,7 +236,10 @@ describe('StockOpnameService', () => {
 
       opnameItemRepo.create.mockImplementation((dto) => dto as any);
       opnameRepo.create.mockImplementation((dto) => dto as any);
-      opnameRepo.save.mockResolvedValue({ id: 'so-new', opnameNumber: 'SO-2026-003' } as any);
+      opnameRepo.save.mockResolvedValue({
+        id: 'so-new',
+        opnameNumber: 'SO-2026-003',
+      } as any);
 
       const result = await service.create(tenantId, actorId, {
         outletId,

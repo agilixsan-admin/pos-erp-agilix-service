@@ -13,7 +13,8 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { Tax } from './tax.entity';
 
 export type DiscountType = 'PERCENTAGE' | 'FIXED';
-export type VoidVerificationMode = 'NONE' | 'SELF_PASSWORD' | 'SUPERVISOR_APPROVAL';
+export type VoidVerificationMode =
+  'NONE' | 'SELF_PASSWORD' | 'SUPERVISOR_APPROVAL';
 
 @Entity('pos_settings')
 @Index(['tenantId'])

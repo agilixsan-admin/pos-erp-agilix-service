@@ -43,4 +43,3 @@ export class AddVoidVerificationSettingsAndApprovedBy1700000000029 implements Mi
     `);
   }
 }
-

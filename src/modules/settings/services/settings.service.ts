@@ -96,8 +96,7 @@ export class SettingsService {
         discountValue: dto.discountValue ?? 0,
         cashEnabled: dto.cashEnabled ?? true,
         qrisEnabled: dto.qrisEnabled ?? true,
-        voidVerificationMode:
-          dto.voidVerificationMode ?? 'SUPERVISOR_APPROVAL',
+        voidVerificationMode: dto.voidVerificationMode ?? 'SUPERVISOR_APPROVAL',
         billLogoUrl: dto.billLogoUrl ?? null,
         billFooterText:
           dto.billFooterText ?? 'Terima kasih atas kunjungan Anda!',
