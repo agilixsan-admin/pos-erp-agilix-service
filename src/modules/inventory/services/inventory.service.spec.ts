@@ -318,6 +318,17 @@ describe('InventoryService', () => {
           id: 'adj-1',
         })),
         save: jest.fn((a: Record<string, unknown>) => Promise.resolve(a)),
+        // The post-insert re-fetch must go through the transaction's own
+        // manager, not the plain repository — see findAdjustmentById.
+        findOne: jest.fn().mockResolvedValue({
+          id: 'adj-1',
+          adjustmentNumber: 'ADJ-2026-003',
+          previousStock: 10,
+          quantity: 5,
+          currentStock: 15,
+          type: 'IN',
+          imageUrl: 'https://storage.example.com/proof.webp',
+        }),
       };
 
       mockDataSource.transaction.mockImplementation(
@@ -332,16 +343,6 @@ describe('InventoryService', () => {
           });
         },
       );
-
-      mockAdjustmentRepo.findOne.mockResolvedValue({
-        id: 'adj-1',
-        adjustmentNumber: 'ADJ-2026-003',
-        previousStock: 10,
-        quantity: 5,
-        currentStock: 15,
-        type: 'IN',
-        imageUrl: 'https://storage.example.com/proof.webp',
-      });
 
       const result = await service.createAdjustment(
         'tenant-1',

@@ -19,6 +19,7 @@ import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { AuditService } from '../../audit/audit.service';
+import { retryOnUniqueViolation } from '../../../common/utils/retry-on-unique-violation.util';
 import { SettingsService } from '../../settings/services/settings.service';
 import { DiscountService } from '../../settings/services/discount.service';
 import { PackagingService } from '../../packaging/services/packaging.service';
@@ -58,7 +59,7 @@ export class OrderService {
   private generateOrderNumber(): string {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const rand = Math.floor(1000 + Math.random() * 9000);
+    const rand = Math.floor(100000 + Math.random() * 900000);
     return `ORD-${dateStr}-${rand}`;
   }
 
@@ -304,182 +305,186 @@ export class OrderService {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const orderRepo = manager.getRepository(Order);
-      const itemRepo = manager.getRepository(OrderItem);
-      const tableRepo = manager.getRepository(Table);
+    return retryOnUniqueViolation(() =>
+      this.dataSource.transaction(async (manager) => {
+        const orderRepo = manager.getRepository(Order);
+        const itemRepo = manager.getRepository(OrderItem);
+        const tableRepo = manager.getRepository(Table);
 
-      if (assignedTable) {
-        assignedTable.status = 'OCCUPIED';
-        await tableRepo.save(assignedTable);
-      }
+        if (assignedTable) {
+          assignedTable.status = 'OCCUPIED';
+          await tableRepo.save(assignedTable);
+        }
 
-      const orderNumber = this.generateOrderNumber();
+        const orderNumber = this.generateOrderNumber();
 
-      const order = orderRepo.create({
-        tenantId,
-        outletId: targetOutletId,
-        orderNumber,
-        status: 'PENDING',
-        orderType,
-        tableId: assignedTable ? assignedTable.id : null,
-        tableNumber:
-          dto.tableNumber ?? (assignedTable ? assignedTable.tableNumber : null),
-        customerName: dto.customerName ?? null,
-        subtotal: calculatedSubtotal,
-        discountAmount,
-        discountId: appliedDiscountId,
-        serviceCharge,
-        taxAmount,
-        taxName,
-        taxRate,
-        taxType,
-        packagingFee,
-        totalAmount,
-        notes: dto.notes ?? null,
-        createdBy: userId,
-      });
-
-      const savedOrder = await orderRepo.save(order);
-
-      const items = orderItemsToCreate.map((item) =>
-        itemRepo.create({
-          ...item,
-          orderId: savedOrder.id,
-        }),
-      );
-
-      const savedItems = await itemRepo.save(items);
-
-      // Deduct raw materials for all items sent to station (recipes)
-      const recipeRepo = manager.getRepository(Recipe);
-      const stockRepo = manager.getRepository(InventoryStock);
-      const movementRepo = manager.getRepository(InventoryMovement);
-
-      for (const item of savedItems) {
-        const recipes = await recipeRepo.find({
-          where: { tenantId, variantId: item.variantId },
+        const order = orderRepo.create({
+          tenantId,
+          outletId: targetOutletId,
+          orderNumber,
+          status: 'PENDING',
+          orderType,
+          tableId: assignedTable ? assignedTable.id : null,
+          tableNumber:
+            dto.tableNumber ??
+            (assignedTable ? assignedTable.tableNumber : null),
+          customerName: dto.customerName ?? null,
+          subtotal: calculatedSubtotal,
+          discountAmount,
+          discountId: appliedDiscountId,
+          serviceCharge,
+          taxAmount,
+          taxName,
+          taxRate,
+          taxType,
+          packagingFee,
+          totalAmount,
+          notes: dto.notes ?? null,
+          createdBy: userId,
         });
 
-        for (const recipe of recipes) {
-          const deductionQty = Number(item.quantity) * Number(recipe.quantity);
+        const savedOrder = await orderRepo.save(order);
 
-          const stock = await stockRepo.findOne({
-            where: {
+        const items = orderItemsToCreate.map((item) =>
+          itemRepo.create({
+            ...item,
+            orderId: savedOrder.id,
+          }),
+        );
+
+        const savedItems = await itemRepo.save(items);
+
+        // Deduct raw materials for all items sent to station (recipes)
+        const recipeRepo = manager.getRepository(Recipe);
+        const stockRepo = manager.getRepository(InventoryStock);
+        const movementRepo = manager.getRepository(InventoryMovement);
+
+        for (const item of savedItems) {
+          const recipes = await recipeRepo.find({
+            where: { tenantId, variantId: item.variantId },
+          });
+
+          for (const recipe of recipes) {
+            const deductionQty =
+              Number(item.quantity) * Number(recipe.quantity);
+
+            const stock = await stockRepo.findOne({
+              where: {
+                tenantId,
+                outletId: targetOutletId,
+                inventoryItemId: recipe.inventoryItemId,
+              },
+            });
+
+            const currentQty = stock ? Number(stock.quantity) : 0;
+            if (currentQty < deductionQty) {
+              throw new BadRequestException({
+                success: false,
+                message: `Stok bahan baku tidak mencukupi untuk menu "${item.productName || 'Menu'}" (${item.variantName || 'Varian'}). Dibutuhkan: ${deductionQty}, tersedia: ${currentQty}.`,
+                code: 'INSUFFICIENT_RAW_MATERIAL_STOCK',
+              });
+            }
+
+            stock!.quantity = currentQty - deductionQty;
+            await stockRepo.save(stock!);
+
+            const movement = movementRepo.create({
               tenantId,
               outletId: targetOutletId,
               inventoryItemId: recipe.inventoryItemId,
-            },
-          });
-
-          const currentQty = stock ? Number(stock.quantity) : 0;
-          if (currentQty < deductionQty) {
-            throw new BadRequestException({
-              success: false,
-              message: `Stok bahan baku tidak mencukupi untuk menu "${item.productName || 'Menu'}" (${item.variantName || 'Varian'}). Dibutuhkan: ${deductionQty}, tersedia: ${currentQty}.`,
-              code: 'INSUFFICIENT_RAW_MATERIAL_STOCK',
+              movementType: 'SALE',
+              quantity: deductionQty,
+              referenceType: 'ORDER',
+              referenceId: savedOrder.orderNumber || savedOrder.id,
+              notes: `Sent to station via Order ${savedOrder.orderNumber} (${item.productName} - ${item.variantName})`,
+              movementDate: new Date(),
+              createdBy: userId,
+              metadata: {
+                orderId: savedOrder.id,
+                orderNumber: savedOrder.orderNumber,
+                orderItemId: item.id,
+                variantId: item.variantId,
+              },
             });
+            await movementRepo.save(movement);
           }
+        }
 
-          stock!.quantity = currentQty - deductionQty;
-          await stockRepo.save(stock!);
-
-          const movement = movementRepo.create({
+        // Packaging-based stock deduction for TAKE_AWAY orders
+        if (orderType === 'TAKE_AWAY') {
+          const packagings = await this.packagingService.findApplicableForOrder(
             tenantId,
-            outletId: targetOutletId,
-            inventoryItemId: recipe.inventoryItemId,
-            movementType: 'SALE',
-            quantity: deductionQty,
-            referenceType: 'ORDER',
-            referenceId: savedOrder.orderNumber || savedOrder.id,
-            notes: `Sent to station via Order ${savedOrder.orderNumber} (${item.productName} - ${item.variantName})`,
-            movementDate: new Date(),
-            createdBy: userId,
+            targetOutletId,
+            orderType,
+          );
+
+          for (const pkg of packagings) {
+            if (!pkg.inventoryItemId) continue;
+
+            let pStock = await stockRepo.findOne({
+              where: {
+                tenantId,
+                outletId: targetOutletId,
+                inventoryItemId: pkg.inventoryItemId,
+              },
+            });
+
+            if (!pStock) {
+              pStock = stockRepo.create({
+                tenantId,
+                outletId: targetOutletId,
+                inventoryItemId: pkg.inventoryItemId,
+                quantity: -1,
+              });
+            } else {
+              pStock.quantity = Number(pStock.quantity) - 1;
+            }
+            await stockRepo.save(pStock);
+
+            const pMovement = movementRepo.create({
+              tenantId,
+              outletId: targetOutletId,
+              inventoryItemId: pkg.inventoryItemId,
+              movementType: 'SALE',
+              quantity: 1,
+              referenceType: 'ORDER',
+              referenceId: savedOrder.orderNumber || savedOrder.id,
+              notes: `Takeaway packaging for Order ${savedOrder.orderNumber} (${pkg.name})`,
+              movementDate: new Date(),
+              createdBy: userId,
+              metadata: {
+                orderId: savedOrder.id,
+                orderNumber: savedOrder.orderNumber,
+                packagingId: pkg.id,
+              },
+            });
+            await movementRepo.save(pMovement);
+          }
+        }
+
+        await this.audit.record(
+          {
+            action: 'ORDER_CREATED',
+            tenantId,
+            actorType: 'USER',
+            actorId: userId,
             metadata: {
               orderId: savedOrder.id,
               orderNumber: savedOrder.orderNumber,
-              orderItemId: item.id,
-              variantId: item.variantId,
+              totalAmount: savedOrder.totalAmount,
+              packagingFee: savedOrder.packagingFee,
+              tableId: assignedTable?.id,
             },
-          });
-          await movementRepo.save(movement);
-        }
-      }
-
-      // Packaging-based stock deduction for TAKE_AWAY orders
-      if (orderType === 'TAKE_AWAY') {
-        const packagings = await this.packagingService.findApplicableForOrder(
-          tenantId,
-          targetOutletId,
-          orderType,
+          },
+          manager,
         );
 
-        for (const pkg of packagings) {
-          if (!pkg.inventoryItemId) continue;
-
-          let pStock = await stockRepo.findOne({
-            where: {
-              tenantId,
-              outletId: targetOutletId,
-              inventoryItemId: pkg.inventoryItemId,
-            },
-          });
-
-          if (!pStock) {
-            pStock = stockRepo.create({
-              tenantId,
-              outletId: targetOutletId,
-              inventoryItemId: pkg.inventoryItemId,
-              quantity: -1,
-            });
-          } else {
-            pStock.quantity = Number(pStock.quantity) - 1;
-          }
-          await stockRepo.save(pStock);
-
-          const pMovement = movementRepo.create({
-            tenantId,
-            outletId: targetOutletId,
-            inventoryItemId: pkg.inventoryItemId,
-            movementType: 'SALE',
-            quantity: 1,
-            referenceType: 'ORDER',
-            referenceId: savedOrder.orderNumber || savedOrder.id,
-            notes: `Takeaway packaging for Order ${savedOrder.orderNumber} (${pkg.name})`,
-            movementDate: new Date(),
-            createdBy: userId,
-            metadata: {
-              orderId: savedOrder.id,
-              orderNumber: savedOrder.orderNumber,
-              packagingId: pkg.id,
-            },
-          });
-          await movementRepo.save(pMovement);
-        }
-      }
-
-      await this.audit.record(
-        {
-          action: 'ORDER_CREATED',
-          tenantId,
-          actorType: 'USER',
-          actorId: userId,
-          metadata: {
-            orderId: savedOrder.id,
-            orderNumber: savedOrder.orderNumber,
-            totalAmount: savedOrder.totalAmount,
-            packagingFee: savedOrder.packagingFee,
-            tableId: assignedTable?.id,
-          },
-        },
-        manager,
-      );
-
-      return orderRepo.findOne({
-        where: { id: savedOrder.id, tenantId },
-        relations: { items: true, outlet: true, creator: true, table: true },
-      });
-    });
+        return orderRepo.findOne({
+          where: { id: savedOrder.id, tenantId },
+          relations: { items: true, outlet: true, creator: true, table: true },
+        });
+      }),
+    );
   }
 
   async findAll(tenantId: string, query: QueryOrderDto) {

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { InventoryCategory } from '../entities/inventory-category.entity';
 import { InventoryStock } from '../entities/inventory-stock.entity';
@@ -658,7 +658,7 @@ export class InventoryService {
         manager,
       );
 
-      return this.findAdjustmentById(tenantId, savedAdjustment.id);
+      return this.findAdjustmentById(tenantId, savedAdjustment.id, manager);
     });
   }
 
@@ -781,8 +781,15 @@ export class InventoryService {
   async findAdjustmentById(
     tenantId: string,
     id: string,
+    manager?: EntityManager,
   ): Promise<StockAdjustment> {
-    const adjustment = await this.adjustmentRepository.findOne({
+    // Pass the active transaction's manager when called right after a write
+    // in that same transaction — the just-inserted row isn't visible yet on
+    // a separate (non-transactional) connection until it commits.
+    const repo = manager
+      ? manager.getRepository(StockAdjustment)
+      : this.adjustmentRepository;
+    const adjustment = await repo.findOne({
       where: { id, tenantId },
       relations: {
         outlet: true,

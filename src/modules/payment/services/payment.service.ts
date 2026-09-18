@@ -11,6 +11,7 @@ import { Transaction } from '../entities/transaction.entity';
 import { Order } from '../../order/entities/order.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
+import { retryOnUniqueViolation } from '../../../common/utils/retry-on-unique-violation.util';
 import {
   CreatePaymentDto,
   GenerateQrisDto,
@@ -40,7 +41,7 @@ export class PaymentService {
   private generateTransactionNumber(): string {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const rand = Math.floor(1000 + Math.random() * 9000);
+    const rand = Math.floor(100000 + Math.random() * 900000);
     return `TRX-${dateStr}-${rand}`;
   }
 
@@ -194,25 +195,27 @@ export class PaymentService {
     const changeAmount =
       dto.paymentMethod === 'CASH' ? paidAmount - orderTotal : 0;
 
-    return this.dataSource.transaction(async (manager) => {
-      const paymentRepo = manager.getRepository(Payment);
+    return retryOnUniqueViolation(() =>
+      this.dataSource.transaction(async (manager) => {
+        const paymentRepo = manager.getRepository(Payment);
 
-      const payment = paymentRepo.create({
-        tenantId,
-        outletId: order.outletId,
-        orderId: order.id,
-        paymentMethod: dto.paymentMethod,
-        amount: paidAmount,
-        changeAmount,
-        status: 'SUCCESS',
-        referenceNumber: dto.referenceNumber ?? null,
-        paidAt: new Date(),
-        createdBy: userId,
-      });
-      const savedPayment = await paymentRepo.save(payment);
+        const payment = paymentRepo.create({
+          tenantId,
+          outletId: order.outletId,
+          orderId: order.id,
+          paymentMethod: dto.paymentMethod,
+          amount: paidAmount,
+          changeAmount,
+          status: 'SUCCESS',
+          referenceNumber: dto.referenceNumber ?? null,
+          paidAt: new Date(),
+          createdBy: userId,
+        });
+        const savedPayment = await paymentRepo.save(payment);
 
-      return this.executeSettlement(manager, savedPayment, order, userId);
-    });
+        return this.executeSettlement(manager, savedPayment, order, userId);
+      }),
+    );
   }
 
   async generateQris(tenantId: string, userId: string, dto: GenerateQrisDto) {
@@ -364,54 +367,56 @@ export class PaymentService {
     userId?: string | null,
     paidAt: Date = new Date(),
   ) {
-    return this.dataSource.transaction(async (manager) => {
-      const paymentRepo = manager.getRepository(Payment);
-      const orderRepo = manager.getRepository(Order);
+    return retryOnUniqueViolation(() =>
+      this.dataSource.transaction(async (manager) => {
+        const paymentRepo = manager.getRepository(Payment);
+        const orderRepo = manager.getRepository(Order);
 
-      const payment = await paymentRepo
-        .createQueryBuilder('p')
-        .setLock('pessimistic_write')
-        .where('p.id = :id AND p.tenantId = :tenantId', {
-          id: paymentId,
-          tenantId,
-        })
-        .getOne();
+        const payment = await paymentRepo
+          .createQueryBuilder('p')
+          .setLock('pessimistic_write')
+          .where('p.id = :id AND p.tenantId = :tenantId', {
+            id: paymentId,
+            tenantId,
+          })
+          .getOne();
 
-      if (!payment) {
-        throw new NotFoundException({
-          success: false,
-          message: 'Payment not found',
-          code: 'PAYMENT_NOT_FOUND',
+        if (!payment) {
+          throw new NotFoundException({
+            success: false,
+            message: 'Payment not found',
+            code: 'PAYMENT_NOT_FOUND',
+          });
+        }
+
+        if (payment.status === 'SUCCESS') {
+          return {
+            success: true,
+            message: 'Payment is already settled',
+            payment,
+          };
+        }
+
+        payment.status = 'SUCCESS';
+        payment.paidAt = paidAt;
+        const savedPayment = await paymentRepo.save(payment);
+
+        const order = await orderRepo.findOne({
+          where: { id: payment.orderId, tenantId },
+          relations: { items: true, outlet: true },
         });
-      }
 
-      if (payment.status === 'SUCCESS') {
-        return {
-          success: true,
-          message: 'Payment is already settled',
-          payment,
-        };
-      }
+        if (!order) {
+          throw new NotFoundException({
+            success: false,
+            message: 'Order not found for payment',
+            code: 'ORDER_NOT_FOUND',
+          });
+        }
 
-      payment.status = 'SUCCESS';
-      payment.paidAt = paidAt;
-      const savedPayment = await paymentRepo.save(payment);
-
-      const order = await orderRepo.findOne({
-        where: { id: payment.orderId, tenantId },
-        relations: { items: true, outlet: true },
-      });
-
-      if (!order) {
-        throw new NotFoundException({
-          success: false,
-          message: 'Order not found for payment',
-          code: 'ORDER_NOT_FOUND',
-        });
-      }
-
-      return this.executeSettlement(manager, savedPayment, order, userId);
-    });
+        return this.executeSettlement(manager, savedPayment, order, userId);
+      }),
+    );
   }
 
   async checkQrisStatus(tenantId: string, userId: string, orderId: string) {
