@@ -10,6 +10,7 @@ import { AuditLog } from '../modules/audit/audit-log.entity';
 import { Category } from '../modules/product/entities/category.entity';
 import { Product } from '../modules/product/entities/product.entity';
 import { ProductVariant } from '../modules/product/entities/product-variant.entity';
+import { OutletProduct } from '../modules/product/entities/outlet-product.entity';
 import { InventoryCategory } from '../modules/inventory/entities/inventory-category.entity';
 import { InventoryItem } from '../modules/inventory/entities/inventory-item.entity';
 import { InventoryStock } from '../modules/inventory/entities/inventory-stock.entity';
@@ -58,6 +59,7 @@ export default new DataSource({
     Category,
     Product,
     ProductVariant,
+    OutletProduct,
     InventoryCategory,
     InventoryItem,
     InventoryStock,
