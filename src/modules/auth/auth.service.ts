@@ -245,6 +245,15 @@ export class AuthService {
       refreshToken,
       refreshExpiresIn,
       user: safeUser,
+      tenant: user.tenant
+        ? {
+            id: user.tenant.id,
+            name: user.tenant.businessName,
+            businessName: user.tenant.businessName,
+            status: user.tenant.status,
+            plan: user.tenant.planType,
+          }
+        : null,
     };
   }
 }

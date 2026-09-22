@@ -135,6 +135,10 @@ describe('AuthService', () => {
           roleId: 'role-1',
           status: 'ACTIVE',
         }),
+        tenant: expect.objectContaining({
+          businessName: 'Test Cafe',
+          name: 'Test Cafe',
+        }),
       });
 
       expect(signAsync).toHaveBeenCalledTimes(2);
@@ -218,6 +222,10 @@ describe('AuthService', () => {
           outletId: 'outlet-1',
           roleId: 'role-1',
           status: 'ACTIVE',
+        }),
+        tenant: expect.objectContaining({
+          businessName: 'Test Cafe',
+          name: 'Test Cafe',
         }),
       });
       expect(verifyAsync).toHaveBeenCalledWith('valid-refresh-token', {
