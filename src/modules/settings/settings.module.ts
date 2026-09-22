@@ -6,6 +6,7 @@ import { Discount } from './entities/discount.entity';
 import { Outlet } from '../outlet/outlet.entity';
 import { Product } from '../product/entities/product.entity';
 import { AuditModule } from '../audit/audit.module';
+import { StorageModule } from '../storage/storage.module';
 import { SettingsService } from './services/settings.service';
 import { TaxService } from './services/tax.service';
 import { DiscountService } from './services/discount.service';
@@ -17,6 +18,7 @@ import { DiscountController } from './controllers/discount.controller';
   imports: [
     TypeOrmModule.forFeature([PosSettings, Tax, Discount, Outlet, Product]),
     AuditModule,
+    StorageModule,
   ],
   controllers: [SettingsController, TaxController, DiscountController],
   providers: [SettingsService, TaxService, DiscountService],

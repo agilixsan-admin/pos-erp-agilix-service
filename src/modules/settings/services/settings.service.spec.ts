@@ -78,6 +78,37 @@ describe('SettingsService', () => {
       expect(result.taxRate).toBe(11);
     });
 
+    it('inherits global tenant billLogoUrl when outlet-specific settings exist without logo', async () => {
+      const mockOutletSettings = {
+        id: 's-outlet',
+        tenantId: mockTenantId,
+        outletId: mockOutletId,
+        taxEnabled: true,
+        taxRate: 11,
+        billLogoUrl: null,
+        billFooterText: null,
+      } as PosSettings;
+
+      const mockTenantSettings = {
+        id: 's-tenant',
+        tenantId: mockTenantId,
+        outletId: null,
+        billLogoUrl: 'https://storage.agilix.id/uploads/tenant/branding/logo.webp',
+        billFooterText: 'Terima kasih atas kunjungan Anda!',
+      } as PosSettings;
+
+      settingsRepo.findOne
+        .mockResolvedValueOnce(mockOutletSettings)
+        .mockResolvedValueOnce(mockTenantSettings);
+
+      const result = await service.getSettings(mockTenantId, mockOutletId);
+      expect(result.id).toBe('s-outlet');
+      expect(result.billLogoUrl).toBe(
+        'https://storage.agilix.id/uploads/tenant/branding/logo.webp',
+      );
+      expect(result.billFooterText).toBe('Terima kasih atas kunjungan Anda!');
+    });
+
     it('falls back to tenant-level settings when outlet-specific settings do not exist', async () => {
       const mockTenantSettings = {
         id: 's-tenant',

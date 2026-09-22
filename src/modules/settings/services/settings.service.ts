@@ -26,6 +26,19 @@ export class SettingsService {
         relations: ['defaultGlobalTax'],
       });
       if (outletSettings) {
+        // Logo is global per tenant. Inherit tenant logo and fallback footer text.
+        const tenantSettings = await this.settingsRepository.findOne({
+          where: { tenantId, outletId: IsNull() },
+        });
+        if (tenantSettings) {
+          outletSettings.billLogoUrl = tenantSettings.billLogoUrl;
+          if (
+            outletSettings.billFooterText === undefined ||
+            outletSettings.billFooterText === null
+          ) {
+            outletSettings.billFooterText = tenantSettings.billFooterText;
+          }
+        }
         return outletSettings;
       }
     }

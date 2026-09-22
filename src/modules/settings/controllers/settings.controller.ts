@@ -1,5 +1,17 @@
-import { Body, Controller, Get, Put, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SettingsService } from '../services/settings.service';
+import { StorageService } from '../../storage/services/storage.service';
 import {
   QueryPosSettingsDto,
   UpdatePosSettingsDto,
@@ -10,7 +22,30 @@ import { User } from '../../user/user.entity';
 
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly storageService: StorageService,
+  ) {}
+
+  @Post('upload-logo')
+  @Permissions('settings.manage')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadLogo(
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File logo wajib diunggah');
+    }
+
+    const url = await this.storageService.uploadBillLogo(user.tenantId, file);
+
+    return {
+      success: true,
+      message: 'Logo struk berhasil diunggah',
+      data: { url },
+    };
+  }
 
   @Get()
   @Permissions('settings.read')

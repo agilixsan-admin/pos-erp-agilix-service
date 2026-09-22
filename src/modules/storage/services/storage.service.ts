@@ -49,6 +49,51 @@ export class StorageService {
     );
   }
 
+  async uploadBillLogo(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    this.imageProcessor.validateImage(file);
+    const processed = await this.imageProcessor.convertToWebp(file.buffer);
+
+    const filename = `bill_logo_${Date.now()}${processed.extension}`;
+    const filePath = `uploads/${tenantId}/branding/${filename}`;
+
+    return this.driver.uploadFile(
+      filePath,
+      processed.buffer,
+      processed.contentType,
+    );
+  }
+
+  async deleteBillLogo(
+    tenantId: string,
+    imageUrl: string | null | undefined,
+  ): Promise<void> {
+    if (!imageUrl) return;
+
+    try {
+      const tenantPrefix = `uploads/${tenantId}/`;
+      const prefixIndex = imageUrl.indexOf(tenantPrefix);
+
+      if (prefixIndex === -1) {
+        this.logger.warn(
+          `Skipping deletion of logo outside tenant scope: ${imageUrl}`,
+        );
+        return;
+      }
+
+      const filePath = imageUrl.substring(prefixIndex);
+      await this.driver.deleteFile(filePath);
+    } catch (err: unknown) {
+      this.logger.warn(
+        `Failed to delete old bill logo (${imageUrl}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
   async deleteProductImage(
     tenantId: string,
     imageUrl: string | null | undefined,
