@@ -12,6 +12,7 @@ describe('SettingsService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
   };
   let outletRepo: {
     findOne: jest.Mock;
@@ -40,6 +41,7 @@ describe('SettingsService', () => {
           id: entity.id || 'settings-uuid-1',
         } as PosSettings),
       ),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     outletRepo = {
@@ -78,7 +80,7 @@ describe('SettingsService', () => {
       expect(result.taxRate).toBe(11);
     });
 
-    it('inherits global tenant billLogoUrl when outlet-specific settings exist without logo', async () => {
+    it('inherits global tenant billLogoUrl and billFooterText when outlet-specific settings exist', async () => {
       const mockOutletSettings = {
         id: 's-outlet',
         tenantId: mockTenantId,
@@ -86,15 +88,16 @@ describe('SettingsService', () => {
         taxEnabled: true,
         taxRate: 11,
         billLogoUrl: null,
-        billFooterText: null,
+        billFooterText: 'Old Stale Default Footer',
       } as PosSettings;
 
       const mockTenantSettings = {
         id: 's-tenant',
         tenantId: mockTenantId,
         outletId: null,
-        billLogoUrl: 'https://storage.agilix.id/uploads/tenant/branding/logo.webp',
-        billFooterText: 'Terima kasih atas kunjungan Anda!',
+        billLogoUrl:
+          'https://storage.agilix.id/uploads/tenant/branding/logo.webp',
+        billFooterText: 'Fresh Updated Global Footer!',
       } as PosSettings;
 
       settingsRepo.findOne
@@ -106,7 +109,7 @@ describe('SettingsService', () => {
       expect(result.billLogoUrl).toBe(
         'https://storage.agilix.id/uploads/tenant/branding/logo.webp',
       );
-      expect(result.billFooterText).toBe('Terima kasih atas kunjungan Anda!');
+      expect(result.billFooterText).toBe('Fresh Updated Global Footer!');
     });
 
     it('falls back to tenant-level settings when outlet-specific settings do not exist', async () => {
@@ -201,6 +204,37 @@ describe('SettingsService', () => {
       expect(result.taxRate).toBe(12);
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'SETTINGS_UPDATED' }),
+      );
+    });
+
+    it('synchronizes billLogoUrl and billFooterText to all tenant settings rows when global settings are updated', async () => {
+      const existingGlobal = {
+        id: 's-global',
+        tenantId: mockTenantId,
+        outletId: null,
+        billLogoUrl: null,
+        billFooterText: 'Old Footer',
+      } as PosSettings;
+      settingsRepo.findOne.mockResolvedValue(existingGlobal);
+
+      const result = await service.updateSettings(
+        mockTenantId,
+        {
+          outletId: null,
+          billLogoUrl: 'https://new-logo.png',
+          billFooterText: 'Brand New Footer Note',
+        },
+        mockUserId,
+      );
+
+      expect(result.billLogoUrl).toBe('https://new-logo.png');
+      expect(result.billFooterText).toBe('Brand New Footer Note');
+      expect(settingsRepo.update).toHaveBeenCalledWith(
+        { tenantId: mockTenantId },
+        {
+          billLogoUrl: 'https://new-logo.png',
+          billFooterText: 'Brand New Footer Note',
+        },
       );
     });
   });

@@ -26,18 +26,13 @@ export class SettingsService {
         relations: ['defaultGlobalTax'],
       });
       if (outletSettings) {
-        // Logo is global per tenant. Inherit tenant logo and fallback footer text.
+        // Logo and receipt footer are global per tenant. Always inherit from tenantSettings.
         const tenantSettings = await this.settingsRepository.findOne({
           where: { tenantId, outletId: IsNull() },
         });
         if (tenantSettings) {
           outletSettings.billLogoUrl = tenantSettings.billLogoUrl;
-          if (
-            outletSettings.billFooterText === undefined ||
-            outletSettings.billFooterText === null
-          ) {
-            outletSettings.billFooterText = tenantSettings.billFooterText;
-          }
+          outletSettings.billFooterText = tenantSettings.billFooterText;
         }
         return outletSettings;
       }
@@ -98,6 +93,9 @@ export class SettingsService {
     });
 
     if (!settings) {
+      const tenantSettings = await this.settingsRepository.findOne({
+        where: { tenantId, outletId: IsNull() },
+      });
       settings = this.settingsRepository.create({
         tenantId,
         outletId: targetOutletId,
@@ -110,9 +108,11 @@ export class SettingsService {
         cashEnabled: dto.cashEnabled ?? true,
         qrisEnabled: dto.qrisEnabled ?? true,
         voidVerificationMode: dto.voidVerificationMode ?? 'SUPERVISOR_APPROVAL',
-        billLogoUrl: dto.billLogoUrl ?? null,
+        billLogoUrl: dto.billLogoUrl ?? tenantSettings?.billLogoUrl ?? null,
         billFooterText:
-          dto.billFooterText ?? 'Terima kasih atas kunjungan Anda!',
+          dto.billFooterText !== undefined
+            ? dto.billFooterText
+            : (tenantSettings?.billFooterText ?? 'Terima kasih atas kunjungan Anda!'),
       });
     } else {
       if (dto.taxEnabled !== undefined) settings.taxEnabled = dto.taxEnabled;
@@ -134,6 +134,22 @@ export class SettingsService {
     }
 
     const saved = await this.settingsRepository.save(settings);
+
+    if (targetOutletId === null) {
+      const syncUpdate: {
+        billLogoUrl?: string | null;
+        billFooterText?: string | null;
+      } = {};
+      if (dto.billLogoUrl !== undefined) {
+        syncUpdate.billLogoUrl = dto.billLogoUrl;
+      }
+      if (dto.billFooterText !== undefined) {
+        syncUpdate.billFooterText = dto.billFooterText;
+      }
+      if (Object.keys(syncUpdate).length > 0) {
+        await this.settingsRepository.update({ tenantId }, syncUpdate);
+      }
+    }
 
     await this.audit.record({
       action: 'SETTINGS_UPDATED',
