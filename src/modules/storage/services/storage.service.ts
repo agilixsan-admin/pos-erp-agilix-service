@@ -49,6 +49,23 @@ export class StorageService {
     );
   }
 
+  async uploadReceiptPhoto(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    this.imageProcessor.validateImage(file);
+    const processed = await this.imageProcessor.convertToWebp(file.buffer);
+
+    const filename = `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${processed.extension}`;
+    const filePath = `uploads/${tenantId}/receipts/${filename}`;
+
+    return this.driver.uploadFile(
+      filePath,
+      processed.buffer,
+      processed.contentType,
+    );
+  }
+
   async uploadBillLogo(
     tenantId: string,
     file: Express.Multer.File,

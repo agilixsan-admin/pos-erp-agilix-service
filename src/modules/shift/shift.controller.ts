@@ -6,8 +6,12 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ShiftService } from './shift.service';
+import { StorageService } from '../storage/services/storage.service';
 import {
   CloseShiftDto,
   OpenShiftDto,
@@ -20,7 +24,28 @@ import { User } from '../user/user.entity';
 
 @Controller('shifts')
 export class ShiftController {
-  constructor(private readonly shiftService: ShiftService) {}
+  constructor(
+    private readonly shiftService: ShiftService,
+    private readonly storageService: StorageService,
+  ) {}
+
+  @Post('upload-receipt')
+  @Permissions('shift.petty_cash')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadReceipt(
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const url = await this.storageService.uploadReceiptPhoto(
+      user.tenantId,
+      file,
+    );
+    return {
+      success: true,
+      message: 'Foto nota berhasil diunggah.',
+      url,
+    };
+  }
 
   @Post('open')
   @Permissions('shift.open')

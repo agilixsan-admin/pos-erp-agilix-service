@@ -8,12 +8,14 @@ import { ShiftService } from './shift.service';
 import { ShiftController } from './shift.controller';
 import { FinanceModule } from '../finance/finance.module';
 import { AuditModule } from '../audit/audit.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PosShift, PettyCashTransaction, Order, Payment]),
     FinanceModule,
     AuditModule,
+    StorageModule,
   ],
   providers: [ShiftService],
   controllers: [ShiftController],
