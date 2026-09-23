@@ -6,6 +6,7 @@ import { PaymentService } from './payment.service';
 import { Payment } from '../entities/payment.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { Order } from '../../order/entities/order.entity';
+import { PosShift } from '../../shift/entities/pos-shift.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
@@ -35,6 +36,16 @@ describe('PaymentService', () => {
     findOne: jest.fn(),
   };
 
+  const mockShiftRepo = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'user-1',
+      status: 'OPEN',
+    }),
+  };
+
   const mockDataSource = {
     transaction: jest.fn(),
   };
@@ -60,6 +71,13 @@ describe('PaymentService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockShiftRepo.findOne.mockResolvedValue({
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'user-1',
+      status: 'OPEN',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,6 +93,10 @@ describe('PaymentService', () => {
         {
           provide: getRepositoryToken(Order),
           useValue: mockOrderRepo,
+        },
+        {
+          provide: getRepositoryToken(PosShift),
+          useValue: mockShiftRepo,
         },
         {
           provide: QRIS_PROVIDER_TOKEN,
@@ -449,9 +471,44 @@ describe('PaymentService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('rejects payment if cashier does not have an active open shift', async () => {
+      mockOrderRepo.findOne.mockResolvedValue({
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        totalAmount: 50000,
+      });
+      mockShiftRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.create('tenant-1', 'user-1', {
+          orderId: 'ord-1',
+          paymentMethod: 'CASH',
+          amount: 50000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('generateQris', () => {
+    it('rejects QRIS generation if cashier does not have an active open shift', async () => {
+      mockOrderRepo.findOne.mockResolvedValue({
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        status: 'PENDING',
+        totalAmount: 50000,
+      });
+      mockShiftRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.generateQris('tenant-1', 'user-1', {
+          orderId: 'ord-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
     it('generates dynamic QRIS for a pending order', async () => {
       const order = {
         id: 'ord-1',

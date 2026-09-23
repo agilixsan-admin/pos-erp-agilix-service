@@ -7,6 +7,7 @@ import { Outlet } from '../outlet/outlet.entity';
 import { ProductVariant } from '../product/entities/product-variant.entity';
 import { OutletProduct } from '../product/entities/outlet-product.entity';
 import { Table } from '../table/entities/table.entity';
+import { PosShift } from '../shift/entities/pos-shift.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
 import { PackagingModule } from '../packaging/packaging.module';
@@ -23,6 +24,7 @@ import { OrderController } from './controllers/order.controller';
       ProductVariant,
       OutletProduct,
       Table,
+      PosShift,
     ]),
     AuditModule,
     SettingsModule,

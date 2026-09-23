@@ -18,6 +18,7 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { ProductVariant } from '../../product/entities/product-variant.entity';
 import { OutletProduct } from '../../product/entities/outlet-product.entity';
 import { Table } from '../../table/entities/table.entity';
+import { PosShift } from '../../shift/entities/pos-shift.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
@@ -48,6 +49,16 @@ describe('OrderService', () => {
 
   const mockOutletRepo = {
     findOne: jest.fn(),
+  };
+
+  const mockShiftRepo = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'user-1',
+      status: 'OPEN',
+    }),
   };
 
   const mockVariantRepo = {
@@ -105,6 +116,13 @@ describe('OrderService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockShiftRepo.findOne.mockResolvedValue({
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'user-1',
+      status: 'OPEN',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -136,6 +154,10 @@ describe('OrderService', () => {
         {
           provide: getRepositoryToken(OutletProduct),
           useValue: mockOutletProductRepo,
+        },
+        {
+          provide: getRepositoryToken(PosShift),
+          useValue: mockShiftRepo,
         },
         {
           provide: DataSource,
@@ -254,6 +276,20 @@ describe('OrderService', () => {
           isActive: false,
         },
       ]);
+
+      await expect(
+        service.create('tenant-1', 'user-1', 'outlet-1', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects order creation if cashier does not have an active open shift', async () => {
+      mockOutletRepo.findOne.mockResolvedValue({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockShiftRepo.findOne.mockResolvedValueOnce(null);
 
       await expect(
         service.create('tenant-1', 'user-1', 'outlet-1', {
@@ -2004,6 +2040,28 @@ describe('OrderService', () => {
 
       await expect(
         service.addItems('tenant-1', 'user-1', 'ord-comp', {
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects adding items if cashier does not have an active open shift', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'ord-pending',
+          status: 'PENDING',
+          tenantId: 'tenant-1',
+          outletId: 'outlet-1',
+          items: [],
+        }),
+      } as unknown as SelectQueryBuilder<Order>;
+      mockOrderRepo.createQueryBuilder.mockReturnValue(qb);
+      mockShiftRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.addItems('tenant-1', 'user-1', 'ord-pending', {
           items: [{ variantId: 'var-1', quantity: 1 }],
         }),
       ).rejects.toThrow(BadRequestException);

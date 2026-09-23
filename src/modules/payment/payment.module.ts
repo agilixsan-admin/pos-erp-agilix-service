@@ -9,6 +9,7 @@ import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { Table } from '../table/entities/table.entity';
 import { Packaging } from '../packaging/entities/packaging.entity';
+import { PosShift } from '../shift/entities/pos-shift.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -30,6 +31,7 @@ import { QRIS_PROVIDER_TOKEN } from './interfaces/qris-provider.interface';
       InventoryMovement,
       Table,
       Packaging,
+      PosShift,
     ]),
     AuditModule,
     SettingsModule,

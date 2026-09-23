@@ -18,6 +18,7 @@ import { Table } from '../../table/entities/table.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
 import { InventoryStock } from '../../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
+import { PosShift } from '../../shift/entities/pos-shift.entity';
 import { AuditService } from '../../audit/audit.service';
 import { retryOnUniqueViolation } from '../../../common/utils/retry-on-unique-violation.util';
 import { SettingsService } from '../../settings/services/settings.service';
@@ -49,6 +50,8 @@ export class OrderService {
     private readonly outletProductRepository: Repository<OutletProduct>,
     @InjectRepository(Table)
     private readonly tableRepository: Repository<Table>,
+    @InjectRepository(PosShift)
+    private readonly shiftRepository: Repository<PosShift>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly settingsService: SettingsService,
@@ -86,6 +89,24 @@ export class OrderService {
         success: false,
         message: 'Outlet not found or does not belong to this tenant',
         code: 'INVALID_OUTLET',
+      });
+    }
+
+    const activeShift = await this.shiftRepository.findOne({
+      where: {
+        tenantId,
+        outletId: targetOutletId,
+        userId,
+        status: 'OPEN',
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException({
+        success: false,
+        message:
+          'Shift kasir belum dibuka. Silakan buka shift terlebih dahulu sebelum melakukan transaksi.',
+        code: 'SHIFT_NOT_OPEN',
       });
     }
 
@@ -1186,6 +1207,24 @@ export class OrderService {
         success: false,
         message: `Cannot add items to an order with status ${order.status}`,
         code: 'ORDER_LOCKED',
+      });
+    }
+
+    const activeShift = await this.shiftRepository.findOne({
+      where: {
+        tenantId,
+        outletId: order.outletId,
+        userId,
+        status: 'OPEN',
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException({
+        success: false,
+        message:
+          'Shift kasir belum dibuka. Silakan buka shift terlebih dahulu sebelum menambahkan item ke pesanan.',
+        code: 'SHIFT_NOT_OPEN',
       });
     }
 

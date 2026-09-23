@@ -38,6 +38,9 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
     const mockPackagingService = {
       findApplicableForOrder: jest.fn().mockResolvedValue([]),
     };
+    const mockShiftRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'shift-1', status: 'OPEN' }),
+    };
 
     beforeEach(() => {
       jest.clearAllMocks();
@@ -49,6 +52,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockVariantRepo as any,
         mockOutletProductRepo as any,
         mockTableRepo as any,
+        mockShiftRepo as any,
         mockDataSource as any,
         mockAuditService as any,
         mockSettingsService as any,
@@ -190,6 +194,9 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
     const mockPackagingService = {
       findApplicableForOrder: jest.fn().mockResolvedValue([]),
     };
+    const mockShiftRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'shift-1', status: 'OPEN' }),
+    };
 
     beforeEach(() => {
       jest.clearAllMocks();
@@ -201,6 +208,7 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         {} as any,
         mockOutletProductRepo as any,
         mockTableRepo as any,
+        mockShiftRepo as any,
         mockDataSource as any,
         mockAuditService as any,
         mockSettingsService as any,
@@ -353,16 +361,27 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         .mockResolvedValue({ cashEnabled: true, qrisEnabled: true }),
     };
 
+    const mockShiftRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'shift-1', status: 'OPEN' }),
+    };
+
     beforeEach(() => {
       jest.clearAllMocks();
       paymentService = new PaymentService(
         mockPaymentRepo as any,
         mockTrxRepo as any,
         mockOrderRepo as any,
+        mockShiftRepo as any,
         {} as any,
         mockDataSource as any,
         mockAuditService as any,
         mockSettingsService as any,
+        {
+          ensureOutletCashAccount: jest.fn().mockResolvedValue({ id: 'cash-1' }),
+        } as any,
+        {
+          recordJournal: jest.fn().mockResolvedValue({ id: 'journal-1' }),
+        } as any,
       );
     });
 

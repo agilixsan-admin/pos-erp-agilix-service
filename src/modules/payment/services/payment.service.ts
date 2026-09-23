@@ -9,6 +9,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Payment } from '../entities/payment.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { Order } from '../../order/entities/order.entity';
+import { PosShift } from '../../shift/entities/pos-shift.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { OrderItem } from '../../order/entities/order-item.entity';
@@ -36,6 +37,8 @@ export class PaymentService {
     private readonly transactionRepository: Repository<Transaction>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(PosShift)
+    private readonly shiftRepository: Repository<PosShift>,
     @Inject(QRIS_PROVIDER_TOKEN)
     private readonly qrisProvider: IQrisProvider,
     private readonly dataSource: DataSource,
@@ -336,6 +339,24 @@ export class PaymentService {
       });
     }
 
+    const activeShift = await this.shiftRepository.findOne({
+      where: {
+        tenantId,
+        outletId: order.outletId,
+        userId,
+        status: 'OPEN',
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException({
+        success: false,
+        message:
+          'Shift kasir belum dibuka. Silakan buka shift terlebih dahulu sebelum menyelesaikan pembayaran transaksi.',
+        code: 'SHIFT_NOT_OPEN',
+      });
+    }
+
     const settings = await this.settingsService.getSettings(
       tenantId,
       order.outletId,
@@ -422,6 +443,24 @@ export class PaymentService {
         success: false,
         message: `Cannot process payment for an order with status ${order.status}`,
         code: 'ORDER_INACTIVE',
+      });
+    }
+
+    const activeShift = await this.shiftRepository.findOne({
+      where: {
+        tenantId,
+        outletId: order.outletId,
+        userId,
+        status: 'OPEN',
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException({
+        success: false,
+        message:
+          'Shift kasir belum dibuka. Silakan buka shift terlebih dahulu sebelum memproses pembayaran QRIS.',
+        code: 'SHIFT_NOT_OPEN',
       });
     }
 
