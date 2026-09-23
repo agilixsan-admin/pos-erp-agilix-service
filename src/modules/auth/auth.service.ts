@@ -121,7 +121,8 @@ export class AuthService {
    * Verify an invitation token before showing password setup UI
    */
   async verifyInvitation(token: string) {
-    const tokenHash = this.hashToken(token);
+    const cleanToken = (token || '').trim();
+    const tokenHash = this.hashToken(cleanToken);
     const invitation = await this.invitationRepo.findOne({
       where: { tokenHash },
       relations: { user: { tenant: true, outlet: true, role: true } },
@@ -149,7 +150,8 @@ export class AuthService {
    * Set user password using a valid invitation token
    */
   async setPassword(token: string, password: string) {
-    const tokenHash = this.hashToken(token);
+    const cleanToken = (token || '').trim();
+    const tokenHash = this.hashToken(cleanToken);
     const invitation = await this.invitationRepo.findOne({
       where: { tokenHash },
       relations: { user: { tenant: true, outlet: true, role: true } },

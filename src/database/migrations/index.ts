@@ -29,6 +29,7 @@ import { FixHttsSchemeInImageUrls1700000000027 } from './1700000000027-FixHttsSc
 import { AddServiceChargeAndTaxDetails1700000000028 } from './1700000000028-AddServiceChargeAndTaxDetails';
 import { AddVoidVerificationSettingsAndApprovedBy1700000000029 } from './1700000000029-AddVoidVerificationSettingsAndApprovedBy';
 import { CreateOutletProductsTable1700000000030 } from './1700000000030-CreateOutletProductsTable';
+import { UpdateUserInvitationEmailTemplateForMobileIOS1700000000031 } from './1700000000031-UpdateUserInvitationEmailTemplateForMobileIOS';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -62,4 +63,5 @@ export const ALL_MIGRATIONS = [
   AddServiceChargeAndTaxDetails1700000000028,
   AddVoidVerificationSettingsAndApprovedBy1700000000029,
   CreateOutletProductsTable1700000000030,
+  UpdateUserInvitationEmailTemplateForMobileIOS1700000000031,
 ];
