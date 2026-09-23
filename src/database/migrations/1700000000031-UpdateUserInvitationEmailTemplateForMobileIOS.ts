@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class UpdateUserInvitationEmailTemplateForMobileIOS1700000000031
-  implements MigrationInterface
-{
+export class UpdateUserInvitationEmailTemplateForMobileIOS1700000000031 implements MigrationInterface {
   name = 'UpdateUserInvitationEmailTemplateForMobileIOS1700000000031';
 
   async up(queryRunner: QueryRunner): Promise<void> {
@@ -128,8 +126,7 @@ export class UpdateUserInvitationEmailTemplateForMobileIOS1700000000031
     );
   }
 
-  async down(queryRunner: QueryRunner): Promise<void> {
+  async down(): Promise<void> {
     // Safe no-op or revert if necessary
   }
 }
-

@@ -112,7 +112,8 @@ export class SettingsService {
         billFooterText:
           dto.billFooterText !== undefined
             ? dto.billFooterText
-            : (tenantSettings?.billFooterText ?? 'Terima kasih atas kunjungan Anda!'),
+            : (tenantSettings?.billFooterText ??
+              'Terima kasih atas kunjungan Anda!'),
       });
     } else {
       if (dto.taxEnabled !== undefined) settings.taxEnabled = dto.taxEnabled;
