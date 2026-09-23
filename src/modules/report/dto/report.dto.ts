@@ -74,3 +74,33 @@ export class QueryInventoryMovementsReportDto {
   @Min(1)
   limit?: number = 20;
 }
+
+export class QueryShiftReportDto {
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  outletId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+}
+
+export class QueryFinancialReportDto {
+  @IsDateString()
+  startDate!: string;
+
+  @IsDateString()
+  endDate!: string;
+
+  @IsOptional()
+  @IsString()
+  outletId?: string;
+}

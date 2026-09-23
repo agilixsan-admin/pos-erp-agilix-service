@@ -9,6 +9,11 @@ import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { Recipe } from '../recipe/entities/recipe.entity';
+import { PosShift } from '../shift/entities/pos-shift.entity';
+import { Expense } from '../finance/entities/expense.entity';
+import { FinancialAccount } from '../finance/entities/financial-account.entity';
+import { FixedAsset } from '../finance/entities/fixed-asset.entity';
+import { FixedAssetService } from '../finance/services/fixed-asset.service';
 
 describe('ReportService', () => {
   let service: ReportService;
@@ -21,6 +26,11 @@ describe('ReportService', () => {
   const mockMovementRepo = { createQueryBuilder: jest.fn() };
   const mockItemRepo = { createQueryBuilder: jest.fn() };
   const mockRecipeRepo = { createQueryBuilder: jest.fn() };
+  const mockShiftRepo = { createQueryBuilder: jest.fn() };
+  const mockExpenseRepo = { createQueryBuilder: jest.fn() };
+  const mockAccountRepo = { find: jest.fn().mockResolvedValue([]) };
+  const mockAssetRepo = { createQueryBuilder: jest.fn() };
+  const mockAssetService = { getAssets: jest.fn().mockResolvedValue([]) };
 
   const buildQb = (overrides: Record<string, jest.Mock> = {}) => ({
     select: jest.fn().mockReturnThis(),
@@ -38,6 +48,7 @@ describe('ReportService', () => {
     getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
     getCount: jest.fn().mockResolvedValue(0),
     getRawMany: jest.fn().mockResolvedValue([]),
+    getRawOne: jest.fn().mockResolvedValue(null),
     ...overrides,
   });
 
@@ -64,6 +75,14 @@ describe('ReportService', () => {
         },
         { provide: getRepositoryToken(InventoryItem), useValue: mockItemRepo },
         { provide: getRepositoryToken(Recipe), useValue: mockRecipeRepo },
+        { provide: getRepositoryToken(PosShift), useValue: mockShiftRepo },
+        { provide: getRepositoryToken(Expense), useValue: mockExpenseRepo },
+        {
+          provide: getRepositoryToken(FinancialAccount),
+          useValue: mockAccountRepo,
+        },
+        { provide: getRepositoryToken(FixedAsset), useValue: mockAssetRepo },
+        { provide: FixedAssetService, useValue: mockAssetService },
       ],
     }).compile();
 

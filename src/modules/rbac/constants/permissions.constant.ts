@@ -104,6 +104,38 @@ export const SYSTEM_PERMISSIONS_GROUPS: PermissionGroup[] = [
           },
         ],
       },
+      {
+        key: 'pos_shift',
+        title: 'Shift & Kasir Laci',
+        permissions: [
+          {
+            code: 'shift.read',
+            name: 'Lihat Data Shift Kasir',
+            description: 'Melihat status shift yang aktif dan riwayat shift',
+            action: 'read',
+          },
+          {
+            code: 'shift.open',
+            name: 'Buka Shift Kasir',
+            description: 'Membuka shift kasir dan memasukkan modal awal laci',
+            action: 'create',
+          },
+          {
+            code: 'shift.petty_cash',
+            name: 'Catat Kas Keluar (Petty Cash)',
+            description:
+              'Mengeluarkan uang kas laci untuk kebutuhan mendesak dan unggah nota',
+            action: 'create',
+          },
+          {
+            code: 'shift.close',
+            name: 'Tutup Shift Kasir (Blind Close)',
+            description:
+              'Menutup shift dan memasukkan hitungan fisik uang laci',
+            action: 'update',
+          },
+        ],
+      },
     ],
   },
   {
@@ -337,10 +369,139 @@ export const SYSTEM_PERMISSIONS_GROUPS: PermissionGroup[] = [
         permissions: [
           {
             code: 'report.read',
-            name: 'Lihat Seluruh Laporan',
+            name: 'Lihat Seluruh Laporan Penjualan',
             description:
-              'Mengakses laporan penjualan, profit/laba rugi, COGS, dan mutasi inventori',
+              'Mengakses laporan penjualan, profit/laba kotor, COGS, dan mutasi inventori',
             action: 'read',
+          },
+          {
+            code: 'report.shift.read',
+            name: 'Lihat Laporan Rekonsiliasi Shift',
+            description:
+              'Melihat audit rekapitulasi shift kasir dan selisih fisik uang laci',
+            action: 'read',
+          },
+          {
+            code: 'report.financial.read',
+            name: 'Lihat Laporan Keuangan Akuntansi',
+            description:
+              'Mengakses Laporan Laba/Rugi Bersih, Neraca Keuangan, dan Arus Kas Komprehensif',
+            action: 'read',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    groupKey: 'keuangan',
+    groupTitle: 'Modul Keuangan & Akuntansi (ERP)',
+    description:
+      'Pengelolaan kas & bank, biaya operasional (opex), aset tetap & depresiasi, bagan akun (COA), dan jurnal umum',
+    subGroups: [
+      {
+        key: 'finance_account',
+        title: 'Kas & Bank',
+        permissions: [
+          {
+            code: 'finance.account.read',
+            name: 'Lihat Kas & Rekening Bank',
+            description:
+              'Melihat daftar akun kas toko, rekening bank, saldo QRIS, dan mutasi saldo',
+            action: 'read',
+          },
+          {
+            code: 'finance.account.manage',
+            name: 'Kelola Akun Kas & Bank',
+            description: 'Menambah, mengubah, dan menonaktifkan akun kas/bank',
+            action: 'manage',
+          },
+          {
+            code: 'finance.transfer.create',
+            name: 'Transfer Antar Kas & Bank',
+            description:
+              'Mencatat pemindahan saldo kas laci ke bank atau antar rekening',
+            action: 'create',
+          },
+        ],
+      },
+      {
+        key: 'expense',
+        title: 'Biaya Operasional (Opex)',
+        permissions: [
+          {
+            code: 'finance.expense.read',
+            name: 'Lihat Pengeluaran Biaya',
+            description:
+              'Melihat daftar transaksi pengeluaran operasional dan kas kecil POS',
+            action: 'read',
+          },
+          {
+            code: 'finance.expense.create',
+            name: 'Catat Pengeluaran Baru',
+            description:
+              'Mencatat biaya operasional rutin (gaji, listrik, sewa, perlengkapan)',
+            action: 'create',
+          },
+          {
+            code: 'finance.expense.delete',
+            name: 'Hapus Transaksi Pengeluaran',
+            description:
+              'Membatalkan atau menghapus transaksi pengeluaran biaya',
+            action: 'delete',
+          },
+        ],
+      },
+      {
+        key: 'fixed_asset',
+        title: 'Aset Tetap & Depresiasi',
+        permissions: [
+          {
+            code: 'finance.asset.read',
+            name: 'Lihat Daftar Aset Tetap',
+            description:
+              'Melihat nilai investasi aset, umur ekonomis, dan akumulasi penyusutan',
+            action: 'read',
+          },
+          {
+            code: 'finance.asset.create',
+            name: 'Tambah Aset Tetap Baru',
+            description:
+              'Mendaftarkan aset baru beserta harga beli dan estimasi masa pakai',
+            action: 'create',
+          },
+          {
+            code: 'finance.asset.dispose',
+            name: 'Pelepasan / Jual Aset',
+            description:
+              'Mencatat pelepasan aset tetap (dijual atau dihapus karena rusak)',
+            action: 'update',
+          },
+        ],
+      },
+      {
+        key: 'general_ledger',
+        title: 'Buku Besar & Jurnal Akuntansi',
+        permissions: [
+          {
+            code: 'finance.journal.read',
+            name: 'Lihat Buku Besar & Jurnal',
+            description:
+              'Melihat riwayat entri jurnal umum debit & kredit (auto-journal & manual)',
+            action: 'read',
+          },
+          {
+            code: 'finance.journal.create',
+            name: 'Buat Jurnal Manual',
+            description:
+              'Memasukkan entri jurnal penyesuaian manual debit dan kredit seimbang',
+            action: 'create',
+          },
+          {
+            code: 'finance.coa.manage',
+            name: 'Kelola Bagan Akun (COA)',
+            description:
+              'Menambah atau menyesuaikan daftar bagan akun perkiraan keuangan',
+            action: 'manage',
           },
         ],
       },

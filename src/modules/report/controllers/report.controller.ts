@@ -5,6 +5,8 @@ import {
   QuerySummaryReportDto,
   QueryInventoryReportDto,
   QueryInventoryMovementsReportDto,
+  QueryShiftReportDto,
+  QueryFinancialReportDto,
 } from '../dto/report.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -97,6 +99,83 @@ export class ReportController {
       success: true,
       message: 'Inventory movements report retrieved successfully',
       ...data,
+    };
+  }
+
+  @Get('shifts')
+  @Permissions('report.shift.read')
+  async getShiftReconciliationReport(
+    @CurrentUser() user: User,
+    @Query() query: QueryShiftReportDto,
+  ) {
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getShiftReconciliationReport(
+      user.tenantId,
+      {
+        ...query,
+        outletId: effectiveOutletId,
+      },
+    );
+    return {
+      success: true,
+      message: 'Laporan rekonsiliasi shift berhasil diambil.',
+      ...data,
+    };
+  }
+
+  @Get('financial/income-statement')
+  @Permissions('report.financial.read')
+  async getIncomeStatement(
+    @CurrentUser() user: User,
+    @Query() query: QueryFinancialReportDto,
+  ) {
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getIncomeStatement(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
+    return {
+      success: true,
+      message: 'Laporan laba rugi bersih berhasil diambil.',
+      data,
+    };
+  }
+
+  @Get('financial/balance-sheet')
+  @Permissions('report.financial.read')
+  async getBalanceSheet(
+    @CurrentUser() user: User,
+    @Query('asOfDate') asOfDate?: string,
+    @Query('outletId') outletId?: string,
+  ) {
+    const effectiveOutletId = this.getEffectiveOutletId(user, outletId);
+    const data = await this.reportService.getBalanceSheet(
+      user.tenantId,
+      asOfDate,
+      effectiveOutletId,
+    );
+    return {
+      success: true,
+      message: 'Laporan neraca keuangan berhasil diambil.',
+      data,
+    };
+  }
+
+  @Get('financial/cash-flow')
+  @Permissions('report.financial.read')
+  async getCashFlowStatement(
+    @CurrentUser() user: User,
+    @Query() query: QueryFinancialReportDto,
+  ) {
+    const effectiveOutletId = this.getEffectiveOutletId(user, query.outletId);
+    const data = await this.reportService.getCashFlowStatement(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
+    return {
+      success: true,
+      message: 'Laporan arus kas berhasil diambil.',
+      data,
     };
   }
 }

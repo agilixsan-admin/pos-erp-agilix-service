@@ -9,11 +9,18 @@ import { InventoryStock } from '../inventory/entities/inventory-stock.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { Recipe } from '../recipe/entities/recipe.entity';
+import { PosShift } from '../shift/entities/pos-shift.entity';
+import { Expense } from '../finance/entities/expense.entity';
+import { FinancialAccount } from '../finance/entities/financial-account.entity';
+import { FixedAsset } from '../finance/entities/fixed-asset.entity';
+import { FixedAssetService } from '../finance/services/fixed-asset.service';
 import {
   QuerySalesReportDto,
   QuerySummaryReportDto,
   QueryInventoryReportDto,
   QueryInventoryMovementsReportDto,
+  QueryShiftReportDto,
+  QueryFinancialReportDto,
 } from './dto/report.dto';
 
 @Injectable()
@@ -35,6 +42,15 @@ export class ReportService {
     private readonly itemRepo: Repository<InventoryItem>,
     @InjectRepository(Recipe)
     private readonly recipeRepo: Repository<Recipe>,
+    @InjectRepository(PosShift)
+    private readonly shiftRepo: Repository<PosShift>,
+    @InjectRepository(Expense)
+    private readonly expenseRepo: Repository<Expense>,
+    @InjectRepository(FinancialAccount)
+    private readonly accountRepo: Repository<FinancialAccount>,
+    @InjectRepository(FixedAsset)
+    private readonly assetRepo: Repository<FixedAsset>,
+    private readonly assetService: FixedAssetService,
   ) {}
 
   // ─── Summary ──────────────────────────────────────────────────────────────
@@ -252,13 +268,80 @@ export class ReportService {
       0,
     );
 
+    // Hitung rincian komprehensif dari orders
+    const orderTotalsQb = this.orderRepo
+      .createQueryBuilder('o')
+      .select('COALESCE(SUM(o.subtotal), 0)', 'grossSales')
+      .addSelect('COALESCE(SUM(o.discount_amount), 0)', 'totalDiscount')
+      .addSelect('COALESCE(SUM(o.tax_amount), 0)', 'totalTax')
+      .addSelect('COALESCE(SUM(o.service_charge), 0)', 'totalService')
+      .addSelect('COALESCE(SUM(o.packaging_fee), 0)', 'totalPackaging')
+      .addSelect('COALESCE(SUM(o.total_amount), 0)', 'totalAmount')
+      .where('o.tenant_id = :tenantId', { tenantId })
+      .andWhere('o.status = :status', { status: 'COMPLETED' })
+      .andWhere('o.completed_at >= :startDate', { startDate })
+      .andWhere('o.completed_at <= :endDate', { endDate });
+
+    if (outletId) {
+      orderTotalsQb.andWhere('o.outlet_id = :outletId', { outletId });
+    }
+
+    const totalsRaw = await orderTotalsQb.getRawOne<{
+      grossSales: string;
+      totalDiscount: string;
+      totalTax: string;
+      totalService: string;
+      totalPackaging: string;
+      totalAmount: string;
+    }>();
+
+    const grossSales = totalsRaw?.grossSales
+      ? Number(totalsRaw.grossSales)
+      : totalRevenue;
+    const totalDiscount = Number(totalsRaw?.totalDiscount || 0);
+    const netSales = totalsRaw?.grossSales
+      ? Math.round((grossSales - totalDiscount) * 100) / 100
+      : totalRevenue;
+    const totalTax = Number(totalsRaw?.totalTax || 0);
+    const totalService = Number(totalsRaw?.totalService || 0);
+    const totalPackaging = Number(totalsRaw?.totalPackaging || 0);
+    const totalCollected = totalsRaw?.totalAmount
+      ? Number(totalsRaw.totalAmount)
+      : totalRevenue;
+
+    const totalCogs =
+      Math.round(
+        byProduct.reduce((sum, p) => {
+          const qty = Number(p.quantitySold);
+          const unitCogs = cogsMap.get(p.variantId) ?? 0;
+          return sum + qty * unitCogs;
+        }, 0) * 100,
+      ) / 100;
+
+    const grossProfit = Math.round((netSales - totalCogs) * 100) / 100;
+    const marginPercentage =
+      netSales > 0 ? Math.round((grossProfit / netSales) * 100 * 10) / 10 : 0;
+
+    const effectiveTotalRevenue =
+      totalRevenue > 0 ? totalRevenue : totalCollected;
+
     return {
       summary: {
-        totalRevenue,
+        grossSales,
+        totalDiscount,
+        netSales,
+        totalCogs,
+        grossProfit,
+        marginPercentage,
+        totalTax,
+        totalService,
+        totalPackaging,
+        totalCollected,
+        totalRevenue: effectiveTotalRevenue,
         totalOrders,
         totalTransactions,
         averageOrderValue:
-          totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
+          totalOrders > 0 ? Math.round(effectiveTotalRevenue / totalOrders) : 0,
       },
       byDate: byDate.map((r) => ({
         date: r.date,
@@ -452,6 +535,373 @@ export class ReportService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  // ─── Laporan Rekonsiliasi Shift ──────────────────────────────────────────
+
+  async getShiftReconciliationReport(
+    tenantId: string,
+    query: QueryShiftReportDto,
+  ) {
+    const { startDate, endDate, outletId, userId } = query;
+    const qb = this.shiftRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.outlet', 'o')
+      .leftJoinAndSelect('s.user', 'u')
+      .leftJoinAndSelect('s.pettyCashTransactions', 'pct')
+      .where('s.tenantId = :tenantId', { tenantId });
+
+    if (outletId && outletId !== 'ALL') {
+      qb.andWhere('s.outletId = :outletId', { outletId });
+    }
+    if (userId) {
+      qb.andWhere('s.userId = :userId', { userId });
+    }
+    if (startDate) {
+      qb.andWhere('s.openedAt >= :startDate', { startDate });
+    }
+    if (endDate) {
+      qb.andWhere('s.openedAt <= :endDate', { endDate });
+    }
+
+    const shifts = await qb.orderBy('s.openedAt', 'DESC').getMany();
+
+    const data = shifts.map((s) => {
+      const diff = Number(s.cashDifference || 0);
+      let differenceStatus: 'MATCH' | 'SURPLUS' | 'SHORT' = 'MATCH';
+      if (diff > 0) differenceStatus = 'SURPLUS';
+      else if (diff < 0) differenceStatus = 'SHORT';
+
+      return {
+        id: s.id,
+        outletId: s.outletId,
+        outletName: s.outlet?.name || 'Outlet',
+        userId: s.userId,
+        cashierName: s.user?.name || s.user?.email || 'Kasir',
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        status: s.status,
+        openingCash: Number(s.openingCash),
+        totalCashSales: Number(s.totalCashSales),
+        totalCashOut: Number(s.totalCashOut),
+        expectedCash: Number(s.expectedCash || 0),
+        actualCash: Number(s.actualCash || 0),
+        cashDifference: diff,
+        differenceStatus,
+        notes: s.notes,
+        pettyCashCount: s.pettyCashTransactions?.length || 0,
+        pettyCashList: (s.pettyCashTransactions || []).map((pct) => ({
+          id: pct.id,
+          amount: Number(pct.amount),
+          category: pct.category,
+          notes: pct.notes,
+          receiptPhotoUrl: pct.receiptPhotoUrl,
+          createdAt: pct.createdAt,
+        })),
+      };
+    });
+
+    return {
+      shifts: data,
+      summary: {
+        totalShifts: data.length,
+        totalCashSales: data.reduce((sum, d) => sum + d.totalCashSales, 0),
+        totalCashOut: data.reduce((sum, d) => sum + d.totalCashOut, 0),
+        totalDifference: data.reduce((sum, d) => sum + d.cashDifference, 0),
+        totalShortCount: data.filter((d) => d.differenceStatus === 'SHORT')
+          .length,
+        totalSurplusCount: data.filter((d) => d.differenceStatus === 'SURPLUS')
+          .length,
+      },
+    };
+  }
+
+  // ─── Tiga Laporan Keuangan Standar Akuntansi ─────────────────────────────
+
+  /**
+   * 1. Laporan Laba / Rugi Bersih (Income Statement)
+   */
+  async getIncomeStatement(tenantId: string, query: QueryFinancialReportDto) {
+    const { startDate, endDate, outletId } = query;
+    const targetOutlet = outletId && outletId !== 'ALL' ? outletId : undefined;
+
+    // A. Penjualan & Diskon & HPP Produk
+    const salesReport = await this.getSalesReport(tenantId, {
+      startDate,
+      endDate,
+      outletId: targetOutlet,
+    });
+    const {
+      grossSales,
+      totalDiscount,
+      netSales,
+      totalCogs,
+      grossProfit,
+      marginPercentage,
+    } = salesReport.summary;
+
+    // B. Biaya Operasional (Opex)
+    const expenseQb = this.expenseRepo
+      .createQueryBuilder('e')
+      .innerJoinAndSelect('e.category', 'cat')
+      .select('cat.name', 'categoryName')
+      .addSelect('SUM(e.amount)', 'total')
+      .where('e.tenantId = :tenantId', { tenantId })
+      .andWhere('e.expenseDate >= :startDate', {
+        startDate: startDate.slice(0, 10),
+      })
+      .andWhere('e.expenseDate <= :endDate', {
+        endDate: endDate.slice(0, 10),
+      });
+
+    if (targetOutlet) {
+      expenseQb.andWhere('e.outletId = :outletId', { outletId: targetOutlet });
+    }
+
+    const expensesByCategory = await expenseQb
+      .groupBy('cat.name')
+      .getRawMany<{ categoryName: string; total: string }>();
+
+    const totalOpexDirect = expensesByCategory.reduce(
+      (sum, c) => sum + Number(c.total || 0),
+      0,
+    );
+
+    // C. Depresiasi / Penyusutan Aset Tetap
+    const assets = await this.assetService.getAssets(
+      tenantId,
+      targetOutlet,
+      endDate,
+    );
+    const totalDepreciation =
+      Math.round(
+        assets.reduce((sum, a) => sum + Number(a.monthlyDepreciation || 0), 0) *
+          100,
+      ) / 100;
+
+    const totalOperatingExpenses =
+      Math.round((totalOpexDirect + totalDepreciation) * 100) / 100;
+    const netProfit =
+      Math.round((grossProfit - totalOperatingExpenses) * 100) / 100;
+
+    return {
+      revenue: {
+        grossSales,
+        discounts: totalDiscount,
+        netSales,
+      },
+      cogs: {
+        rawMaterialCogs: totalCogs,
+        totalCogs,
+      },
+      grossProfit,
+      marginPercentage,
+      operatingExpenses: {
+        breakdown: [
+          ...expensesByCategory.map((e) => ({
+            category: e.categoryName,
+            amount: Number(e.total),
+          })),
+          {
+            category: 'Penyusutan Aset Tetap',
+            amount: totalDepreciation,
+          },
+        ],
+        totalExpenses: totalOperatingExpenses,
+      },
+      netProfit,
+      meta: { startDate, endDate, outletId: targetOutlet ?? null },
+    };
+  }
+
+  /**
+   * 2. Neraca Keuangan (Balance Sheet)
+   */
+  async getBalanceSheet(
+    tenantId: string,
+    asOfDate?: string,
+    outletId?: string,
+  ) {
+    const targetDate = asOfDate || new Date().toISOString().slice(0, 10);
+    const targetOutlet = outletId && outletId !== 'ALL' ? outletId : undefined;
+
+    // A. Kas & Bank
+    const accounts = await this.accountRepo.find({
+      where: { tenantId, isActive: true },
+    });
+    const filteredAccounts = targetOutlet
+      ? accounts.filter((a) => !a.outletId || a.outletId === targetOutlet)
+      : accounts;
+
+    const cashInDrawer = filteredAccounts
+      .filter((a) => a.accountType === 'CASH')
+      .reduce((sum, a) => sum + Number(a.currentBalance || 0), 0);
+    const bankAndEwallet = filteredAccounts
+      .filter((a) => a.accountType !== 'CASH')
+      .reduce((sum, a) => sum + Number(a.currentBalance || 0), 0);
+
+    // B. Persediaan Bahan Baku (Stok Fisik x Harga Modal)
+    const stockQb = this.stockRepo
+      .createQueryBuilder('s')
+      .innerJoin('s.inventoryItem', 'ii')
+      .select('SUM(s.quantity * ii.unit_cost)', 'totalValuation')
+      .where('s.tenant_id = :tenantId', { tenantId })
+      .andWhere('ii.deleted_at IS NULL');
+
+    if (targetOutlet) {
+      stockQb.andWhere('s.outlet_id = :outletId', { outletId: targetOutlet });
+    }
+
+    const stockValRaw = await stockQb.getRawOne<{ totalValuation: string }>();
+    const inventoryValuation = Number(stockValRaw?.totalValuation || 0);
+
+    // C. Nilai Buku Aset Tetap
+    const assets = await this.assetService.getAssets(
+      tenantId,
+      targetOutlet,
+      targetDate,
+    );
+    const totalAssetCost = assets.reduce(
+      (sum, a) => sum + Number(a.purchaseCost),
+      0,
+    );
+    const totalAccumulatedDepr = assets.reduce(
+      (sum, a) => sum + Number(a.accumulatedDepreciation),
+      0,
+    );
+    const netFixedAssets = totalAssetCost - totalAccumulatedDepr;
+
+    const totalCurrentAssets =
+      cashInDrawer + bankAndEwallet + inventoryValuation;
+    const totalAssets = totalCurrentAssets + netFixedAssets;
+
+    // D. Kewajiban (Hutang Pajak PB1/PPN)
+    const taxPayableRaw = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('SUM(o.tax_amount)', 'tax')
+      .where('o.tenant_id = :tenantId', { tenantId })
+      .andWhere('o.status = :status', { status: 'COMPLETED' })
+      .getRawOne<{ tax: string }>();
+    const taxPayables = Number(taxPayableRaw?.tax || 0);
+
+    // E. Ekuitas (Total Aset - Total Kewajiban)
+    const retainedEarnings = totalAssets - taxPayables;
+
+    return {
+      asOfDate: targetDate,
+      outletId: targetOutlet ?? null,
+      assets: {
+        currentAssets: {
+          cashInDrawer,
+          bankAndEwallet,
+          inventoryValuation,
+          totalCurrentAssets,
+        },
+        fixedAssets: {
+          totalAssetCost,
+          totalAccumulatedDepreciation: totalAccumulatedDepr,
+          netFixedAssets,
+        },
+        totalAssets,
+      },
+      liabilities: {
+        taxPayables,
+        accountsPayable: 0,
+        totalLiabilities: taxPayables,
+      },
+      equity: {
+        retainedEarnings,
+        totalEquity: retainedEarnings,
+      },
+    };
+  }
+
+  /**
+   * 3. Laporan Arus Kas (Cash Flow Statement)
+   */
+  async getCashFlowStatement(tenantId: string, query: QueryFinancialReportDto) {
+    const { startDate, endDate, outletId } = query;
+    const targetOutlet = outletId && outletId !== 'ALL' ? outletId : undefined;
+
+    // Arus Kas Operasional:
+    // Penerimaan Kas dari Pembayaran Kasir Lunas
+    const paymentQb = this.paymentRepo
+      .createQueryBuilder('p')
+      .select('SUM(p.amount)', 'total')
+      .where('p.tenantId = :tenantId', { tenantId })
+      .andWhere('p.status = :status', { status: 'SUCCESS' })
+      .andWhere('p.paidAt >= :startDate', { startDate })
+      .andWhere('p.paidAt <= :endDate', { endDate });
+
+    if (targetOutlet) {
+      paymentQb.andWhere('p.outletId = :outletId', { outletId: targetOutlet });
+    }
+
+    const paymentRaw = await paymentQb.getRawOne<{ total: string }>();
+    const cashFromSales = Number(paymentRaw?.total || 0);
+
+    // Pengeluaran Kas untuk Biaya Operasional
+    const expenseQb = this.expenseRepo
+      .createQueryBuilder('e')
+      .select('SUM(e.amount)', 'total')
+      .where('e.tenantId = :tenantId', { tenantId })
+      .andWhere('e.expenseDate >= :startDate', {
+        startDate: startDate.slice(0, 10),
+      })
+      .andWhere('e.expenseDate <= :endDate', {
+        endDate: endDate.slice(0, 10),
+      });
+
+    if (targetOutlet) {
+      expenseQb.andWhere('e.outletId = :outletId', { outletId: targetOutlet });
+    }
+
+    const expenseRaw = await expenseQb.getRawOne<{ total: string }>();
+    const cashPaidForExpenses = Number(expenseRaw?.total || 0);
+
+    const netOperatingCash = cashFromSales - cashPaidForExpenses;
+
+    // Arus Kas Investasi: Pembelian Aset Tetap
+    const assetQb = this.assetRepo
+      .createQueryBuilder('a')
+      .select('SUM(a.purchaseCost)', 'total')
+      .where('a.tenantId = :tenantId', { tenantId })
+      .andWhere('a.purchaseDate >= :startDate', {
+        startDate: startDate.slice(0, 10),
+      })
+      .andWhere('a.purchaseDate <= :endDate', {
+        endDate: endDate.slice(0, 10),
+      });
+
+    if (targetOutlet) {
+      assetQb.andWhere('a.outletId = :outletId', { outletId: targetOutlet });
+    }
+
+    const assetRaw = await assetQb.getRawOne<{ total: string }>();
+    const cashPaidForAssets = Number(assetRaw?.total || 0);
+    const netInvestingCash = -cashPaidForAssets;
+
+    // Arus Kas Pendanaan
+    const netFinancingCash = 0;
+    const netCashChange =
+      netOperatingCash + netInvestingCash + netFinancingCash;
+
+    return {
+      operatingActivities: {
+        cashFromSales,
+        cashPaidForExpenses,
+        netOperatingCash,
+      },
+      investingActivities: {
+        cashPaidForAssets,
+        netInvestingCash,
+      },
+      financingActivities: {
+        netFinancingCash,
+      },
+      netCashChange,
+      meta: { startDate, endDate, outletId: targetOutlet ?? null },
     };
   }
 }

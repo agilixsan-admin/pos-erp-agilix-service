@@ -11,6 +11,11 @@ import { Transaction } from '../entities/transaction.entity';
 import { Order } from '../../order/entities/order.entity';
 import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
+import { OrderItem } from '../../order/entities/order-item.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
+import { FinancialAccount } from '../../finance/entities/financial-account.entity';
+import { FinanceAccountService } from '../../finance/services/finance-account.service';
+import { JournalService } from '../../finance/services/journal.service';
 import { retryOnUniqueViolation } from '../../../common/utils/retry-on-unique-violation.util';
 import {
   CreatePaymentDto,
@@ -36,6 +41,8 @@ export class PaymentService {
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly settingsService: SettingsService,
+    private readonly financeAccountService: FinanceAccountService,
+    private readonly journalService: JournalService,
   ) {}
 
   private generateTransactionNumber(): string {
@@ -111,6 +118,176 @@ export class PaymentService {
       },
       manager,
     );
+
+    // ─── Auto-Journaling & Financial Account Balance Update ─────────────────
+    try {
+      const isCash = payment.paymentMethod === 'CASH';
+      let targetAccountCode = '1-1250';
+
+      if (isCash) {
+        targetAccountCode = '1-1100';
+        const cashAccount =
+          await this.financeAccountService.ensureOutletCashAccount(
+            order.tenantId,
+            order.outletId,
+            manager,
+          );
+        cashAccount.currentBalance =
+          Number(cashAccount.currentBalance) + orderTotal;
+        await manager.save(cashAccount);
+      } else {
+        const faRepo = manager.getRepository(FinancialAccount);
+        let qrisAccount = await faRepo.findOne({
+          where: {
+            tenantId: order.tenantId,
+            accountType: 'PAYMENT_GATEWAY',
+            isActive: true,
+          },
+        });
+        if (!qrisAccount) {
+          qrisAccount = faRepo.create({
+            tenantId: order.tenantId,
+            accountCode: '1-1250',
+            accountName: 'Saldo QRIS & Payment Gateway',
+            accountType: 'PAYMENT_GATEWAY',
+            currentBalance: 0,
+            isActive: true,
+          });
+        }
+        qrisAccount.currentBalance =
+          Number(qrisAccount.currentBalance) + orderTotal;
+        await manager.save(qrisAccount);
+      }
+
+      // Auto-Journal Penjualan Produk
+      const journalLines: {
+        accountCode: string;
+        debit: number;
+        credit: number;
+        notes?: string;
+      }[] = [
+        {
+          accountCode: targetAccountCode,
+          debit: orderTotal,
+          credit: 0,
+          notes: `Penerimaan ${payment.paymentMethod} Pesanan ${order.orderNumber}`,
+        },
+      ];
+
+      const discountAmt = Number(order.discountAmount || 0);
+      if (discountAmt > 0) {
+        journalLines.push({
+          accountCode: '4-2000',
+          debit: discountAmt,
+          credit: 0,
+          notes: `Diskon Pesanan ${order.orderNumber}`,
+        });
+      }
+
+      const subtotalAmt = Number(order.subtotal || 0);
+      journalLines.push({
+        accountCode: '4-1000',
+        debit: 0,
+        credit: subtotalAmt,
+        notes: `Gross Sales Pesanan ${order.orderNumber}`,
+      });
+
+      const taxAmt = Number(order.taxAmount || 0);
+      if (taxAmt > 0) {
+        journalLines.push({
+          accountCode: '2-1200',
+          debit: 0,
+          credit: taxAmt,
+          notes: `Hutang Pajak Pesanan ${order.orderNumber}`,
+        });
+      }
+
+      const serviceAmt = Number(order.serviceCharge || 0);
+      if (serviceAmt > 0) {
+        journalLines.push({
+          accountCode: '2-1300',
+          debit: 0,
+          credit: serviceAmt,
+          notes: `Service Charge Pesanan ${order.orderNumber}`,
+        });
+      }
+
+      const packagingAmt = Number(order.packagingFee || 0);
+      if (packagingAmt > 0) {
+        journalLines.push({
+          accountCode: '4-3000',
+          debit: 0,
+          credit: packagingAmt,
+          notes: `Biaya Kemasan Pesanan ${order.orderNumber}`,
+        });
+      }
+
+      await this.journalService.recordJournal(
+        {
+          tenantId: order.tenantId,
+          outletId: order.outletId,
+          entryDate: new Date().toISOString().slice(0, 10),
+          sourceType: 'ORDER_SALE',
+          sourceId: order.id,
+          description: `Penjualan Pesanan #${order.orderNumber} (${payment.paymentMethod})`,
+          createdBy: userId ?? null,
+          lines: journalLines,
+        },
+        manager,
+      );
+
+      // Auto-Journal HPP Resep Bahan Baku
+      const orderItemRepo = manager.getRepository(OrderItem);
+      const items = await orderItemRepo.find({
+        where: { orderId: order.id, tenantId: order.tenantId },
+      });
+
+      let totalOrderCogs = 0;
+      const recipeRepo = manager.getRepository(Recipe);
+      for (const item of items) {
+        const recipes = await recipeRepo.find({
+          where: { tenantId: order.tenantId, variantId: item.variantId },
+          relations: ['inventoryItem'],
+        });
+        for (const r of recipes) {
+          const unitCost = Number(r.inventoryItem?.unitCost || 0);
+          totalOrderCogs +=
+            Number(item.quantity) * Number(r.quantity) * unitCost;
+        }
+      }
+
+      if (totalOrderCogs > 0) {
+        const cogsRounded = Math.round(totalOrderCogs * 100) / 100;
+        await this.journalService.recordJournal(
+          {
+            tenantId: order.tenantId,
+            outletId: order.outletId,
+            entryDate: new Date().toISOString().slice(0, 10),
+            sourceType: 'ORDER_COGS',
+            sourceId: order.id,
+            description: `HPP Bahan Baku Pesanan #${order.orderNumber}`,
+            createdBy: userId ?? null,
+            lines: [
+              {
+                accountCode: '5-1000',
+                debit: cogsRounded,
+                credit: 0,
+                notes: `HPP Resep Pesanan ${order.orderNumber}`,
+              },
+              {
+                accountCode: '1-1300',
+                debit: 0,
+                credit: cogsRounded,
+                notes: `Pengurangan Persediaan Bahan Baku Pesanan ${order.orderNumber}`,
+              },
+            ],
+          },
+          manager,
+        );
+      }
+    } catch {
+      // Tangani auto-journal secara aman agar transaksi pembayaran tidak terganggu
+    }
 
     (order as unknown as Record<string, unknown>).paidAmount = Number(
       payment.amount,

@@ -13,6 +13,8 @@ import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { QRIS_PROVIDER_TOKEN } from '../interfaces/qris-provider.interface';
 import { SettingsService } from '../../settings/services/settings.service';
+import { FinanceAccountService } from '../../finance/services/finance-account.service';
+import { JournalService } from '../../finance/services/journal.service';
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -89,6 +91,21 @@ describe('PaymentService', () => {
         {
           provide: SettingsService,
           useValue: mockSettingsService,
+        },
+        {
+          provide: FinanceAccountService,
+          useValue: {
+            ensureOutletCashAccount: jest.fn().mockResolvedValue({
+              id: 'cash-acc-1',
+              currentBalance: 0,
+            }),
+          },
+        },
+        {
+          provide: JournalService,
+          useValue: {
+            recordJournal: jest.fn().mockResolvedValue({ id: 'jrn-1' }),
+          },
         },
       ],
     }).compile();

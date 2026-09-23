@@ -11,6 +11,7 @@ import { Table } from '../table/entities/table.entity';
 import { Packaging } from '../packaging/entities/packaging.entity';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
+import { FinanceModule } from '../finance/finance.module';
 import { PaymentService } from './services/payment.service';
 import { PaymentController } from './controllers/payment.controller';
 import { PaymentWebhookController } from './controllers/payment-webhook.controller';
@@ -32,6 +33,7 @@ import { QRIS_PROVIDER_TOKEN } from './interfaces/qris-provider.interface';
     ]),
     AuditModule,
     SettingsModule,
+    FinanceModule,
   ],
   controllers: [PaymentController, PaymentWebhookController],
   providers: [

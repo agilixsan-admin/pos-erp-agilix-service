@@ -30,6 +30,7 @@ import { AddServiceChargeAndTaxDetails1700000000028 } from './1700000000028-AddS
 import { AddVoidVerificationSettingsAndApprovedBy1700000000029 } from './1700000000029-AddVoidVerificationSettingsAndApprovedBy';
 import { CreateOutletProductsTable1700000000030 } from './1700000000030-CreateOutletProductsTable';
 import { UpdateUserInvitationEmailTemplateForMobileIOS1700000000031 } from './1700000000031-UpdateUserInvitationEmailTemplateForMobileIOS';
+import { CreatePosShiftAndFinanceAccountingTables1700000000032 } from './1700000000032-CreatePosShiftAndFinanceAccountingTables';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -64,4 +65,5 @@ export const ALL_MIGRATIONS = [
   AddVoidVerificationSettingsAndApprovedBy1700000000029,
   CreateOutletProductsTable1700000000030,
   UpdateUserInvitationEmailTemplateForMobileIOS1700000000031,
+  CreatePosShiftAndFinanceAccountingTables1700000000032,
 ];
