@@ -15,4 +15,3 @@ export class AddMaxOutletsToTenants1700000000034 implements MigrationInterface {
     );
   }
 }
-
