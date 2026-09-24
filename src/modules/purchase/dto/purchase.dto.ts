@@ -123,9 +123,7 @@ export class ReceivePurchaseDto {
 
   @IsOptional()
   @Transform(({ value }: { value: unknown }): string | undefined =>
-    value === '' || value === null || value === undefined
-      ? undefined
-      : String(value),
+    typeof value === 'string' && value.trim() !== '' ? value : undefined,
   )
   @IsUUID()
   financialAccountId?: string;
