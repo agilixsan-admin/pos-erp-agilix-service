@@ -80,9 +80,15 @@ export class ExpenseService {
     }
   }
 
-  async getCategories(tenantId: string): Promise<ExpenseCategory[]> {
-    await this.ensureDefaultCategories(tenantId);
-    return this.categoryRepo.find({
+  async getCategories(
+    tenantId: string,
+    manager?: EntityManager,
+  ): Promise<ExpenseCategory[]> {
+    await this.ensureDefaultCategories(tenantId, manager);
+    const repo = manager
+      ? manager.getRepository(ExpenseCategory)
+      : this.categoryRepo;
+    return repo.find({
       where: { tenantId, isActive: true },
       order: { name: 'ASC' },
     });
@@ -109,16 +115,17 @@ export class ExpenseService {
     userId: string,
     dto: CreateExpenseDto,
     pettyCashId?: string,
+    manager?: EntityManager,
   ): Promise<Expense> {
-    return this.dataSource.transaction(async (manager) => {
-      const category = await manager
+    const runner = async (em: EntityManager) => {
+      const category = await em
         .getRepository(ExpenseCategory)
         .findOne({ where: { id: dto.categoryId, tenantId } });
       if (!category) {
         throw new NotFoundException('Kategori pengeluaran tidak ditemukan.');
       }
 
-      const account = await manager
+      const account = await em
         .getRepository(FinancialAccount)
         .findOne({ where: { id: dto.financialAccountId, tenantId } });
       if (!account) {
@@ -136,10 +143,10 @@ export class ExpenseService {
 
       // Potong saldo akun
       account.currentBalance = Number(account.currentBalance) - amount;
-      await manager.save(account);
+      await em.save(account);
 
       // Simpan pengeluaran
-      const expense = manager.getRepository(Expense).create({
+      const expense = em.getRepository(Expense).create({
         tenantId,
         outletId: dto.outletId,
         categoryId: category.id,
@@ -152,7 +159,7 @@ export class ExpenseService {
         pettyCashId: pettyCashId ?? null,
         createdBy: userId,
       });
-      const savedExpense = await manager.save(expense);
+      const savedExpense = await em.save(expense);
 
       // Jurnal otomatis:
       // Debit: 6-xxxx Beban Operasional
@@ -183,13 +190,15 @@ export class ExpenseService {
             },
           ],
         },
-        manager,
+        em,
       );
 
       savedExpense.category = category;
       savedExpense.financialAccount = account;
       return savedExpense;
-    });
+    };
+
+    return manager ? runner(manager) : this.dataSource.transaction(runner);
   }
 
   async getExpenses(

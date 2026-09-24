@@ -18,6 +18,7 @@ import {
 } from './dto/shift.dto';
 import { FinanceAccountService } from '../finance/services/finance-account.service';
 import { ExpenseService } from '../finance/services/expense.service';
+import { Expense } from '../finance/entities/expense.entity';
 import { JournalService } from '../finance/services/journal.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -203,18 +204,24 @@ export class ShiftService {
       shift.totalCashOut = Number(shift.totalCashOut) + amount;
       await manager.save(shift);
 
-      // 3. Potong saldo Kas Laci di kas & bank
+      // 3. Pastikan akun Kas Laci outlet dan kurangi saldonya
       const cashAccount =
         await this.financeAccountService.ensureOutletCashAccount(
           tenantId,
           dto.outletId,
           manager,
         );
-      cashAccount.currentBalance = Number(cashAccount.currentBalance) - amount;
+      cashAccount.currentBalance = Math.max(
+        0,
+        Number(cashAccount.currentBalance) - amount,
+      );
       await manager.save(cashAccount);
 
       // 4. Catat otomatis ke pengeluaran back-office (Opex)
-      const categories = await this.expenseService.getCategories(tenantId);
+      const categories = await this.expenseService.getCategories(
+        tenantId,
+        manager,
+      );
       const defaultCat =
         categories.find(
           (c) =>
@@ -223,21 +230,52 @@ export class ShiftService {
         ) || categories[0];
 
       if (defaultCat) {
-        await this.expenseService.createExpense(
+        const expense = manager.getRepository(Expense).create({
           tenantId,
-          userId,
-          {
-            outletId: dto.outletId,
-            categoryId: defaultCat.id,
-            financialAccountId: cashAccount.id,
-            amount,
-            expenseDate: new Date().toISOString().slice(0, 10),
-            recipient: 'Kasir POS (Kas Kecil)',
-            notes: `[Kas Keluar POS] ${dto.category}: ${dto.notes || '-'}`,
-            receiptUrl: dto.receiptPhotoUrl,
-          },
-          savedPettyCash.id,
-        );
+          outletId: dto.outletId,
+          categoryId: defaultCat.id,
+          financialAccountId: cashAccount.id,
+          amount,
+          expenseDate: new Date().toISOString().slice(0, 10),
+          recipient: 'Kasir POS (Kas Kecil)',
+          notes: `[Kas Keluar POS] ${dto.category}: ${dto.notes || '-'}`,
+          receiptUrl: dto.receiptPhotoUrl,
+          pettyCashId: savedPettyCash.id,
+          createdBy: userId,
+        });
+        await manager.save(expense);
+
+        // 5. Jurnal otomatis Beban Kas Kecil (Debit: 6-5000, Kredit: 1-1100)
+        try {
+          await this.journalService.recordJournal(
+            {
+              tenantId,
+              outletId: dto.outletId,
+              entryDate: new Date().toISOString().slice(0, 10),
+              sourceType: 'PETTY_CASH',
+              sourceId: savedPettyCash.id,
+              description: `Kas Keluar Kasir [${dto.category}] - ${dto.notes || 'Operasional Kas Kecil'}`,
+              createdBy: userId,
+              lines: [
+                {
+                  accountCode: '6-5000',
+                  debit: amount,
+                  credit: 0,
+                  notes: `Petty Cash: ${dto.category}`,
+                },
+                {
+                  accountCode: '1-1100',
+                  debit: 0,
+                  credit: amount,
+                  notes: `Kas Laci Kasir (${cashAccount.accountName})`,
+                },
+              ],
+            },
+            manager,
+          );
+        } catch {
+          // Tangani secara aman jika akun jurnal COA belum terkonfigurasi
+        }
       }
 
       await this.auditService.record(

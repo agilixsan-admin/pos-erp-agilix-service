@@ -18,6 +18,10 @@ export class OpenShiftDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   openingCash!: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class PettyCashDto {

@@ -197,4 +197,95 @@ describe('ShiftService', () => {
     expect(result?.currentExpectedCash).toBe(130000); // 100000 + 50000 - 20000
     expect(result?.completedOrdersCount).toBe(2);
   });
+
+  it('should record petty cash successfully when drawer cash is sufficient', async () => {
+    // Mock active shift with 100,000 opening cash
+    mockShiftRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({
+        id: 'shift-1',
+        status: 'OPEN',
+        outletId: 'outlet-1',
+        openingCash: 100000,
+        totalCashOut: 0,
+        openedAt: new Date(),
+      }),
+    });
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      innerJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '0', count: '0' }),
+    });
+
+    const result = await service.recordPettyCash('tenant-1', 'user-1', {
+      outletId: 'outlet-1',
+      amount: 50000,
+      category: 'Es Batu / Gas / Galon',
+      notes: 'beli 2 ball es kristal',
+      receiptPhotoUrl: 'https://example.com/receipt.jpg',
+    });
+
+    expect(result).toBeDefined();
+    expect(mockFinanceAccountService.ensureOutletCashAccount).toHaveBeenCalled();
+    expect(mockAuditService.record).toHaveBeenCalled();
+  });
+
+  it('should reject petty cash when requested amount exceeds drawer cash', async () => {
+    // Mock active shift with only 20,000 cash
+    mockShiftRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({
+        id: 'shift-1',
+        status: 'OPEN',
+        outletId: 'outlet-1',
+        openingCash: 20000,
+        totalCashOut: 0,
+        openedAt: new Date(),
+      }),
+    });
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      innerJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '0', count: '0' }),
+    });
+
+    await expect(
+      service.recordPettyCash('tenant-1', 'user-1', {
+        outletId: 'outlet-1',
+        amount: 50000,
+        category: 'Es Batu / Gas / Galon',
+        notes: 'beli es',
+        receiptPhotoUrl: 'https://example.com/receipt.jpg',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject petty cash when no active shift is open', async () => {
+    mockShiftRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    });
+
+    await expect(
+      service.recordPettyCash('tenant-1', 'user-1', {
+        outletId: 'outlet-1',
+        amount: 50000,
+        category: 'Es Batu / Gas / Galon',
+        notes: 'beli es',
+        receiptPhotoUrl: 'https://example.com/receipt.jpg',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
 });
