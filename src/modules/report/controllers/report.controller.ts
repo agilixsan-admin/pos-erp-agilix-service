@@ -20,11 +20,32 @@ export class ReportController {
     user: User,
     outletId?: string,
   ): string | undefined {
+    const isTenantWideUser =
+      user.isSuperAdmin ||
+      user.role?.name === 'Owner' ||
+      user.role?.menuAccess?.includes('*');
+
     const requestedOutletId =
       outletId && outletId !== 'ALL' && outletId.trim() !== ''
         ? outletId
         : undefined;
-    return requestedOutletId ?? user.outletId ?? undefined;
+
+    if (requestedOutletId) {
+      if (
+        !isTenantWideUser &&
+        user.outletId &&
+        user.outletId !== requestedOutletId
+      ) {
+        return user.outletId;
+      }
+      return requestedOutletId;
+    }
+
+    if (isTenantWideUser) {
+      return undefined;
+    }
+
+    return user.outletId ?? undefined;
   }
 
   @Get()
