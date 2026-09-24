@@ -184,13 +184,16 @@ export class FinanceAccountService {
       await manager.save(fromAcc);
       await manager.save(toAcc);
 
+      const transferDate =
+        dto.transferDate || new Date().toISOString().slice(0, 10);
+
       // Simpan riwayat transfer
       const transfer = manager.getRepository(FinancialTransfer).create({
         tenantId,
         fromAccountId: fromAcc.id,
         toAccountId: toAcc.id,
         amount,
-        transferDate: dto.transferDate,
+        transferDate,
         notes: dto.notes ?? null,
         createdBy: userId,
       });
@@ -203,7 +206,7 @@ export class FinanceAccountService {
         {
           tenantId,
           outletId: fromAcc.outletId || toAcc.outletId,
-          entryDate: dto.transferDate,
+          entryDate: transferDate,
           sourceType: 'TRANSFER',
           sourceId: savedTransfer.id,
           description: `Transfer dari ${fromAcc.accountName} ke ${toAcc.accountName}${dto.notes ? ' - ' + dto.notes : ''}`,

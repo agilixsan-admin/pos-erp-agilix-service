@@ -122,7 +122,9 @@ describe('PurchaseService', () => {
       save: jest.fn(),
     } as any;
     auditService = { record: jest.fn().mockResolvedValue(undefined) } as any;
-    journalService = { recordJournal: jest.fn().mockResolvedValue({} as any) } as any;
+    journalService = {
+      recordJournal: jest.fn().mockResolvedValue({} as any),
+    } as any;
 
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => {

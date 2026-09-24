@@ -163,7 +163,11 @@ describe('ShiftService', () => {
       getOne: jest.fn().mockResolvedValue(null),
     });
 
-    const result = await service.getCurrentShift('tenant-1', 'user-1', 'outlet-1');
+    const result = await service.getCurrentShift(
+      'tenant-1',
+      'user-1',
+      'outlet-1',
+    );
     expect(result).toBeNull();
   });
 
@@ -190,7 +194,11 @@ describe('ShiftService', () => {
       getRawOne: jest.fn().mockResolvedValue({ total: '50000', count: '2' }),
     });
 
-    const result = await service.getCurrentShift('tenant-1', 'user-1', 'outlet-1');
+    const result = await service.getCurrentShift(
+      'tenant-1',
+      'user-1',
+      'outlet-1',
+    );
     expect(result).toBeDefined();
     expect(result?.shift.id).toBe('shift-1');
     expect(result?.currentCashSales).toBe(50000);
@@ -231,7 +239,9 @@ describe('ShiftService', () => {
     });
 
     expect(result).toBeDefined();
-    expect(mockFinanceAccountService.ensureOutletCashAccount).toHaveBeenCalled();
+    expect(
+      mockFinanceAccountService.ensureOutletCashAccount,
+    ).toHaveBeenCalled();
     expect(mockAuditService.record).toHaveBeenCalled();
   });
 

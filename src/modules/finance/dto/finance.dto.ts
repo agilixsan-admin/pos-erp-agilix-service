@@ -76,8 +76,9 @@ export class CreateFinancialTransferDto {
   @Min(1)
   amount!: number;
 
+  @IsOptional()
   @IsDateString()
-  transferDate!: string;
+  transferDate?: string;
 
   @IsOptional()
   @IsString()

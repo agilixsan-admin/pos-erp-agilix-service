@@ -122,7 +122,9 @@ export class ReceivePurchaseDto {
   notes?: string;
 
   @IsOptional()
-  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @Transform(({ value }) =>
+    value === '' || value === null ? undefined : value,
+  )
   @IsUUID()
   financialAccountId?: string;
 }

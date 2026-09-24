@@ -377,7 +377,9 @@ describe('Business Flow & Transaction Hardening Tests (Phase 18)', () => {
         mockAuditService as any,
         mockSettingsService as any,
         {
-          ensureOutletCashAccount: jest.fn().mockResolvedValue({ id: 'cash-1' }),
+          ensureOutletCashAccount: jest
+            .fn()
+            .mockResolvedValue({ id: 'cash-1' }),
         } as any,
         {
           recordJournal: jest.fn().mockResolvedValue({ id: 'journal-1' }),
