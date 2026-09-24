@@ -269,4 +269,42 @@ export class JournalService {
       .addOrderBy('j.createdAt', 'DESC')
       .getMany();
   }
+
+  /**
+   * Menghitung saldo akun COA berdasarkan kode akun (akumulasi credit - debit untuk liabilitas/ekuitas)
+   */
+  async getAccountBalance(
+    tenantId: string,
+    accountCode: string,
+    outletId?: string,
+    asOfDate?: string,
+  ): Promise<number> {
+    const qb = this.lineRepo
+      .createQueryBuilder('l')
+      .innerJoin('l.journalEntry', 'j')
+      .innerJoin('l.account', 'acc')
+      .select('SUM(l.credit)', 'totalCredit')
+      .addSelect('SUM(l.debit)', 'totalDebit')
+      .where('j.tenantId = :tenantId', { tenantId })
+      .andWhere('acc.accountCode = :accountCode', { accountCode });
+
+    if (outletId) {
+      qb.andWhere('(j.outletId = :outletId OR j.outletId IS NULL)', {
+        outletId,
+      });
+    }
+
+    if (asOfDate) {
+      qb.andWhere('j.entryDate <= :asOfDate', { asOfDate });
+    }
+
+    const raw = await qb.getRawOne<{
+      totalCredit?: string;
+      totalDebit?: string;
+    }>();
+    const totalCredit = Number(raw?.totalCredit || 0);
+    const totalDebit = Number(raw?.totalDebit || 0);
+
+    return Math.max(0, Math.round((totalCredit - totalDebit) * 100) / 100);
+  }
 }

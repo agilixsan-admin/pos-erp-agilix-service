@@ -14,6 +14,7 @@ import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
+import { JournalService } from '../finance/services/journal.service';
 
 describe('ReportService', () => {
   let service: ReportService;
@@ -31,6 +32,9 @@ describe('ReportService', () => {
   const mockAccountRepo = { find: jest.fn().mockResolvedValue([]) };
   const mockAssetRepo = { createQueryBuilder: jest.fn() };
   const mockAssetService = { getAssets: jest.fn().mockResolvedValue([]) };
+  const mockJournalService = {
+    getAccountBalance: jest.fn().mockResolvedValue(0),
+  };
 
   const buildQb = (overrides: Record<string, jest.Mock> = {}) => ({
     select: jest.fn().mockReturnThis(),
@@ -83,6 +87,7 @@ describe('ReportService', () => {
         },
         { provide: getRepositoryToken(FixedAsset), useValue: mockAssetRepo },
         { provide: FixedAssetService, useValue: mockAssetService },
+        { provide: JournalService, useValue: mockJournalService },
       ],
     }).compile();
 
@@ -441,6 +446,60 @@ describe('ReportService', () => {
 
       expect(result.meta.totalPages).toBe(3);
       expect(result.meta.total).toBe(45);
+    });
+  });
+
+  // ─── getBalanceSheet ───────────────────────────────────────────────────────
+
+  describe('getBalanceSheet', () => {
+    it('calculates balance sheet correctly including accounts payable (Hutang Usaha)', async () => {
+      mockAccountRepo.find.mockResolvedValue([
+        { accountType: 'CASH', currentBalance: 500000 },
+        { accountType: 'BANK', currentBalance: 1500000 },
+      ]);
+
+      const stockQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ totalValuation: '1000000' }),
+      });
+      mockStockRepo.createQueryBuilder.mockReturnValue(stockQb);
+
+      mockAssetService.getAssets.mockResolvedValue([
+        { purchaseCost: 5000000, accumulatedDepreciation: 1000000 },
+      ]);
+
+      const orderQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ tax: '50000' }),
+      });
+      mockOrderRepo.createQueryBuilder.mockReturnValue(orderQb);
+
+      mockJournalService.getAccountBalance.mockResolvedValue(750000);
+
+      const result = await service.getBalanceSheet(
+        'tenant-1',
+        '2026-09-24',
+        'outlet-1',
+      );
+
+      // Assets: Cash(500k) + Bank(1.5m) + Inv(1m) = Current 3m; Fixed: 5m - 1m = 4m; Total = 7m
+      expect(result.assets.currentAssets.totalCurrentAssets).toBe(3000000);
+      expect(result.assets.fixedAssets.netFixedAssets).toBe(4000000);
+      expect(result.assets.totalAssets).toBe(7000000);
+
+      // Liabilities: Tax(50k) + AccountsPayable(750k) = 800k
+      expect(result.liabilities.taxPayables).toBe(50000);
+      expect(result.liabilities.accountsPayable).toBe(750000);
+      expect(result.liabilities.totalLiabilities).toBe(800000);
+
+      // Equity: 7m - 800k = 6.2m
+      expect(result.equity.retainedEarnings).toBe(6200000);
+      expect(result.equity.totalEquity).toBe(6200000);
+
+      expect(mockJournalService.getAccountBalance).toHaveBeenCalledWith(
+        'tenant-1',
+        '2-1100',
+        'outlet-1',
+        '2026-09-24',
+      );
     });
   });
 });

@@ -14,6 +14,7 @@ import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
+import { JournalService } from '../finance/services/journal.service';
 import {
   QuerySalesReportDto,
   QuerySummaryReportDto,
@@ -51,6 +52,7 @@ export class ReportService {
     @InjectRepository(FixedAsset)
     private readonly assetRepo: Repository<FixedAsset>,
     private readonly assetService: FixedAssetService,
+    private readonly journalService: JournalService,
   ) {}
 
   // ─── Summary ──────────────────────────────────────────────────────────────
@@ -776,17 +778,35 @@ export class ReportService {
       cashInDrawer + bankAndEwallet + inventoryValuation;
     const totalAssets = totalCurrentAssets + netFixedAssets;
 
-    // D. Kewajiban (Hutang Pajak PB1/PPN)
-    const taxPayableRaw = await this.orderRepo
+    // D. Kewajiban (Hutang Pajak PB1/PPN & Hutang Usaha / Supplier)
+    const taxPayableQb = this.orderRepo
       .createQueryBuilder('o')
       .select('SUM(o.tax_amount)', 'tax')
       .where('o.tenant_id = :tenantId', { tenantId })
-      .andWhere('o.status = :status', { status: 'COMPLETED' })
-      .getRawOne<{ tax: string }>();
+      .andWhere('o.status = :status', { status: 'COMPLETED' });
+
+    if (targetOutlet) {
+      taxPayableQb.andWhere('o.outlet_id = :outletId', {
+        outletId: targetOutlet,
+      });
+    }
+
+    const taxPayableRaw = await taxPayableQb.getRawOne<{ tax: string }>();
     const taxPayables = Number(taxPayableRaw?.tax || 0);
 
+    const accountsPayable = await this.journalService.getAccountBalance(
+      tenantId,
+      '2-1100', // Hutang Usaha / Supplier
+      targetOutlet,
+      targetDate,
+    );
+
+    const totalLiabilities =
+      Math.round((taxPayables + accountsPayable) * 100) / 100;
+
     // E. Ekuitas (Total Aset - Total Kewajiban)
-    const retainedEarnings = totalAssets - taxPayables;
+    const retainedEarnings =
+      Math.round((totalAssets - totalLiabilities) * 100) / 100;
 
     return {
       asOfDate: targetDate,
@@ -807,8 +827,8 @@ export class ReportService {
       },
       liabilities: {
         taxPayables,
-        accountsPayable: 0,
-        totalLiabilities: taxPayables,
+        accountsPayable,
+        totalLiabilities,
       },
       equity: {
         retainedEarnings,
