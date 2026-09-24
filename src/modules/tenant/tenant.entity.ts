@@ -39,6 +39,9 @@ export class Tenant {
   @Column({ type: 'enum', enum: TenantStatus, default: TenantStatus.ACTIVE })
   status!: TenantStatus;
 
+  @Column({ name: 'max_outlets', type: 'int', default: 1 })
+  maxOutlets!: number;
+
   @Column({
     name: 'console_api_key',
     type: 'varchar',

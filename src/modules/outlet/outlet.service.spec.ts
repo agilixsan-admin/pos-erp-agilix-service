@@ -1,12 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { OutletService } from './outlet.service';
 import { Outlet } from './outlet.entity';
+import { Tenant } from '../tenant/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 
 describe('OutletService', () => {
   let service: OutletService;
+
+  const mockTenant = {
+    id: 'tenant-1',
+    maxOutlets: 2,
+  };
 
   const mockOutlet: Partial<Outlet> = {
     id: 'outlet-1',
@@ -21,8 +31,13 @@ describe('OutletService', () => {
   const mockRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
+    count: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+  };
+
+  const mockTenantRepo = {
+    findOne: jest.fn(),
   };
 
   const mockAuditService = {
@@ -31,11 +46,14 @@ describe('OutletService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTenantRepo.findOne.mockResolvedValue(mockTenant);
+    mockRepo.count.mockResolvedValue(0);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OutletService,
         { provide: getRepositoryToken(Outlet), useValue: mockRepo },
+        { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
         { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
@@ -145,6 +163,43 @@ describe('OutletService', () => {
 
       expect(result.code).toBe('CABANG');
       expect(mockAuditService.record).toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when outlet quota is reached', async () => {
+      mockTenantRepo.findOne.mockResolvedValue({
+        id: 'tenant-1',
+        maxOutlets: 2,
+      });
+      mockRepo.count.mockResolvedValue(2);
+
+      await expect(
+        service.create('tenant-1', 'user-1', { name: 'Branch 3' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when tenant is not found', async () => {
+      mockTenantRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.create('tenant-1', 'user-1', { name: 'Branch 1' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getQuota', () => {
+    it('returns quota info for tenant', async () => {
+      mockTenantRepo.findOne.mockResolvedValue({
+        id: 'tenant-1',
+        maxOutlets: 3,
+      });
+      mockRepo.count.mockResolvedValue(1);
+
+      const result = await service.getQuota('tenant-1');
+      expect(result).toEqual({
+        max: 3,
+        used: 1,
+        remaining: 2,
+      });
     });
   });
 

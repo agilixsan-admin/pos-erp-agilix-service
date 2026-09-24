@@ -9,11 +9,9 @@ import { DataSource, IsNull } from 'typeorm';
 import { ConsoleWebhookDto } from './console-webhook.dto';
 import { ExternalCommand } from './external-command.entity';
 import { Tenant } from '../tenant/tenant.entity';
-import { Outlet } from '../outlet/outlet.entity';
 import { PosSettings } from '../settings/entities/pos-settings.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantStatus } from '../tenant/tenant-status.enum';
-import { Role } from '../rbac/role.entity';
 import { User } from '../user/user.entity';
 import * as bcrypt from 'bcryptjs';
 
@@ -55,6 +53,15 @@ export class WebhookService {
       let tenant = await tenantRepository.findOne({ where: { id: tenantId } });
       if (payload.event === 'tenant.created') {
         if (!tenant) {
+          const outletCount = Number(payload.data.outletCount ?? 1);
+          if (!Number.isInteger(outletCount) || outletCount < 1) {
+            throw new BadRequestException({
+              success: false,
+              message: 'Invalid outlet count',
+              code: 'INVALID_PAYLOAD',
+            });
+          }
+
           tenant = tenantRepository.create({
             id: tenantId,
             businessName: this.requiredString(
@@ -68,51 +75,13 @@ export class WebhookService {
             ),
             ownerPhone: this.optionalString(payload.data.ownerPhone),
             planType: this.requiredString(payload.data.planType, 'planType'),
+            maxOutlets: outletCount,
             expiryDate: this.parseDate(payload.data.expiryDate),
             status: TenantStatus.ACTIVE,
           });
           await tenantRepository.save(tenant);
-          const outletCount = Number(payload.data.outletCount ?? 1);
-          if (!Number.isInteger(outletCount) || outletCount < 1) {
-            throw new BadRequestException({
-              success: false,
-              message: 'Invalid outlet count',
-              code: 'INVALID_PAYLOAD',
-            });
-          }
-          const outletRepository = manager.getRepository(Outlet);
-          const createdOutlets = await outletRepository.save(
-            Array.from({ length: outletCount }, (_, index) =>
-              outletRepository.create({
-                tenantId,
-                name: `Outlet ${index + 1}`,
-                code: `OUTLET-${index + 1}`,
-                status: 'ACTIVE',
-              }),
-            ),
-          );
 
-          const firstOutlet = createdOutlets[0];
-
-          // 1. Provision Default Owner Role (Full POS Access)
-          const roleRepository = manager.getRepository(Role);
-          let role = await roleRepository.findOne({
-            where: { tenantId, name: 'Owner' },
-          });
-          if (!role) {
-            role = await roleRepository.save(
-              roleRepository.create({
-                tenantId,
-                outletId: firstOutlet.id,
-                name: 'Owner',
-                description: 'Pemilik bisnis dengan akses penuh POS',
-                menuAccess: ['*'],
-                status: 'ACTIVE',
-              }),
-            );
-          }
-
-          // 2. Provision Default Owner User for POS Login
+          // Provision Default Owner User for POS Login
           const userRepository = manager.getRepository(User);
           const existingUser = await userRepository.findOne({
             where: { email: tenant.ownerEmail },
@@ -129,8 +98,8 @@ export class WebhookService {
             await userRepository.save(
               userRepository.create({
                 tenantId,
-                outletId: firstOutlet.id,
-                roleId: role.id,
+                outletId: null,
+                roleId: null,
                 name: tenant.ownerName,
                 email: tenant.ownerEmail,
                 passwordHash,
@@ -187,6 +156,12 @@ export class WebhookService {
             this.optionalString(payload.data.ownerPhone) ?? tenant.ownerPhone;
           tenant.planType =
             this.optionalString(payload.data.planType) ?? tenant.planType;
+          if (payload.data.outletCount !== undefined) {
+            const oc = Number(payload.data.outletCount);
+            if (Number.isInteger(oc) && oc >= 1) {
+              tenant.maxOutlets = oc;
+            }
+          }
           if (payload.data.expiryDate)
             tenant.expiryDate = this.parseDate(payload.data.expiryDate);
         }

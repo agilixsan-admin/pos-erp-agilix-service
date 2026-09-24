@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Outlet } from './outlet.entity';
+import { Tenant } from '../tenant/tenant.entity';
 import { OutletService } from './outlet.service';
 import { OutletController } from './controllers/outlet.controller';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Outlet]), AuditModule],
+  imports: [TypeOrmModule.forFeature([Outlet, Tenant]), AuditModule],
   controllers: [OutletController],
   providers: [OutletService],
   exports: [OutletService, TypeOrmModule],

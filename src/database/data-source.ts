@@ -33,11 +33,22 @@ import { Packaging } from '../modules/packaging/entities/packaging.entity';
 import { Supplier } from '../modules/supplier/entities/supplier.entity';
 import { Purchase } from '../modules/purchase/entities/purchase.entity';
 import { PurchaseItem } from '../modules/purchase/entities/purchase-item.entity';
+import { PurchasePayment } from '../modules/purchase/entities/purchase-payment.entity';
 import { StockOpname } from '../modules/stock-opname/entities/stock-opname.entity';
 import { StockOpnameItem } from '../modules/stock-opname/entities/stock-opname-item.entity';
 import { StockAdjustment } from '../modules/inventory/entities/stock-adjustment.entity';
 import { EmailTemplate } from '../modules/mail/entities/email-template.entity';
 import { UserInvitation } from '../modules/user/entities/user-invitation.entity';
+import { PosShift } from '../modules/shift/entities/pos-shift.entity';
+import { PettyCashTransaction } from '../modules/shift/entities/petty-cash-transaction.entity';
+import { ChartOfAccount } from '../modules/finance/entities/chart-of-account.entity';
+import { ExpenseCategory } from '../modules/finance/entities/expense-category.entity';
+import { Expense } from '../modules/finance/entities/expense.entity';
+import { FinancialAccount } from '../modules/finance/entities/financial-account.entity';
+import { FinancialTransfer } from '../modules/finance/entities/financial-transfer.entity';
+import { FixedAsset } from '../modules/finance/entities/fixed-asset.entity';
+import { JournalEntry } from '../modules/finance/entities/journal-entry.entity';
+import { JournalEntryLine } from '../modules/finance/entities/journal-entry-line.entity';
 import { ALL_MIGRATIONS } from './migrations';
 
 export default new DataSource({
@@ -82,11 +93,22 @@ export default new DataSource({
     Supplier,
     Purchase,
     PurchaseItem,
+    PurchasePayment,
     StockOpname,
     StockOpnameItem,
     StockAdjustment,
     EmailTemplate,
     UserInvitation,
+    PosShift,
+    PettyCashTransaction,
+    ChartOfAccount,
+    ExpenseCategory,
+    Expense,
+    FinancialAccount,
+    FinancialTransfer,
+    FixedAsset,
+    JournalEntry,
+    JournalEntryLine,
   ],
   migrations: ALL_MIGRATIONS,
   synchronize: false,

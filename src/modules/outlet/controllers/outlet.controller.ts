@@ -24,9 +24,13 @@ export class OutletController {
   @Permissions('outlet.read')
   async findAll(@CurrentUser() user: User) {
     const data = await this.outletService.findAll(user.tenantId);
+    const quota = await this.outletService.getQuota(user.tenantId);
     return {
       success: true,
       data,
+      meta: {
+        quota,
+      },
     };
   }
 

@@ -281,17 +281,13 @@ describe('WebhookService', () => {
           id: 'tenant-new-1',
           businessName: 'Coffee Hub',
           status: TenantStatus.ACTIVE,
+          maxOutlets: 2,
         }),
       );
       expect(tenantRepo.save).toHaveBeenCalled();
 
-      // Verifies Outlets creation
-      expect(outletRepo.save).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Outlet 1', code: 'OUTLET-1' }),
-          expect.objectContaining({ name: 'Outlet 2', code: 'OUTLET-2' }),
-        ]),
-      );
+      // Verifies Outlets creation is not done automatically (0 outlets initially)
+      expect(outletRepo.save).not.toHaveBeenCalled();
 
       // Verifies PosSettings creation
       expect(settingsRepo.create).toHaveBeenCalledWith(
@@ -306,19 +302,14 @@ describe('WebhookService', () => {
       );
       expect(settingsRepo.save).toHaveBeenCalled();
 
-      // Verifies Owner Role and Owner User creation for POS login
-      expect(roleRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId: 'tenant-new-1',
-          name: 'Owner',
-          menuAccess: ['*'],
-        }),
-      );
+      // Verifies Owner User creation for POS login
       expect(userRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: 'tenant-new-1',
           email: 'budi@coffee.com',
           name: 'Budi',
+          outletId: null,
+          roleId: null,
           isSuperAdmin: true,
           status: 'ACTIVE',
         }),
@@ -440,6 +431,7 @@ describe('WebhookService', () => {
           businessName: 'Updated Name',
           ownerName: 'Updated Owner',
           planType: 'ENTERPRISE',
+          outletCount: 5,
         },
       };
 
@@ -449,6 +441,7 @@ describe('WebhookService', () => {
       expect(existingTenant.businessName).toBe('Updated Name');
       expect(existingTenant.ownerName).toBe('Updated Owner');
       expect(existingTenant.planType).toBe('ENTERPRISE');
+      expect(existingTenant.maxOutlets).toBe(5);
       expect(tenantRepo.save).toHaveBeenCalledWith(existingTenant);
       expect(mockAuditRecord).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'tenant.updated' }),

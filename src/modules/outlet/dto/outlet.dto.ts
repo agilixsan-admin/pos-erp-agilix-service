@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -24,6 +25,10 @@ export class CreateOutletDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class UpdateOutletDto {

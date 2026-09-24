@@ -25,6 +25,7 @@ describe('OutletController', () => {
 
   const mockOutletService = {
     findAll: jest.fn(),
+    getQuota: jest.fn().mockResolvedValue({ max: 2, used: 1, remaining: 1 }),
     findById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -43,7 +44,7 @@ describe('OutletController', () => {
   });
 
   describe('findAll', () => {
-    it('returns list of outlets for user tenant', async () => {
+    it('returns list of outlets for user tenant with quota metadata', async () => {
       mockOutletService.findAll.mockResolvedValue([mockOutlet]);
 
       const result = await controller.findAll(mockUser);
@@ -51,8 +52,12 @@ describe('OutletController', () => {
       expect(result).toEqual({
         success: true,
         data: [mockOutlet],
+        meta: {
+          quota: { max: 2, used: 1, remaining: 1 },
+        },
       });
       expect(mockOutletService.findAll).toHaveBeenCalledWith('tenant-1');
+      expect(mockOutletService.getQuota).toHaveBeenCalledWith('tenant-1');
     });
   });
 

@@ -1,11 +1,13 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Outlet } from './outlet.entity';
+import { Tenant } from '../tenant/tenant.entity';
 import { AuditService } from '../audit/audit.service';
 import { CreateOutletDto, UpdateOutletDto } from './dto/outlet.dto';
 
@@ -14,11 +16,26 @@ export class OutletService {
   constructor(
     @InjectRepository(Outlet)
     private readonly outlets: Repository<Outlet>,
+    @InjectRepository(Tenant)
+    private readonly tenants: Repository<Tenant>,
     private readonly auditService: AuditService,
   ) {}
 
   findForTenant(tenantId: string, outletId: string) {
     return this.outlets.findOne({ where: { id: outletId, tenantId } });
+  }
+
+  async getQuota(tenantId: string) {
+    const tenant = await this.tenants.findOne({ where: { id: tenantId } });
+    const max = tenant?.maxOutlets ?? 1;
+    const used = await this.outlets.count({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+    return {
+      max,
+      used,
+      remaining: Math.max(0, max - used),
+    };
   }
 
   async findAll(tenantId: string): Promise<Outlet[]> {
@@ -47,6 +64,28 @@ export class OutletService {
     actorId: string,
     dto: CreateOutletDto,
   ): Promise<Outlet> {
+    const tenant = await this.tenants.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Tenant not found',
+        code: 'TENANT_NOT_FOUND',
+      });
+    }
+
+    const activeCount = await this.outlets.count({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+
+    const maxOutlets = tenant.maxOutlets ?? 1;
+    if (activeCount >= maxOutlets) {
+      throw new ForbiddenException({
+        success: false,
+        message: `Batas kuota cabang telah tercapai (${activeCount}/${maxOutlets}). Silakan tambah kuota cabang di Agilix Console.`,
+        code: 'OUTLET_LIMIT_REACHED',
+      });
+    }
+
     let code: string;
 
     if (dto.code) {
