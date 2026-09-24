@@ -93,6 +93,7 @@ export class JournalService {
         | 'TRANSFER'
         | 'ASSET_PURCHASE'
         | 'PURCHASE'
+        | 'PURCHASE_PAYMENT'
         | 'MANUAL';
       sourceId?: string | null;
       description: string;

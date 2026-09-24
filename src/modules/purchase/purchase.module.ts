@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Purchase } from './entities/purchase.entity';
 import { PurchaseItem } from './entities/purchase-item.entity';
+import { PurchasePayment } from './entities/purchase-payment.entity';
 import { Outlet } from '../outlet/outlet.entity';
 import { Supplier } from '../supplier/entities/supplier.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
@@ -18,6 +19,7 @@ import { FinanceModule } from '../finance/finance.module';
     TypeOrmModule.forFeature([
       Purchase,
       PurchaseItem,
+      PurchasePayment,
       Outlet,
       Supplier,
       InventoryItem,

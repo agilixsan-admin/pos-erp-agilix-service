@@ -15,12 +15,14 @@ import { Outlet } from '../../outlet/outlet.entity';
 import { Supplier } from '../../supplier/entities/supplier.entity';
 import { User } from '../../user/user.entity';
 import { PurchaseItem } from './purchase-item.entity';
+import { PurchasePayment } from './purchase-payment.entity';
 
 @Entity('purchases')
 @Index(['tenantId'])
 @Index(['tenantId', 'outletId'])
 @Index(['tenantId', 'purchaseNumber'])
 @Index(['status'])
+@Index(['paymentStatus'])
 export class Purchase {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -46,6 +48,14 @@ export class Purchase {
 
   @Column({ type: 'varchar', length: 50, default: 'DRAFT' })
   status!: 'DRAFT' | 'RECEIVED' | 'CANCELLED';
+
+  @Column({
+    name: 'payment_status',
+    type: 'varchar',
+    length: 50,
+    default: 'UNPAID',
+  })
+  paymentStatus!: 'UNPAID' | 'PARTIAL' | 'PAID';
 
   @Column({ name: 'total_items', type: 'int', default: 0 })
   totalItems!: number;
@@ -75,6 +85,19 @@ export class Purchase {
     },
   })
   totalAmount!: number;
+
+  @Column({
+    name: 'paid_amount',
+    type: 'decimal',
+    precision: 14,
+    scale: 2,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => Number(value),
+    },
+  })
+  paidAmount!: number;
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
@@ -119,4 +142,9 @@ export class Purchase {
 
   @OneToMany(() => PurchaseItem, (item) => item.purchase, { cascade: true })
   items!: PurchaseItem[];
+
+  @OneToMany(() => PurchasePayment, (payment) => payment.purchase, {
+    cascade: true,
+  })
+  payments!: PurchasePayment[];
 }

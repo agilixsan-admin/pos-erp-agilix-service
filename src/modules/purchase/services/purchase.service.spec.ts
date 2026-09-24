@@ -5,6 +5,7 @@ import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { PurchaseService } from './purchase.service';
 import { Purchase } from '../entities/purchase.entity';
 import { PurchaseItem } from '../entities/purchase-item.entity';
+import { PurchasePayment } from '../entities/purchase-payment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { Supplier } from '../../supplier/entities/supplier.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
@@ -19,6 +20,7 @@ describe('PurchaseService', () => {
   let service: PurchaseService;
   let purchaseRepo: jest.Mocked<Repository<Purchase>>;
   let purchaseItemRepo: jest.Mocked<Repository<PurchaseItem>>;
+  let purchasePaymentRepo: jest.Mocked<Repository<PurchasePayment>>;
   let outletRepo: jest.Mocked<Repository<Outlet>>;
   let supplierRepo: jest.Mocked<Repository<Supplier>>;
   let inventoryItemRepo: jest.Mocked<Repository<InventoryItem>>;
@@ -38,9 +40,11 @@ describe('PurchaseService', () => {
     purchaseNumber: 'PB-2024-001',
     purchaseDate: new Date(),
     status: 'DRAFT',
+    paymentStatus: 'UNPAID',
     totalItems: 1,
     subtotal: 13000,
     totalAmount: 13000,
+    paidAmount: 0,
     notes: 'Draft order susu',
     receivedAt: null,
     receivedBy: null,
@@ -53,6 +57,7 @@ describe('PurchaseService', () => {
     supplier: { id: 'supp-1', name: 'PT Sumber Makmur' } as any,
     receiver: null,
     creator: {} as any,
+    payments: [],
     items: [
       {
         id: 'item-row-1',
@@ -121,6 +126,24 @@ describe('PurchaseService', () => {
       findOne: jest.fn(),
       save: jest.fn(),
     } as any;
+    purchasePaymentRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest
+        .fn()
+        .mockImplementation((dto) => ({ id: 'mock-pay-id', ...dto })),
+      save: jest
+        .fn()
+        .mockImplementation((e) =>
+          Promise.resolve({ id: 'mock-pay-id', ...e }),
+        ),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      }),
+    } as any;
     auditService = { record: jest.fn().mockResolvedValue(undefined) } as any;
     journalService = {
       recordJournal: jest.fn().mockResolvedValue({} as any),
@@ -132,6 +155,7 @@ describe('PurchaseService', () => {
           getRepository: (entity: any) => {
             if (entity === Purchase) return purchaseRepo;
             if (entity === PurchaseItem) return purchaseItemRepo;
+            if (entity === PurchasePayment) return purchasePaymentRepo;
             if (entity === InventoryStock) return stockRepo;
             if (entity === InventoryMovement) return movementRepo;
             if (entity === InventoryItem) return inventoryItemRepo;
@@ -152,6 +176,10 @@ describe('PurchaseService', () => {
         {
           provide: getRepositoryToken(PurchaseItem),
           useValue: purchaseItemRepo,
+        },
+        {
+          provide: getRepositoryToken(PurchasePayment),
+          useValue: purchasePaymentRepo,
         },
         { provide: getRepositoryToken(Outlet), useValue: outletRepo },
         { provide: getRepositoryToken(Supplier), useValue: supplierRepo },
@@ -581,6 +609,190 @@ describe('PurchaseService', () => {
       await expect(
         service.receive('tenant-1', 'pur-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('createPayment', () => {
+    const receivedPurchase: Purchase = {
+      ...mockPurchase,
+      status: 'RECEIVED',
+      paymentStatus: 'UNPAID',
+      totalAmount: 100000,
+      paidAmount: 0,
+      items: [],
+      supplier: { id: 'supp-1', name: 'PT Lancar Jaya' } as any,
+    };
+
+    const mockAccount = {
+      id: 'acc-bank-1',
+      tenantId: 'tenant-1',
+      accountName: 'BCA Operasional',
+      accountType: 'BANK',
+      currentBalance: 500000,
+      isActive: true,
+    } as any;
+
+    it('records partial payment, updates paidAmount and paymentStatus to PARTIAL, and records auto-journal', async () => {
+      purchaseRepo.findOne.mockResolvedValue({ ...receivedPurchase });
+      financialAccountRepo.findOne.mockResolvedValue({ ...mockAccount });
+
+      const result = await service.createPayment(
+        'tenant-1',
+        'pur-1',
+        'user-1',
+        {
+          financialAccountId: 'acc-bank-1',
+          amount: 40000,
+          notes: 'Cicilan 1',
+        },
+      );
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('mock-pay-id');
+      expect(result.amount).toBe(40000);
+      expect(purchaseRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paidAmount: 40000,
+          paymentStatus: 'PARTIAL',
+        }),
+      );
+      expect(financialAccountRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentBalance: 460000, // 500000 - 40000
+        }),
+      );
+      expect(journalService.recordJournal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          sourceType: 'PURCHASE_PAYMENT',
+          lines: expect.arrayContaining([
+            expect.objectContaining({
+              accountCode: '2-1100', // Hutang Usaha
+              debit: 40000,
+              credit: 0,
+            }),
+            expect.objectContaining({
+              accountCode: '1-1200', // Bank
+              debit: 0,
+              credit: 40000,
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PURCHASE_PAYMENT_CREATED',
+        }),
+      );
+    });
+
+    it('records full payment and updates paymentStatus to PAID', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...receivedPurchase,
+        paidAmount: 40000,
+        paymentStatus: 'PARTIAL',
+      });
+      financialAccountRepo.findOne.mockResolvedValue({ ...mockAccount });
+
+      await service.createPayment('tenant-1', 'pur-1', 'user-1', {
+        financialAccountId: 'acc-bank-1',
+        amount: 60000, // sisa 60000
+        notes: 'Pelunasan sisa hutang',
+      });
+
+      expect(purchaseRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paidAmount: 100000,
+          paymentStatus: 'PAID',
+        }),
+      );
+    });
+
+    it('throws BadRequestException if purchase is not in RECEIVED status', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...receivedPurchase,
+        status: 'DRAFT',
+      });
+
+      await expect(
+        service.createPayment('tenant-1', 'pur-1', 'user-1', {
+          financialAccountId: 'acc-bank-1',
+          amount: 50000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if purchase is already PAID', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...receivedPurchase,
+        paidAmount: 100000,
+        paymentStatus: 'PAID',
+      });
+
+      await expect(
+        service.createPayment('tenant-1', 'pur-1', 'user-1', {
+          financialAccountId: 'acc-bank-1',
+          amount: 50000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if payment amount exceeds remaining debt', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...receivedPurchase,
+        paidAmount: 80000,
+        paymentStatus: 'PARTIAL',
+      });
+
+      await expect(
+        service.createPayment('tenant-1', 'pur-1', 'user-1', {
+          financialAccountId: 'acc-bank-1',
+          amount: 50000, // Sisa hanya 20000
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException if payment account balance is insufficient', async () => {
+      purchaseRepo.findOne.mockResolvedValue({ ...receivedPurchase });
+      financialAccountRepo.findOne.mockResolvedValue({
+        ...mockAccount,
+        currentBalance: 10000, // Kurang dari 50000
+      });
+
+      await expect(
+        service.createPayment('tenant-1', 'pur-1', 'user-1', {
+          financialAccountId: 'acc-bank-1',
+          amount: 50000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getPayments', () => {
+    it('returns list of payments for a purchase', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...mockPurchase,
+        status: 'RECEIVED',
+      });
+      purchasePaymentRepo.find.mockResolvedValue([
+        { id: 'pay-1', amount: 50000 } as any,
+      ]);
+
+      const result = await service.getPayments('tenant-1', 'pur-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('pay-1');
+      expect(purchasePaymentRepo.find).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-1', purchaseId: 'pur-1' },
+        relations: {
+          financialAccount: true,
+          creator: true,
+        },
+        order: {
+          paymentDate: 'DESC',
+          createdAt: 'DESC',
+        },
+      });
     });
   });
 });

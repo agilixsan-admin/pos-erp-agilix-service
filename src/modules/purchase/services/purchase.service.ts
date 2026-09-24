@@ -4,9 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Purchase } from '../entities/purchase.entity';
 import { PurchaseItem } from '../entities/purchase-item.entity';
+import { PurchasePayment } from '../entities/purchase-payment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { Supplier } from '../../supplier/entities/supplier.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
@@ -18,6 +19,7 @@ import { JournalService } from '../../finance/services/journal.service';
 import { FinancialAccount } from '../../finance/entities/financial-account.entity';
 import {
   CreatePurchaseDto,
+  CreatePurchasePaymentDto,
   QueryPurchaseDto,
   ReceivePurchaseDto,
   UpdatePurchaseDto,
@@ -40,6 +42,8 @@ export class PurchaseService {
     private readonly purchaseRepository: Repository<Purchase>,
     @InjectRepository(PurchaseItem)
     private readonly purchaseItemRepository: Repository<PurchaseItem>,
+    @InjectRepository(PurchasePayment)
+    private readonly purchasePaymentRepository: Repository<PurchasePayment>,
     @InjectRepository(Outlet)
     private readonly outletRepository: Repository<Outlet>,
     @InjectRepository(Supplier)
@@ -81,6 +85,12 @@ export class PurchaseService {
 
     if (query.status) {
       qb.andWhere('purchase.status = :status', { status: query.status });
+    }
+
+    if (query.paymentStatus) {
+      qb.andWhere('purchase.paymentStatus = :paymentStatus', {
+        paymentStatus: query.paymentStatus,
+      });
     }
 
     if (query.outletId) {
@@ -143,6 +153,16 @@ export class PurchaseService {
         creator: true,
         items: {
           inventoryItem: true,
+        },
+        payments: {
+          financialAccount: true,
+          creator: true,
+        },
+      },
+      order: {
+        payments: {
+          paymentDate: 'DESC',
+          createdAt: 'DESC',
         },
       },
     });
@@ -603,6 +623,15 @@ export class PurchaseService {
       if (dto?.notes) {
         purchase.notes = dto.notes;
       }
+
+      if (paymentAccount && totalReceivedCost > 0) {
+        purchase.paidAmount = totalReceivedCost;
+        purchase.paymentStatus = 'PAID';
+      } else {
+        purchase.paidAmount = 0;
+        purchase.paymentStatus = 'UNPAID';
+      }
+
       await purchaseRepo.save(purchase);
 
       // 3. Recalculate Cumulative Average Unit Cost for all affected items
@@ -651,6 +680,24 @@ export class PurchaseService {
           paymentAccount.currentBalance =
             Number(paymentAccount.currentBalance) - totalReceivedCost;
           await accountRepo.save(paymentAccount);
+
+          const paymentRepo = manager.getRepository(PurchasePayment);
+          const paymentNumber = await this.generatePaymentNumber(
+            tenantId,
+            manager,
+          );
+          const initialPayment = paymentRepo.create({
+            tenantId,
+            outletId: purchase.outletId,
+            purchaseId: purchase.id,
+            financialAccountId: paymentAccount.id,
+            paymentNumber,
+            paymentDate: new Date(),
+            amount: totalReceivedCost,
+            notes: 'Pembayaran langsung saat terima barang',
+            createdBy: actorId,
+          });
+          await paymentRepo.save(initialPayment);
 
           creditCode =
             paymentAccount.accountType === 'CASH' ? '1-1100' : '1-1200';
@@ -778,5 +825,245 @@ export class PurchaseService {
     }
 
     return item;
+  }
+
+  /**
+   * Generate next payment number (PAY-YYYYMM-XXXX)
+   */
+  private async generatePaymentNumber(
+    tenantId: string,
+    manager?: EntityManager,
+  ): Promise<string> {
+    const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+    const prefix = `PAY-${yearMonth}-`;
+
+    const repo = manager
+      ? manager.getRepository(PurchasePayment)
+      : this.purchasePaymentRepository;
+
+    const lastPayment = await repo
+      .createQueryBuilder('p')
+      .where('p.tenantId = :tenantId', { tenantId })
+      .andWhere('p.paymentNumber LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('p.createdAt', 'DESC')
+      .getOne();
+
+    let seq = 1;
+    if (lastPayment?.paymentNumber) {
+      const parts = lastPayment.paymentNumber.split('-');
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) {
+        seq = lastSeq + 1;
+      }
+    }
+
+    return `${prefix}${String(seq).padStart(4, '0')}`;
+  }
+
+  /**
+   * Record debt payment / settlement for a received purchase
+   */
+  async createPayment(
+    tenantId: string,
+    purchaseId: string,
+    actorId: string,
+    dto: CreatePurchasePaymentDto,
+  ): Promise<PurchasePayment> {
+    return this.dataSource.transaction(async (manager) => {
+      const purchaseRepo = manager.getRepository(Purchase);
+      const paymentRepo = manager.getRepository(PurchasePayment);
+      const accountRepo = manager.getRepository(FinancialAccount);
+
+      const purchase = await purchaseRepo.findOne({
+        where: { id: purchaseId, tenantId },
+        relations: { supplier: true, outlet: true },
+      });
+
+      if (!purchase) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Purchase not found',
+          code: 'PURCHASE_NOT_FOUND',
+        });
+      }
+
+      if (purchase.status !== 'RECEIVED') {
+        throw new BadRequestException({
+          success: false,
+          message:
+            'Pembayaran hutang hanya dapat dilakukan untuk pembelian yang sudah berstatus RECEIVED (Diterima)',
+          code: 'PURCHASE_NOT_RECEIVED',
+        });
+      }
+
+      const totalAmount = Number(purchase.totalAmount || 0);
+      const currentPaid = Number(purchase.paidAmount || 0);
+      const remainingDebt = Math.max(
+        0,
+        Math.round((totalAmount - currentPaid) * 100) / 100,
+      );
+
+      if (remainingDebt <= 0 || purchase.paymentStatus === 'PAID') {
+        throw new BadRequestException({
+          success: false,
+          message: 'Pembelian ini sudah lunas (tidak ada sisa hutang).',
+          code: 'PURCHASE_ALREADY_PAID',
+        });
+      }
+
+      const payAmount = Math.round(Number(dto.amount) * 100) / 100;
+      if (payAmount <= 0) {
+        throw new BadRequestException({
+          success: false,
+          message: 'Nominal pembayaran harus lebih dari 0.',
+          code: 'INVALID_PAYMENT_AMOUNT',
+        });
+      }
+
+      if (payAmount > remainingDebt) {
+        throw new BadRequestException({
+          success: false,
+          message: `Nominal pembayaran (Rp ${payAmount.toLocaleString('id-ID')}) melebihi sisa hutang (Rp ${remainingDebt.toLocaleString('id-ID')}).`,
+          code: 'PAYMENT_EXCEEDS_REMAINING_DEBT',
+        });
+      }
+
+      const account = await accountRepo.findOne({
+        where: { id: dto.financialAccountId, tenantId },
+      });
+
+      if (!account) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Akun kas/bank pembayaran tidak ditemukan.',
+          code: 'ACCOUNT_NOT_FOUND',
+        });
+      }
+
+      if (!account.isActive) {
+        throw new BadRequestException({
+          success: false,
+          message: `Akun kas/bank ${account.accountName} sedang nonaktif.`,
+          code: 'ACCOUNT_INACTIVE',
+        });
+      }
+
+      if (Number(account.currentBalance) < payAmount) {
+        throw new BadRequestException({
+          success: false,
+          message: `Saldo ${account.accountName} (Rp ${Number(account.currentBalance).toLocaleString('id-ID')}) tidak mencukupi untuk pembayaran sebesar Rp ${payAmount.toLocaleString('id-ID')}.`,
+          code: 'INSUFFICIENT_ACCOUNT_BALANCE',
+        });
+      }
+
+      // Deduct account balance
+      account.currentBalance = Number(account.currentBalance) - payAmount;
+      await accountRepo.save(account);
+
+      // Generate payment number
+      const paymentNumber = await this.generatePaymentNumber(tenantId, manager);
+
+      const paymentDate = dto.paymentDate
+        ? new Date(dto.paymentDate)
+        : new Date();
+
+      // Create purchase payment record
+      const payment = paymentRepo.create({
+        tenantId,
+        outletId: purchase.outletId,
+        purchaseId: purchase.id,
+        financialAccountId: account.id,
+        paymentNumber,
+        paymentDate,
+        amount: payAmount,
+        notes: dto.notes ?? null,
+        createdBy: actorId,
+      });
+      const savedPayment = await paymentRepo.save(payment);
+
+      // Update purchase paid amount & status
+      const updatedPaidAmount =
+        Math.round((currentPaid + payAmount) * 100) / 100;
+      const updatedPaymentStatus =
+        updatedPaidAmount >= totalAmount ? 'PAID' : 'PARTIAL';
+
+      purchase.paidAmount = updatedPaidAmount;
+      purchase.paymentStatus = updatedPaymentStatus;
+      await purchaseRepo.save(purchase);
+
+      // Auto-Journal: Pelunasan Hutang
+      // Debit: 2-1100 (Hutang Usaha / Supplier)
+      // Credit: 1-1100 (Kas) / 1-1200 (Bank)
+      const creditAccountCode =
+        account.accountType === 'CASH' ? '1-1100' : '1-1200';
+      const entryDate = paymentDate.toISOString().slice(0, 10);
+
+      await this.journalService.recordJournal(
+        {
+          tenantId,
+          outletId: purchase.outletId,
+          entryDate,
+          sourceType: 'PURCHASE_PAYMENT',
+          sourceId: savedPayment.id,
+          description: `Pelunasan Hutang Pembelian ${purchase.purchaseNumber} ke ${purchase.supplier?.name || 'Supplier'}`,
+          createdBy: actorId,
+          lines: [
+            {
+              accountCode: '2-1100', // Hutang Usaha / Supplier
+              debit: payAmount,
+              credit: 0,
+              notes: `Pelunasan Hutang PO ${purchase.purchaseNumber}`,
+            },
+            {
+              accountCode: creditAccountCode,
+              debit: 0,
+              credit: payAmount,
+              notes: `Pembayaran dari ${account.accountName}`,
+            },
+          ],
+        },
+        manager,
+      );
+
+      await this.audit.record({
+        action: 'PURCHASE_PAYMENT_CREATED',
+        tenantId,
+        actorType: 'USER',
+        actorId,
+        metadata: {
+          purchaseId: purchase.id,
+          purchaseNumber: purchase.purchaseNumber,
+          paymentId: savedPayment.id,
+          paymentNumber: savedPayment.paymentNumber,
+          amount: payAmount,
+          newPaidAmount: updatedPaidAmount,
+          newPaymentStatus: updatedPaymentStatus,
+        },
+      });
+
+      return savedPayment;
+    });
+  }
+
+  /**
+   * Get list of payments for a purchase
+   */
+  async getPayments(
+    tenantId: string,
+    purchaseId: string,
+  ): Promise<PurchasePayment[]> {
+    await this.findById(tenantId, purchaseId); // ensure existence & tenant isolation
+
+    return this.purchasePaymentRepository.find({
+      where: { tenantId, purchaseId },
+      relations: {
+        financialAccount: true,
+        creator: true,
+      },
+      order: {
+        paymentDate: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
   }
 }

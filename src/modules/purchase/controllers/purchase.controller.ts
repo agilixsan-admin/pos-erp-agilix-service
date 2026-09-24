@@ -12,6 +12,7 @@ import {
 import { PurchaseService } from '../services/purchase.service';
 import {
   CreatePurchaseDto,
+  CreatePurchasePaymentDto,
   QueryPurchaseDto,
   ReceivePurchaseDto,
   UpdatePurchaseDto,
@@ -119,6 +120,40 @@ export class PurchaseController {
       success: true,
       message:
         'Purchase goods received, stock incremented, and unit cost updated successfully',
+      data,
+    };
+  }
+
+  @Post(':id/payments')
+  @Permissions('inventory.update', 'purchase.update')
+  async createPayment(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreatePurchasePaymentDto,
+  ) {
+    const data = await this.purchaseService.createPayment(
+      user.tenantId,
+      id,
+      user.id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Pembayaran hutang pembelian berhasil dicatat.',
+      data,
+    };
+  }
+
+  @Get(':id/payments')
+  @Permissions('inventory.read', 'purchase.read')
+  async getPayments(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.purchaseService.getPayments(user.tenantId, id);
+    return {
+      success: true,
+      message: 'Riwayat pembayaran pembelian berhasil diambil.',
       data,
     };
   }

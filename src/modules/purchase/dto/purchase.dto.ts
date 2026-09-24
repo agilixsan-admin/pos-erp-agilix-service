@@ -148,6 +148,10 @@ export class QueryPurchaseDto {
   status?: 'DRAFT' | 'RECEIVED' | 'CANCELLED';
 
   @IsOptional()
+  @IsIn(['UNPAID', 'PARTIAL', 'PAID'])
+  paymentStatus?: 'UNPAID' | 'PARTIAL' | 'PAID';
+
+  @IsOptional()
   @IsUUID()
   outletId?: string;
 
@@ -166,4 +170,23 @@ export class QueryPurchaseDto {
   @IsOptional()
   @IsString()
   search?: string;
+}
+
+export class CreatePurchasePaymentDto {
+  @IsUUID()
+  @IsNotEmpty()
+  financialAccountId!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  @Type(() => Number)
+  amount!: number;
+
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
