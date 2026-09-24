@@ -458,6 +458,19 @@ export class ShiftService {
     }
 
     const closedAt = shift.closedAt || new Date();
+    const openedAtDate = new Date(shift.openedAt);
+    const closedAtDate = new Date(closedAt);
+    const durationHours = Math.max(
+      0.1,
+      Math.round(
+        ((closedAtDate.getTime() - openedAtDate.getTime()) / (1000 * 60 * 60)) *
+          10,
+      ) / 10,
+    );
+
+    const diff = Number(shift.cashDifference ?? 0);
+    const differenceStatus: 'MATCH' | 'SURPLUS' | 'SHORT' =
+      diff === 0 ? 'MATCH' : diff > 0 ? 'SURPLUS' : 'SHORT';
 
     // Rincian pembayaran per metode bayar
     const paymentsByMethod = await this.paymentRepo
@@ -475,6 +488,24 @@ export class ShiftService {
 
     return {
       shift,
+      cashierName: shift.user?.name || 'Kasir',
+      outletName: shift.outlet?.name || 'Cabang',
+      openedAt: shift.openedAt,
+      closedAt,
+      durationHours,
+      openingCash: Number(shift.openingCash || 0),
+      totalCashSales: Number(shift.totalCashSales || 0),
+      totalCashOut: Number(shift.totalCashOut || 0),
+      expectedCash: Number(shift.expectedCash || 0),
+      actualCash: Number(shift.actualCash || 0),
+      cashDifference: diff,
+      differenceStatus,
+      pettyCashList: (shift.pettyCashTransactions || []).map((pc) => ({
+        id: pc.id,
+        amount: Number(pc.amount || 0),
+        category: pc.category,
+        notes: pc.notes ?? undefined,
+      })),
       paymentsSummary: paymentsByMethod.map((pm) => ({
         method: pm.method,
         total: Number(pm.total || 0),
