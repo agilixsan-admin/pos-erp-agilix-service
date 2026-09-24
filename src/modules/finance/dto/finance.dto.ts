@@ -153,8 +153,10 @@ export class QueryExpenseDto {
 
 export class CreateFixedAssetDto {
   @IsOptional()
-  @Transform(({ value }) =>
-    value === '' || value === null ? undefined : value,
+  @Transform(({ value }: { value: unknown }): string | undefined =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : String(value),
   )
   @IsUUID()
   outletId?: string;
@@ -176,8 +178,10 @@ export class CreateFixedAssetDto {
   purchaseCost!: number;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    value === '' || value === null ? undefined : value,
+  @Transform(({ value }: { value: unknown }): string | undefined =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : String(value),
   )
   @IsUUID()
   financialAccountId?: string;
