@@ -69,15 +69,29 @@ export class ShiftController {
     @Query('outletId') outletId?: string,
   ) {
     const targetOutletId = outletId || user.outletId || undefined;
-    const data = await this.shiftService.getCurrentShift(
+    const result = await this.shiftService.getCurrentShift(
       user.tenantId,
       user.id,
       targetOutletId,
     );
+
+    if (!result) {
+      return {
+        success: true,
+        message: 'Tidak ada sesi shift yang sedang aktif.',
+        data: null,
+      };
+    }
+
     return {
       success: true,
       message: 'Status shift terkini berhasil diambil.',
-      data,
+      data: {
+        ...result.shift,
+        currentCashSales: result.currentCashSales,
+        currentExpectedCash: result.currentExpectedCash,
+        completedOrdersCount: result.completedOrdersCount,
+      },
     };
   }
 

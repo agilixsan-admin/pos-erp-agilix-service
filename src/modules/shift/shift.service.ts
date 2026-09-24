@@ -120,7 +120,7 @@ export class ShiftService {
     currentCashSales: number;
     currentExpectedCash: number;
     completedOrdersCount: number;
-  }> {
+  } | null> {
     const qb = this.shiftRepo
       .createQueryBuilder('s')
       .leftJoinAndSelect('s.outlet', 'o')
@@ -135,7 +135,7 @@ export class ShiftService {
 
     const shift = await qb.getOne();
     if (!shift) {
-      throw new NotFoundException('Tidak ada sesi shift yang sedang aktif.');
+      return null;
     }
 
     // Hitung total penjualan tunai dari order yang completed sejak shift dibuka
@@ -173,6 +173,9 @@ export class ShiftService {
     dto: PettyCashDto,
   ): Promise<PettyCashTransaction> {
     const active = await this.getCurrentShift(tenantId, userId, dto.outletId);
+    if (!active) {
+      throw new BadRequestException('Tidak ada sesi shift yang sedang aktif.');
+    }
     const shift = active.shift;
 
     const amount = Number(dto.amount);

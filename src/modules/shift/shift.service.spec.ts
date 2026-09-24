@@ -154,4 +154,47 @@ describe('ShiftService', () => {
       }),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('should return null from getCurrentShift when no shift is open', async () => {
+    mockShiftRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    });
+
+    const result = await service.getCurrentShift('tenant-1', 'user-1', 'outlet-1');
+    expect(result).toBeNull();
+  });
+
+  it('should return active shift details from getCurrentShift when shift is OPEN', async () => {
+    mockShiftRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({
+        id: 'shift-1',
+        status: 'OPEN',
+        outletId: 'outlet-1',
+        openingCash: 100000,
+        totalCashOut: 20000,
+        openedAt: new Date(),
+      }),
+    });
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      innerJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '50000', count: '2' }),
+    });
+
+    const result = await service.getCurrentShift('tenant-1', 'user-1', 'outlet-1');
+    expect(result).toBeDefined();
+    expect(result?.shift.id).toBe('shift-1');
+    expect(result?.currentCashSales).toBe(50000);
+    expect(result?.currentExpectedCash).toBe(130000); // 100000 + 50000 - 20000
+    expect(result?.completedOrdersCount).toBe(2);
+  });
 });
