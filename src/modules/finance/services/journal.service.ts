@@ -92,6 +92,7 @@ export class JournalService {
         | 'PETTY_CASH'
         | 'TRANSFER'
         | 'ASSET_PURCHASE'
+        | 'PURCHASE'
         | 'MANUAL';
       sourceId?: string | null;
       description: string;

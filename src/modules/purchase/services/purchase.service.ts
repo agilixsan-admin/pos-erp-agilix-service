@@ -14,6 +14,8 @@ import { InventoryStock } from '../../inventory/entities/inventory-stock.entity'
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { Packaging } from '../../packaging/entities/packaging.entity';
 import { AuditService } from '../../audit/audit.service';
+import { JournalService } from '../../finance/services/journal.service';
+import { FinancialAccount } from '../../finance/entities/financial-account.entity';
 import {
   CreatePurchaseDto,
   QueryPurchaseDto,
@@ -52,6 +54,7 @@ export class PurchaseService {
     private readonly packagingRepository: Repository<Packaging>,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
+    private readonly journalService: JournalService,
   ) {}
 
   /**
@@ -493,8 +496,12 @@ export class PurchaseService {
       const movementRepo = manager.getRepository(InventoryMovement);
       const itemRepo = manager.getRepository(InventoryItem);
       const pkgRepo = manager.getRepository(Packaging);
+      const accountRepo = manager.getRepository(FinancialAccount);
 
       const affectedItemIds = new Set<string>();
+
+      let rawMaterialCost = 0;
+      let packagingCost = 0;
 
       for (const item of purchase.items) {
         // Determine quantity received
@@ -507,10 +514,24 @@ export class PurchaseService {
         }
 
         item.quantityReceived = qtyReceived;
-        item.subtotal = qtyReceived * Number(item.unitCost);
+        const itemSubtotal =
+          Math.round(qtyReceived * Number(item.unitCost) * 100) / 100;
+        item.subtotal = itemSubtotal;
         await purchaseItemRepo.save(item);
 
         affectedItemIds.add(item.inventoryItemId);
+
+        // Classify cost for auto-journaling
+        const invItem =
+          item.inventoryItem ||
+          (await itemRepo.findOne({
+            where: { id: item.inventoryItemId, tenantId },
+          }));
+        if (invItem?.itemType === 'PACKAGING') {
+          packagingCost += itemSubtotal;
+        } else {
+          rawMaterialCost += itemSubtotal;
+        }
 
         // 1. Increment inventory physical stock at outlet
         let stock = await stockRepo.findOne({
@@ -549,8 +570,34 @@ export class PurchaseService {
         await movementRepo.save(movement);
       }
 
+      rawMaterialCost = Math.round(rawMaterialCost * 100) / 100;
+      packagingCost = Math.round(packagingCost * 100) / 100;
+      const totalReceivedCost =
+        Math.round((rawMaterialCost + packagingCost) * 100) / 100;
+
+      // Validate payment account and balance if specified
+      let paymentAccount: FinancialAccount | null = null;
+      if (dto?.financialAccountId && totalReceivedCost > 0) {
+        paymentAccount = await accountRepo.findOne({
+          where: { id: dto.financialAccountId, tenantId },
+        });
+        if (!paymentAccount) {
+          throw new NotFoundException(
+            'Akun kas/bank pembayaran tidak ditemukan.',
+          );
+        }
+
+        if (Number(paymentAccount.currentBalance) < totalReceivedCost) {
+          throw new BadRequestException(
+            `Saldo ${paymentAccount.accountName} (Rp ${Number(paymentAccount.currentBalance).toLocaleString('id-ID')}) tidak mencukupi untuk pembayaran pembelian sebesar Rp ${totalReceivedCost.toLocaleString('id-ID')}.`,
+          );
+        }
+      }
+
       // Mark purchase status as RECEIVED before recalculating aggregate
       purchase.status = 'RECEIVED';
+      purchase.subtotal = totalReceivedCost;
+      purchase.totalAmount = totalReceivedCost;
       purchase.receivedAt = new Date();
       purchase.receivedBy = actorId;
       if (dto?.notes) {
@@ -593,6 +640,71 @@ export class PurchaseService {
             { costPrice: cumulativeUnitCost },
           );
         }
+      }
+
+      // 4. Auto-journal for Purchase Receipt
+      if (totalReceivedCost > 0) {
+        let creditCode: string;
+        let creditNotes: string;
+
+        if (paymentAccount) {
+          paymentAccount.currentBalance =
+            Number(paymentAccount.currentBalance) - totalReceivedCost;
+          await accountRepo.save(paymentAccount);
+
+          creditCode =
+            paymentAccount.accountType === 'CASH' ? '1-1100' : '1-1200';
+          creditNotes = `Pembayaran dari ${paymentAccount.accountName}`;
+        } else {
+          creditCode = '2-1100'; // Hutang Usaha / Supplier
+          creditNotes = `Hutang Supplier: ${purchase.supplier?.name || 'Supplier'}`;
+        }
+
+        const lines: {
+          accountCode: string;
+          debit: number;
+          credit: number;
+          notes?: string;
+        }[] = [];
+
+        if (rawMaterialCost > 0) {
+          lines.push({
+            accountCode: '1-1300', // Persediaan Bahan Baku (Inventory)
+            debit: rawMaterialCost,
+            credit: 0,
+            notes: 'Persediaan Bahan Baku Masuk',
+          });
+        }
+
+        if (packagingCost > 0) {
+          lines.push({
+            accountCode: '1-1400', // Persediaan Kemasan & Packaging
+            debit: packagingCost,
+            credit: 0,
+            notes: 'Persediaan Kemasan & Packaging Masuk',
+          });
+        }
+
+        lines.push({
+          accountCode: creditCode,
+          debit: 0,
+          credit: totalReceivedCost,
+          notes: creditNotes,
+        });
+
+        await this.journalService.recordJournal(
+          {
+            tenantId,
+            outletId: purchase.outletId,
+            entryDate: new Date().toISOString().slice(0, 10),
+            sourceType: 'PURCHASE',
+            sourceId: purchase.id,
+            description: `Penerimaan Pembelian ${purchase.purchaseNumber} dari ${purchase.supplier?.name || 'Supplier'}`,
+            createdBy: actorId,
+            lines,
+          },
+          manager,
+        );
       }
     });
 

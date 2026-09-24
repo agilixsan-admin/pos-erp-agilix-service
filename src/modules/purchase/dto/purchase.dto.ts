@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -120,6 +120,11 @@ export class ReceivePurchaseDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? undefined : value))
+  @IsUUID()
+  financialAccountId?: string;
 }
 
 export class QueryPurchaseDto {

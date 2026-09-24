@@ -12,6 +12,8 @@ import { InventoryStock } from '../../inventory/entities/inventory-stock.entity'
 import { InventoryMovement } from '../../inventory/entities/inventory-movement.entity';
 import { Packaging } from '../../packaging/entities/packaging.entity';
 import { AuditService } from '../../audit/audit.service';
+import { JournalService } from '../../finance/services/journal.service';
+import { FinancialAccount } from '../../finance/entities/financial-account.entity';
 
 describe('PurchaseService', () => {
   let service: PurchaseService;
@@ -23,8 +25,10 @@ describe('PurchaseService', () => {
   let stockRepo: jest.Mocked<Repository<InventoryStock>>;
   let movementRepo: jest.Mocked<Repository<InventoryMovement>>;
   let packagingRepo: jest.Mocked<Repository<Packaging>>;
+  let financialAccountRepo: jest.Mocked<Repository<FinancialAccount>>;
   let dataSource: jest.Mocked<DataSource>;
   let auditService: jest.Mocked<AuditService>;
+  let journalService: jest.Mocked<JournalService>;
 
   const mockPurchase: Purchase = {
     id: 'pur-1',
@@ -113,7 +117,12 @@ describe('PurchaseService', () => {
       save: jest.fn(),
       update: jest.fn(),
     } as any;
+    financialAccountRepo = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+    } as any;
     auditService = { record: jest.fn().mockResolvedValue(undefined) } as any;
+    journalService = { recordJournal: jest.fn().mockResolvedValue({} as any) } as any;
 
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => {
@@ -125,8 +134,10 @@ describe('PurchaseService', () => {
             if (entity === InventoryMovement) return movementRepo;
             if (entity === InventoryItem) return inventoryItemRepo;
             if (entity === Packaging) return packagingRepo;
+            if (entity === FinancialAccount) return financialAccountRepo;
             return {};
           },
+          save: jest.fn().mockImplementation((e) => Promise.resolve(e)),
         };
         return cb(manager);
       }),
@@ -154,6 +165,7 @@ describe('PurchaseService', () => {
         { provide: getRepositoryToken(Packaging), useValue: packagingRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: AuditService, useValue: auditService },
+        { provide: JournalService, useValue: journalService },
       ],
     }).compile();
 
@@ -411,7 +423,11 @@ describe('PurchaseService', () => {
 
   describe('receive', () => {
     it('increments inventory stock and recalculates cumulative unit cost upon goods receipt', async () => {
-      purchaseRepo.findOne.mockResolvedValue(mockPurchase);
+      purchaseRepo.findOne.mockResolvedValue({
+        ...mockPurchase,
+        status: 'DRAFT',
+        items: mockPurchase.items.map((i) => ({ ...i })),
+      });
       stockRepo.findOne.mockResolvedValue(null);
       stockRepo.create.mockReturnValue({
         tenantId: 'tenant-1',
@@ -446,6 +462,112 @@ describe('PurchaseService', () => {
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'PURCHASE_RECEIVED' }),
       );
+      expect(journalService.recordJournal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'PURCHASE',
+          sourceId: 'pur-1',
+          lines: expect.arrayContaining([
+            expect.objectContaining({
+              accountCode: '1-1300',
+              debit: 13000,
+              credit: 0,
+            }),
+            expect.objectContaining({
+              accountCode: '2-1100',
+              debit: 0,
+              credit: 13000,
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('records auto-journal and deducts cash/bank balance when financialAccountId is provided', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...mockPurchase,
+        status: 'DRAFT',
+        items: mockPurchase.items.map((i) => ({ ...i })),
+      });
+      stockRepo.findOne.mockResolvedValue(null);
+      stockRepo.create.mockReturnValue({
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        inventoryItemId: 'inv-susu',
+        quantity: 1000,
+      } as any);
+      movementRepo.create.mockReturnValue({} as any);
+
+      const mockAccount: any = {
+        id: 'acc-kas-1',
+        tenantId: 'tenant-1',
+        accountName: 'Kas Laci Kasir',
+        accountType: 'CASH',
+        currentBalance: 50000,
+      };
+      financialAccountRepo.findOne.mockResolvedValue(mockAccount);
+
+      const qbAgg = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest
+          .fn()
+          .mockResolvedValue({ totalCost: 13000, totalQty: 1000 }),
+      } as any;
+      purchaseItemRepo.createQueryBuilder.mockReturnValue(qbAgg);
+
+      await service.receive('tenant-1', 'pur-1', 'user-1', {
+        financialAccountId: 'acc-kas-1',
+      });
+
+      expect(mockAccount.currentBalance).toBe(37000); // 50000 - 13000
+      expect(journalService.recordJournal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'PURCHASE',
+          sourceId: 'pur-1',
+          lines: expect.arrayContaining([
+            expect.objectContaining({
+              accountCode: '1-1300',
+              debit: 13000,
+              credit: 0,
+            }),
+            expect.objectContaining({
+              accountCode: '1-1100',
+              debit: 0,
+              credit: 13000,
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('throws BadRequestException if payment account balance is insufficient', async () => {
+      purchaseRepo.findOne.mockResolvedValue({
+        ...mockPurchase,
+        status: 'DRAFT',
+        items: mockPurchase.items.map((i) => ({ ...i })),
+      });
+      stockRepo.findOne.mockResolvedValue(null);
+      stockRepo.create.mockReturnValue({} as any);
+      movementRepo.create.mockReturnValue({} as any);
+
+      financialAccountRepo.findOne.mockResolvedValue({
+        id: 'acc-kas-1',
+        tenantId: 'tenant-1',
+        accountName: 'Kas Laci Kasir',
+        accountType: 'CASH',
+        currentBalance: 5000, // Insufficient for 13000 cost
+      } as any);
+
+      await expect(
+        service.receive('tenant-1', 'pur-1', 'user-1', {
+          financialAccountId: 'acc-kas-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if purchase is not in DRAFT status', async () => {

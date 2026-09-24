@@ -11,6 +11,7 @@ import { Packaging } from '../packaging/entities/packaging.entity';
 import { PurchaseService } from './services/purchase.service';
 import { PurchaseController } from './controllers/purchase.controller';
 import { AuditModule } from '../audit/audit.module';
+import { FinanceModule } from '../finance/finance.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuditModule } from '../audit/audit.module';
       Packaging,
     ]),
     AuditModule,
+    FinanceModule,
   ],
   controllers: [PurchaseController],
   providers: [PurchaseService],

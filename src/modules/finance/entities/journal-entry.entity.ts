@@ -40,6 +40,7 @@ export class JournalEntry {
     | 'PETTY_CASH'
     | 'TRANSFER'
     | 'ASSET_PURCHASE'
+    | 'PURCHASE'
     | 'MANUAL';
 
   @Column({ name: 'source_id', type: 'uuid', nullable: true })
