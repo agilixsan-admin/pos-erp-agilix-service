@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -151,9 +151,12 @@ export class QueryExpenseDto {
 // ─── Aset Tetap & Depresiasi ────────────────────────────────────────────────
 
 export class CreateFixedAssetDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null ? undefined : value,
+  )
   @IsUUID()
-  @IsNotEmpty()
-  outletId!: string;
+  outletId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -172,6 +175,9 @@ export class CreateFixedAssetDto {
   purchaseCost!: number;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null ? undefined : value,
+  )
   @IsUUID()
   financialAccountId?: string;
 

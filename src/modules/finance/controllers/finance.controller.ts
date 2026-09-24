@@ -241,9 +241,14 @@ export class FinanceController {
     @Body() dto: CreateFixedAssetDto,
   ) {
     const targetOutlet = dto.outletId || user.outletId;
+    if (!targetOutlet) {
+      throw new BadRequestException(
+        'Cabang / outlet wajib dipilih untuk mendaftarkan aset tetap.',
+      );
+    }
     const data = await this.assetService.createAsset(user.tenantId, user.id, {
       ...dto,
-      outletId: targetOutlet!,
+      outletId: targetOutlet,
     });
     return {
       success: true,
