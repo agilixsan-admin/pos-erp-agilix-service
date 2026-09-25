@@ -267,3 +267,75 @@ export class QueryJournalDto {
   @IsString()
   sourceType?: string;
 }
+
+// ─── Transaksi Modal & Pendanaan ──────────────────────────────────────────
+
+export class CreateCapitalTransactionDto {
+  @IsOptional()
+  @IsUUID()
+  outletId?: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  financialAccountId!: string;
+
+  @IsIn([
+    'CAPITAL_INJECTION',
+    'OWNER_WITHDRAWAL',
+    'LOAN_RECEIPT',
+    'LOAN_REPAYMENT',
+  ])
+  type!:
+    | 'CAPITAL_INJECTION'
+    | 'OWNER_WITHDRAWAL'
+    | 'LOAN_RECEIPT'
+    | 'LOAN_REPAYMENT';
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(1)
+  amount!: number;
+
+  @IsOptional()
+  @IsDateString()
+  transactionDate?: string;
+
+  @IsOptional()
+  @IsString()
+  partyName?: string;
+
+  @IsOptional()
+  @IsString()
+  referenceNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class QueryCapitalTransactionDto {
+  @IsOptional()
+  @IsUUID()
+  outletId?: string;
+
+  @IsOptional()
+  @IsIn([
+    'CAPITAL_INJECTION',
+    'OWNER_WITHDRAWAL',
+    'LOAN_RECEIPT',
+    'LOAN_REPAYMENT',
+  ])
+  type?:
+    | 'CAPITAL_INJECTION'
+    | 'OWNER_WITHDRAWAL'
+    | 'LOAN_RECEIPT'
+    | 'LOAN_REPAYMENT';
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+}

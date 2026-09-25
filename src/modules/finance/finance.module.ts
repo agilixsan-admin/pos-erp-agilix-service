@@ -8,10 +8,12 @@ import { FixedAsset } from './entities/fixed-asset.entity';
 import { ChartOfAccount } from './entities/chart-of-account.entity';
 import { JournalEntry } from './entities/journal-entry.entity';
 import { JournalEntryLine } from './entities/journal-entry-line.entity';
+import { CapitalTransaction } from './entities/capital-transaction.entity';
 import { FinanceAccountService } from './services/finance-account.service';
 import { ExpenseService } from './services/expense.service';
 import { FixedAssetService } from './services/fixed-asset.service';
 import { JournalService } from './services/journal.service';
+import { CapitalTransactionService } from './services/capital-transaction.service';
 import { FinanceController } from './controllers/finance.controller';
 
 @Module({
@@ -25,6 +27,7 @@ import { FinanceController } from './controllers/finance.controller';
       ChartOfAccount,
       JournalEntry,
       JournalEntryLine,
+      CapitalTransaction,
     ]),
   ],
   providers: [
@@ -32,6 +35,7 @@ import { FinanceController } from './controllers/finance.controller';
     ExpenseService,
     FixedAssetService,
     JournalService,
+    CapitalTransactionService,
   ],
   controllers: [FinanceController],
   exports: [
@@ -39,6 +43,7 @@ import { FinanceController } from './controllers/finance.controller';
     ExpenseService,
     FixedAssetService,
     JournalService,
+    CapitalTransactionService,
   ],
 })
 export class FinanceModule {}

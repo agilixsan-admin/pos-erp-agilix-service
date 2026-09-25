@@ -80,6 +80,13 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccountTemplate[] = [
     normalBalance: 'CREDIT',
     isSystem: true,
   },
+  {
+    accountCode: '2-2000',
+    name: 'Hutang Bank & Pinjaman Modal Usaha',
+    category: 'LIABILITY',
+    normalBalance: 'CREDIT',
+    isSystem: true,
+  },
 
   // 3-xxxx MODAL (EKUITAS)
   {

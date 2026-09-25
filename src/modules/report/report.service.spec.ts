@@ -13,6 +13,7 @@ import { PosShift } from '../shift/entities/pos-shift.entity';
 import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
+import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
 import { JournalService } from '../finance/services/journal.service';
 
@@ -31,6 +32,7 @@ describe('ReportService', () => {
   const mockExpenseRepo = { createQueryBuilder: jest.fn() };
   const mockAccountRepo = { find: jest.fn().mockResolvedValue([]) };
   const mockAssetRepo = { createQueryBuilder: jest.fn() };
+  const mockCapitalRepo = { createQueryBuilder: jest.fn() };
   const mockAssetService = { getAssets: jest.fn().mockResolvedValue([]) };
   const mockJournalService = {
     getAccountBalance: jest.fn().mockResolvedValue(0),
@@ -86,6 +88,10 @@ describe('ReportService', () => {
           useValue: mockAccountRepo,
         },
         { provide: getRepositoryToken(FixedAsset), useValue: mockAssetRepo },
+        {
+          provide: getRepositoryToken(CapitalTransaction),
+          useValue: mockCapitalRepo,
+        },
         { provide: FixedAssetService, useValue: mockAssetService },
         { provide: JournalService, useValue: mockJournalService },
       ],
@@ -500,6 +506,61 @@ describe('ReportService', () => {
         'outlet-1',
         '2026-09-24',
       );
+    });
+  });
+
+  // ─── getCashFlowStatement ──────────────────────────────────────────────────
+
+  describe('getCashFlowStatement', () => {
+    it('calculates cash flow including operating, investing, and financing activities', async () => {
+      const paymentQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ total: '1000000' }),
+      });
+      mockPaymentRepo.createQueryBuilder.mockReturnValue(paymentQb);
+
+      const expenseQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ total: '300000' }),
+      });
+      mockExpenseRepo.createQueryBuilder.mockReturnValue(expenseQb);
+
+      const assetQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ total: '200000' }),
+      });
+      mockAssetRepo.createQueryBuilder.mockReturnValue(assetQb);
+
+      const capitalQb = buildQb({
+        getRawMany: jest.fn().mockResolvedValue([
+          { type: 'CAPITAL_INJECTION', total: '500000' },
+          { type: 'LOAN_RECEIPT', total: '300000' },
+          { type: 'OWNER_WITHDRAWAL', total: '100000' },
+          { type: 'LOAN_REPAYMENT', total: '50000' },
+        ]),
+      });
+      mockCapitalRepo.createQueryBuilder.mockReturnValue(capitalQb);
+
+      const result = await service.getCashFlowStatement('tenant-1', {
+        startDate: '2026-09-01T00:00:00Z',
+        endDate: '2026-09-30T23:59:59Z',
+      });
+
+      // Operating: Sales(1m) - Exp(300k) = 700k
+      expect(result.operatingActivities.cashFromSales).toBe(1000000);
+      expect(result.operatingActivities.cashPaidForExpenses).toBe(300000);
+      expect(result.operatingActivities.netOperatingCash).toBe(700000);
+
+      // Investing: Assets = 200k, Net = -200k
+      expect(result.investingActivities.cashPaidForAssets).toBe(200000);
+      expect(result.investingActivities.netInvestingCash).toBe(-200000);
+
+      // Financing: Inflow(500k + 300k) - Outflow(100k + 50k) = 650k
+      expect(result.financingActivities.cashFromCapitalInjections).toBe(500000);
+      expect(result.financingActivities.cashFromLoans).toBe(300000);
+      expect(result.financingActivities.cashPaidForDrawings).toBe(100000);
+      expect(result.financingActivities.cashPaidForLoanRepayments).toBe(50000);
+      expect(result.financingActivities.netFinancingCash).toBe(650000);
+
+      // Net cash change: 700k - 200k + 650k = 1,150,000
+      expect(result.netCashChange).toBe(1150000);
     });
   });
 });

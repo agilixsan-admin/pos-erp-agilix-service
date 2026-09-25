@@ -14,6 +14,7 @@ import { PosShift } from '../shift/entities/pos-shift.entity';
 import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
+import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
 import { FinanceModule } from '../finance/finance.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { FinanceModule } from '../finance/finance.module';
       Expense,
       FinancialAccount,
       FixedAsset,
+      CapitalTransaction,
     ]),
     FinanceModule,
   ],

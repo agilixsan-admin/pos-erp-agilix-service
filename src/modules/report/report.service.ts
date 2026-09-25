@@ -13,6 +13,7 @@ import { PosShift } from '../shift/entities/pos-shift.entity';
 import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
+import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
 import { JournalService } from '../finance/services/journal.service';
 import {
@@ -51,6 +52,8 @@ export class ReportService {
     private readonly accountRepo: Repository<FinancialAccount>,
     @InjectRepository(FixedAsset)
     private readonly assetRepo: Repository<FixedAsset>,
+    @InjectRepository(CapitalTransaction)
+    private readonly capitalRepo: Repository<CapitalTransaction>,
     private readonly assetService: FixedAssetService,
     private readonly journalService: JournalService,
   ) {}
@@ -902,8 +905,48 @@ export class ReportService {
     const cashPaidForAssets = Number(assetRaw?.total || 0);
     const netInvestingCash = -cashPaidForAssets;
 
-    // Arus Kas Pendanaan
-    const netFinancingCash = 0;
+    // Arus Kas Pendanaan:
+    const capitalQb = this.capitalRepo
+      .createQueryBuilder('ct')
+      .select('ct.type', 'type')
+      .addSelect('SUM(ct.amount)', 'total')
+      .where('ct.tenantId = :tenantId', { tenantId })
+      .andWhere('ct.transactionDate >= :startDate', {
+        startDate: startDate.slice(0, 10),
+      })
+      .andWhere('ct.transactionDate <= :endDate', {
+        endDate: endDate.slice(0, 10),
+      })
+      .groupBy('ct.type');
+
+    if (targetOutlet) {
+      capitalQb.andWhere('(ct.outletId = :outletId OR ct.outletId IS NULL)', {
+        outletId: targetOutlet,
+      });
+    }
+
+    const capitalRaw = await capitalQb.getRawMany<{
+      type: string;
+      total: string;
+    }>();
+    let cashFromCapitalInjections = 0;
+    let cashFromLoans = 0;
+    let cashPaidForDrawings = 0;
+    let cashPaidForLoanRepayments = 0;
+
+    for (const row of capitalRaw) {
+      const val = Number(row.total || 0);
+      if (row.type === 'CAPITAL_INJECTION') cashFromCapitalInjections += val;
+      if (row.type === 'LOAN_RECEIPT') cashFromLoans += val;
+      if (row.type === 'OWNER_WITHDRAWAL') cashPaidForDrawings += val;
+      if (row.type === 'LOAN_REPAYMENT') cashPaidForLoanRepayments += val;
+    }
+
+    const netFinancingCash =
+      cashFromCapitalInjections +
+      cashFromLoans -
+      (cashPaidForDrawings + cashPaidForLoanRepayments);
+
     const netCashChange =
       netOperatingCash + netInvestingCash + netFinancingCash;
 
@@ -918,6 +961,10 @@ export class ReportService {
         netInvestingCash,
       },
       financingActivities: {
+        cashFromCapitalInjections,
+        cashFromLoans,
+        cashPaidForDrawings,
+        cashPaidForLoanRepayments,
         netFinancingCash,
       },
       netCashChange,

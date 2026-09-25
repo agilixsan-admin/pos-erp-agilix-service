@@ -42,7 +42,8 @@ export class JournalEntry {
     | 'ASSET_PURCHASE'
     | 'PURCHASE'
     | 'PURCHASE_PAYMENT'
-    | 'MANUAL';
+    | 'MANUAL'
+    | 'FINANCING';
 
   @Column({ name: 'source_id', type: 'uuid', nullable: true })
   sourceId!: string | null;

@@ -33,6 +33,7 @@ import { UpdateUserInvitationEmailTemplateForMobileIOS1700000000031 } from './17
 import { CreatePosShiftAndFinanceAccountingTables1700000000032 } from './1700000000032-CreatePosShiftAndFinanceAccountingTables';
 import { AddPurchasePaymentAndStatus1700000000033 } from './1700000000033-AddPurchasePaymentAndStatus';
 import { AddMaxOutletsToTenants1700000000034 } from './1700000000034-AddMaxOutletsToTenants';
+import { CreateCapitalTransactionsTable1700000000035 } from './1700000000035-CreateCapitalTransactionsTable';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -70,4 +71,5 @@ export const ALL_MIGRATIONS = [
   CreatePosShiftAndFinanceAccountingTables1700000000032,
   AddPurchasePaymentAndStatus1700000000033,
   AddMaxOutletsToTenants1700000000034,
+  CreateCapitalTransactionsTable1700000000035,
 ];

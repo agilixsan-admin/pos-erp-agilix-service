@@ -94,7 +94,8 @@ export class JournalService {
         | 'ASSET_PURCHASE'
         | 'PURCHASE'
         | 'PURCHASE_PAYMENT'
-        | 'MANUAL';
+        | 'MANUAL'
+        | 'FINANCING';
       sourceId?: string | null;
       description: string;
       createdBy?: string | null;

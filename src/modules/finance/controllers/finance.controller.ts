@@ -14,7 +14,9 @@ import { FinanceAccountService } from '../services/finance-account.service';
 import { ExpenseService } from '../services/expense.service';
 import { FixedAssetService } from '../services/fixed-asset.service';
 import { JournalService } from '../services/journal.service';
+import { CapitalTransactionService } from '../services/capital-transaction.service';
 import {
+  CreateCapitalTransactionDto,
   CreateExpenseCategoryDto,
   CreateExpenseDto,
   CreateFinancialAccountDto,
@@ -22,6 +24,7 @@ import {
   CreateFixedAssetDto,
   CreateManualJournalDto,
   DisposeFixedAssetDto,
+  QueryCapitalTransactionDto,
   QueryExpenseDto,
   QueryJournalDto,
   UpdateFinancialAccountDto,
@@ -37,6 +40,7 @@ export class FinanceController {
     private readonly expenseService: ExpenseService,
     private readonly assetService: FixedAssetService,
     private readonly journalService: JournalService,
+    private readonly capitalService: CapitalTransactionService,
   ) {}
 
   // ─── Kas & Bank ─────────────────────────────────────────────────────────────
@@ -322,6 +326,64 @@ export class FinanceController {
       success: true,
       message: 'Entri jurnal manual berhasil dicatat.',
       data,
+    };
+  }
+
+  // ─── Modal & Pendanaan (Equity & Loans) ──────────────────────────────────
+
+  @Get('capital-transactions')
+  @Permissions('finance.account.read')
+  async getCapitalTransactions(
+    @CurrentUser() user: User,
+    @Query() query: QueryCapitalTransactionDto,
+  ) {
+    const targetOutlet =
+      query.outletId && query.outletId !== 'ALL'
+        ? query.outletId
+        : (user.outletId ?? undefined);
+    const data = await this.capitalService.getTransactions(user.tenantId, {
+      ...query,
+      outletId: targetOutlet,
+    });
+    return {
+      success: true,
+      message: 'Riwayat transaksi modal & pendanaan berhasil diambil.',
+      data,
+    };
+  }
+
+  @Post('capital-transactions')
+  @Permissions('finance.account.manage')
+  async createCapitalTransaction(
+    @CurrentUser() user: User,
+    @Body() dto: CreateCapitalTransactionDto,
+  ) {
+    const targetOutlet = dto.outletId || user.outletId;
+    const data = await this.capitalService.createTransaction(
+      user.tenantId,
+      user.id,
+      {
+        ...dto,
+        outletId: targetOutlet ?? undefined,
+      },
+    );
+    return {
+      success: true,
+      message: 'Transaksi modal & pendanaan berhasil dicatat.',
+      data,
+    };
+  }
+
+  @Delete('capital-transactions/:id')
+  @Permissions('finance.account.manage')
+  async deleteCapitalTransaction(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.capitalService.deleteTransaction(user.tenantId, id);
+    return {
+      success: true,
+      message: 'Transaksi modal & pendanaan berhasil dibatalkan/dihapus.',
     };
   }
 }
