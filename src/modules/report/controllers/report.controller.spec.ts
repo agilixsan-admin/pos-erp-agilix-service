@@ -77,7 +77,11 @@ describe('ReportController', () => {
     });
 
     it('passes undefined (all branches) for dynamic role with report.financial.read when selecting ALL', async () => {
-      await controller.getBalanceSheet(dynamicAccountantUser, '2026-09-28', 'ALL');
+      await controller.getBalanceSheet(
+        dynamicAccountantUser,
+        '2026-09-28',
+        'ALL',
+      );
 
       expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
         'tenant-1',

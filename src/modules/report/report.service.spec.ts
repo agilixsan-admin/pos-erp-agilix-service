@@ -522,7 +522,9 @@ describe('ReportService', () => {
     it('accurately captures accounts payable directly from purchases table even if journal balance is 0', async () => {
       mockAccountRepo.find.mockResolvedValue([]);
       mockStockRepo.createQueryBuilder.mockReturnValue(
-        buildQb({ getRawOne: jest.fn().mockResolvedValue({ totalValuation: '0' }) }),
+        buildQb({
+          getRawOne: jest.fn().mockResolvedValue({ totalValuation: '0' }),
+        }),
       );
       mockAssetService.getAssets.mockResolvedValue([]);
       mockOrderRepo.createQueryBuilder.mockReturnValue(

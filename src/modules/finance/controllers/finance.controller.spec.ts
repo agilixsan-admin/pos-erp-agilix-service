@@ -52,7 +52,11 @@ describe('FinanceController', () => {
     isSuperAdmin: false,
     role: {
       name: 'Store Manager',
-      menuAccess: ['finance.account.read', 'finance.expense.read', 'finance.journal.read'],
+      menuAccess: [
+        'finance.account.read',
+        'finance.expense.read',
+        'finance.journal.read',
+      ],
     },
   } as unknown as User;
 
@@ -60,7 +64,10 @@ describe('FinanceController', () => {
     it('passes undefined (all outlets) to accountService when ALL is selected by manager', async () => {
       await controller.getAccounts(storeManager, 'ALL');
 
-      expect(accountService.getAccounts).toHaveBeenCalledWith('tenant-1', undefined);
+      expect(accountService.getAccounts).toHaveBeenCalledWith(
+        'tenant-1',
+        undefined,
+      );
     });
 
     it('passes undefined to expenseService when ALL is selected by manager', async () => {
@@ -84,7 +91,10 @@ describe('FinanceController', () => {
     it('passes specific outlet when requested by manager', async () => {
       await controller.getAccounts(storeManager, 'outlet-bims');
 
-      expect(accountService.getAccounts).toHaveBeenCalledWith('tenant-1', 'outlet-bims');
+      expect(accountService.getAccounts).toHaveBeenCalledWith(
+        'tenant-1',
+        'outlet-bims',
+      );
     });
   });
 });

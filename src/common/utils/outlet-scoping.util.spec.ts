@@ -1,4 +1,7 @@
-import { isTenantWideUser, resolveEffectiveOutletId } from './outlet-scoping.util';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from './outlet-scoping.util';
 import { User } from '../../modules/user/user.entity';
 
 describe('outlet-scoping.util', () => {
@@ -26,7 +29,10 @@ describe('outlet-scoping.util', () => {
       const user = {
         isSuperAdmin: false,
         outletId: 'outlet-1',
-        role: { menuAccess: ['report.financial.read'], name: 'Staf Pembukuan Eksternal' },
+        role: {
+          menuAccess: ['report.financial.read'],
+          name: 'Staf Pembukuan Eksternal',
+        },
       } as unknown as User;
       expect(isTenantWideUser(user)).toBe(true);
     });
@@ -65,7 +71,10 @@ describe('outlet-scoping.util', () => {
       const user = {
         isSuperAdmin: false,
         outletId: 'outlet-1',
-        role: { menuAccess: ['order.read', 'order.create'], name: 'Kasir Utama' },
+        role: {
+          menuAccess: ['order.read', 'order.create'],
+          name: 'Kasir Utama',
+        },
       } as unknown as User;
       expect(isTenantWideUser(user)).toBe(false);
     });
@@ -75,7 +84,10 @@ describe('outlet-scoping.util', () => {
     const storeManager = {
       isSuperAdmin: false,
       outletId: 'outlet-deilema',
-      role: { name: 'Store Manager', menuAccess: ['order.read', 'report.read', 'report.financial.read'] },
+      role: {
+        name: 'Store Manager',
+        menuAccess: ['order.read', 'report.read', 'report.financial.read'],
+      },
     } as unknown as User;
 
     const customAccountant = {
@@ -105,11 +117,15 @@ describe('outlet-scoping.util', () => {
     });
 
     it('allows Store Manager to switch to another branch (e.g. Bims Outlet)', () => {
-      expect(resolveEffectiveOutletId(storeManager, 'outlet-bims')).toBe('outlet-bims');
+      expect(resolveEffectiveOutletId(storeManager, 'outlet-bims')).toBe(
+        'outlet-bims',
+      );
     });
 
     it('defaults Store Manager to their home outlet when outletId is omitted', () => {
-      expect(resolveEffectiveOutletId(storeManager, undefined)).toBe('outlet-deilema');
+      expect(resolveEffectiveOutletId(storeManager, undefined)).toBe(
+        'outlet-deilema',
+      );
     });
 
     it('allows SuperAdmin to query ALL branches', () => {
@@ -122,11 +138,15 @@ describe('outlet-scoping.util', () => {
     });
 
     it('blocks regular Cashier from accessing other branches (falls back to home outlet)', () => {
-      expect(resolveEffectiveOutletId(cashier, 'outlet-bims')).toBe('outlet-deilema');
+      expect(resolveEffectiveOutletId(cashier, 'outlet-bims')).toBe(
+        'outlet-deilema',
+      );
     });
 
     it('allows regular Cashier to access their own branch', () => {
-      expect(resolveEffectiveOutletId(cashier, 'outlet-deilema')).toBe('outlet-deilema');
+      expect(resolveEffectiveOutletId(cashier, 'outlet-deilema')).toBe(
+        'outlet-deilema',
+      );
     });
   });
 });
