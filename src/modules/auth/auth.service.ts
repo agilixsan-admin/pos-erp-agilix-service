@@ -140,7 +140,7 @@ export class AuthService {
       valid: true,
       email: invitation.user.email,
       name: invitation.user.name,
-      businessName: invitation.user.tenant?.businessName ?? 'Agilix POS',
+      businessName: invitation.user.tenant?.businessName ?? 'SAJI',
       outletName: invitation.user.outlet?.name ?? 'Semua Outlet',
       roleName: invitation.user.role?.name ?? 'Staff',
     };

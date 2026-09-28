@@ -133,7 +133,7 @@ export class MailService {
         text,
         html,
         headers: {
-          'X-Mailer': 'Agilix POS Mailer',
+          'X-Mailer': 'SAJI Mailer (Agilix Tech Solution)',
           'Auto-Submitted': 'auto-generated',
         },
       });
@@ -159,7 +159,7 @@ export class MailService {
     const variables: Record<string, string | number> = {
       name: data.name,
       email: data.email,
-      businessName: data.businessName || 'Agilix POS',
+      businessName: data.businessName || 'SAJI',
       outletName: data.outletName || 'Semua Outlet',
       roleName: data.roleName || 'Staff',
       accessLevel: data.accessLevel || 'Standard Access',

@@ -143,7 +143,8 @@ async function bootstrap() {
   logger.log(
     '================================================================',
   );
-  logger.log(`  Agilix POS Backend Service [${nodeEnv.toUpperCase()}]`);
+  logger.log(`  
+    SAJI Backend Service [by Agilix Tech Solution] [${nodeEnv.toUpperCase()}]`);
   logger.log(
     '================================================================',
   );

@@ -108,7 +108,7 @@ describe('MailService', () => {
           html: '<h1>Halo Budi</h1><a href="http://localhost:3000/auth/set-password?token=abc">Set Password</a>',
           text: expect.stringContaining('Set Password'),
           headers: {
-            'X-Mailer': 'Agilix POS Mailer',
+            'X-Mailer': 'SAJI Mailer (Agilix Tech Solution)',
             'Auto-Submitted': 'auto-generated',
           },
         }),

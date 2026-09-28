@@ -256,7 +256,7 @@ export class UserService {
         to: savedUser.email,
         name: savedUser.name,
         email: savedUser.email,
-        businessName: tenant?.businessName ?? 'Agilix POS',
+        businessName: tenant?.businessName ?? 'SAJI',
         outletName:
           outlet?.name ??
           (savedUser.isSuperAdmin ? 'Semua Outlet' : 'Belum Ditugaskan'),
@@ -342,7 +342,7 @@ export class UserService {
       to: user.email,
       name: user.name,
       email: user.email,
-      businessName: user.tenant?.businessName ?? 'Agilix POS',
+      businessName: user.tenant?.businessName ?? 'SAJI',
       outletName:
         user.outlet?.name ??
         (user.isSuperAdmin ? 'Semua Outlet' : 'Belum Ditugaskan'),
