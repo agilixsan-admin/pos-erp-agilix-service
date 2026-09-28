@@ -14,6 +14,7 @@ import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
 import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
+import { Purchase } from '../purchase/entities/purchase.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
 import { JournalService } from '../finance/services/journal.service';
 
@@ -33,6 +34,7 @@ describe('ReportService', () => {
   const mockAccountRepo = { find: jest.fn().mockResolvedValue([]) };
   const mockAssetRepo = { createQueryBuilder: jest.fn() };
   const mockCapitalRepo = { createQueryBuilder: jest.fn() };
+  const mockPurchaseRepo = { createQueryBuilder: jest.fn() };
   const mockAssetService = { getAssets: jest.fn().mockResolvedValue([]) };
   const mockJournalService = {
     getAccountBalance: jest.fn().mockResolvedValue(0),
@@ -91,6 +93,10 @@ describe('ReportService', () => {
         {
           provide: getRepositoryToken(CapitalTransaction),
           useValue: mockCapitalRepo,
+        },
+        {
+          provide: getRepositoryToken(Purchase),
+          useValue: mockPurchaseRepo,
         },
         { provide: FixedAssetService, useValue: mockAssetService },
         { provide: JournalService, useValue: mockJournalService },
@@ -478,6 +484,11 @@ describe('ReportService', () => {
       });
       mockOrderRepo.createQueryBuilder.mockReturnValue(orderQb);
 
+      const purchaseQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ payable: '750000' }),
+      });
+      mockPurchaseRepo.createQueryBuilder.mockReturnValue(purchaseQb);
+
       mockJournalService.getAccountBalance.mockResolvedValue(750000);
 
       const result = await service.getBalanceSheet(
@@ -506,6 +517,31 @@ describe('ReportService', () => {
         'outlet-1',
         '2026-09-24',
       );
+    });
+
+    it('accurately captures accounts payable directly from purchases table even if journal balance is 0', async () => {
+      mockAccountRepo.find.mockResolvedValue([]);
+      mockStockRepo.createQueryBuilder.mockReturnValue(
+        buildQb({ getRawOne: jest.fn().mockResolvedValue({ totalValuation: '0' }) }),
+      );
+      mockAssetService.getAssets.mockResolvedValue([]);
+      mockOrderRepo.createQueryBuilder.mockReturnValue(
+        buildQb({ getRawOne: jest.fn().mockResolvedValue({ tax: '0' }) }),
+      );
+
+      // Purchases table has unpaid received purchase of Rp 564.000
+      const purchaseQb = buildQb({
+        getRawOne: jest.fn().mockResolvedValue({ payable: '564000' }),
+      });
+      mockPurchaseRepo.createQueryBuilder.mockReturnValue(purchaseQb);
+
+      // Journal entry has not been recorded yet or returns 0
+      mockJournalService.getAccountBalance.mockResolvedValue(0);
+
+      const result = await service.getBalanceSheet('tenant-1', '2026-09-28');
+
+      expect(result.liabilities.accountsPayable).toBe(564000);
+      expect(result.liabilities.totalLiabilities).toBe(564000);
     });
   });
 

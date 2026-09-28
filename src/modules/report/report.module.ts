@@ -15,6 +15,7 @@ import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
 import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
+import { Purchase } from '../purchase/entities/purchase.entity';
 import { FinanceModule } from '../finance/finance.module';
 
 @Module({
@@ -33,6 +34,7 @@ import { FinanceModule } from '../finance/finance.module';
       FinancialAccount,
       FixedAsset,
       CapitalTransaction,
+      Purchase,
     ]),
     FinanceModule,
   ],

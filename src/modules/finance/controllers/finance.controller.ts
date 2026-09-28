@@ -32,6 +32,7 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
 @Controller('finance')
 export class FinanceController {
@@ -51,8 +52,7 @@ export class FinanceController {
     @CurrentUser() user: User,
     @Query('outletId') outletId?: string,
   ) {
-    const targetOutlet =
-      outletId && outletId !== 'ALL' ? outletId : (user.outletId ?? undefined);
+    const targetOutlet = resolveEffectiveOutletId(user, outletId);
     const data = await this.accountService.getAccounts(
       user.tenantId,
       targetOutlet,
@@ -166,10 +166,7 @@ export class FinanceController {
     @CurrentUser() user: User,
     @Query() query: QueryExpenseDto,
   ) {
-    const targetOutlet =
-      query.outletId && query.outletId !== 'ALL'
-        ? query.outletId
-        : (user.outletId ?? undefined);
+    const targetOutlet = resolveEffectiveOutletId(user, query.outletId);
     const data = await this.expenseService.getExpenses(user.tenantId, {
       ...query,
       outletId: targetOutlet,
@@ -225,8 +222,7 @@ export class FinanceController {
     @Query('outletId') outletId?: string,
     @Query('asOfDate') asOfDate?: string,
   ) {
-    const targetOutlet =
-      outletId && outletId !== 'ALL' ? outletId : (user.outletId ?? undefined);
+    const targetOutlet = resolveEffectiveOutletId(user, outletId);
     const data = await this.assetService.getAssets(
       user.tenantId,
       targetOutlet,
@@ -296,10 +292,7 @@ export class FinanceController {
     @CurrentUser() user: User,
     @Query() query: QueryJournalDto,
   ) {
-    const targetOutlet =
-      query.outletId && query.outletId !== 'ALL'
-        ? query.outletId
-        : (user.outletId ?? undefined);
+    const targetOutlet = resolveEffectiveOutletId(user, query.outletId);
     const data = await this.journalService.getJournals(user.tenantId, {
       ...query,
       outletId: targetOutlet,
@@ -337,10 +330,7 @@ export class FinanceController {
     @CurrentUser() user: User,
     @Query() query: QueryCapitalTransactionDto,
   ) {
-    const targetOutlet =
-      query.outletId && query.outletId !== 'ALL'
-        ? query.outletId
-        : (user.outletId ?? undefined);
+    const targetOutlet = resolveEffectiveOutletId(user, query.outletId);
     const data = await this.capitalService.getTransactions(user.tenantId, {
       ...query,
       outletId: targetOutlet,

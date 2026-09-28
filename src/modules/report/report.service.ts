@@ -14,6 +14,7 @@ import { Expense } from '../finance/entities/expense.entity';
 import { FinancialAccount } from '../finance/entities/financial-account.entity';
 import { FixedAsset } from '../finance/entities/fixed-asset.entity';
 import { CapitalTransaction } from '../finance/entities/capital-transaction.entity';
+import { Purchase } from '../purchase/entities/purchase.entity';
 import { FixedAssetService } from '../finance/services/fixed-asset.service';
 import { JournalService } from '../finance/services/journal.service';
 import {
@@ -54,6 +55,8 @@ export class ReportService {
     private readonly assetRepo: Repository<FixedAsset>,
     @InjectRepository(CapitalTransaction)
     private readonly capitalRepo: Repository<CapitalTransaction>,
+    @InjectRepository(Purchase)
+    private readonly purchaseRepo: Repository<Purchase>,
     private readonly assetService: FixedAssetService,
     private readonly journalService: JournalService,
   ) {}
@@ -797,12 +800,42 @@ export class ReportService {
     const taxPayableRaw = await taxPayableQb.getRawOne<{ tax: string }>();
     const taxPayables = Number(taxPayableRaw?.tax || 0);
 
-    const accountsPayable = await this.journalService.getAccountBalance(
+    // Hutang Usaha / Supplier: Bersumber dari penerimaan pembelian yang belum lunas (purchases table)
+    // dan saldo kredit akun kewajiban COA 2-1100 di buku besar umum.
+    const purchasePayablesQb = this.purchaseRepo
+      .createQueryBuilder('p')
+      .select('SUM(p.total_amount - p.paid_amount)', 'payable')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.status = :status', { status: 'RECEIVED' })
+      .andWhere('p.payment_status IN (:...payStatuses)', {
+        payStatuses: ['UNPAID', 'PARTIAL'],
+      });
+
+    if (targetOutlet) {
+      purchasePayablesQb.andWhere('p.outlet_id = :outletId', {
+        outletId: targetOutlet,
+      });
+    }
+
+    if (targetDate) {
+      purchasePayablesQb.andWhere('p.purchase_date <= :asOfDate', {
+        asOfDate: `${targetDate} 23:59:59.999Z`,
+      });
+    }
+
+    const purchasePayableRaw = await purchasePayablesQb.getRawOne<{
+      payable?: string;
+    }>();
+    const purchasePayables = Number(purchasePayableRaw?.payable || 0);
+
+    const journalPayables = await this.journalService.getAccountBalance(
       tenantId,
       '2-1100', // Hutang Usaha / Supplier
       targetOutlet,
       targetDate,
     );
+
+    const accountsPayable = Math.max(purchasePayables, journalPayables);
 
     const totalLiabilities =
       Math.round((taxPayables + accountsPayable) * 100) / 100;

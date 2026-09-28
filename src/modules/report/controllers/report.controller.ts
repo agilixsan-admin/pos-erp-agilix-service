@@ -12,6 +12,8 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
 
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
+
 @Controller('reports')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
@@ -20,32 +22,7 @@ export class ReportController {
     user: User,
     outletId?: string,
   ): string | undefined {
-    const isTenantWideUser =
-      user.isSuperAdmin ||
-      user.role?.name === 'Owner' ||
-      user.role?.menuAccess?.includes('*');
-
-    const requestedOutletId =
-      outletId && outletId !== 'ALL' && outletId.trim() !== ''
-        ? outletId
-        : undefined;
-
-    if (requestedOutletId) {
-      if (
-        !isTenantWideUser &&
-        user.outletId &&
-        user.outletId !== requestedOutletId
-      ) {
-        return user.outletId;
-      }
-      return requestedOutletId;
-    }
-
-    if (isTenantWideUser) {
-      return undefined;
-    }
-
-    return user.outletId ?? undefined;
+    return resolveEffectiveOutletId(user, outletId);
   }
 
   @Get()
