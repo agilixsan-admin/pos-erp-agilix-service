@@ -35,6 +35,7 @@ import { AddPurchasePaymentAndStatus1700000000033 } from './1700000000033-AddPur
 import { AddMaxOutletsToTenants1700000000034 } from './1700000000034-AddMaxOutletsToTenants';
 import { CreateCapitalTransactionsTable1700000000035 } from './1700000000035-CreateCapitalTransactionsTable';
 import { UpdateEmailTemplateBrandingToSaji1700000000036 } from './1700000000036-UpdateEmailTemplateBrandingToSaji';
+import { AddClosedByToPosShiftsTable1700000000037 } from './1700000000037-AddClosedByToPosShiftsTable';
 
 export const ALL_MIGRATIONS = [
   Foundation1700000000000,
@@ -74,4 +75,5 @@ export const ALL_MIGRATIONS = [
   AddMaxOutletsToTenants1700000000034,
   CreateCapitalTransactionsTable1700000000035,
   UpdateEmailTemplateBrandingToSaji1700000000036,
+  AddClosedByToPosShiftsTable1700000000037,
 ];

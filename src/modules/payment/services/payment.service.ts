@@ -343,7 +343,6 @@ export class PaymentService {
       where: {
         tenantId,
         outletId: order.outletId,
-        userId,
         status: 'OPEN',
       },
     });
@@ -450,7 +449,6 @@ export class PaymentService {
       where: {
         tenantId,
         outletId: order.outletId,
-        userId,
         status: 'OPEN',
       },
     });

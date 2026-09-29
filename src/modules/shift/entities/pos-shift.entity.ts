@@ -16,6 +16,7 @@ import { PettyCashTransaction } from './petty-cash-transaction.entity';
 
 @Entity('pos_shifts')
 @Index(['tenantId', 'outletId'])
+@Index(['tenantId', 'outletId', 'status'])
 @Index(['tenantId', 'userId', 'status'])
 export class PosShift {
   @PrimaryGeneratedColumn('uuid')
@@ -29,6 +30,9 @@ export class PosShift {
 
   @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
+
+  @Column({ name: 'closed_by_id', type: 'uuid', nullable: true })
+  closedById!: string | null;
 
   @Column({ name: 'opened_at', type: 'timestamptz', default: () => 'now()' })
   openedAt!: Date;
@@ -113,6 +117,10 @@ export class PosShift {
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'user_id' })
   user!: User;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'closed_by_id' })
+  closedByUser?: User | null;
 
   @OneToMany(() => PettyCashTransaction, (pettyCash) => pettyCash.shift)
   pettyCashTransactions!: PettyCashTransaction[];

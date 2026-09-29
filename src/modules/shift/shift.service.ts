@@ -48,8 +48,25 @@ export class ShiftService {
     userId: string,
     dto: OpenShiftDto,
   ): Promise<PosShift> {
-    // Validasi apakah kasir ini sudah punya shift yang sedang OPEN
-    const activeShift = await this.shiftRepo.findOne({
+    // 1. Validasi apakah cabang ini sudah memiliki shift yang sedang OPEN
+    const activeOutletShift = await this.shiftRepo.findOne({
+      where: {
+        tenantId,
+        outletId: dto.outletId,
+        status: 'OPEN',
+      },
+      relations: ['user'],
+    });
+
+    if (activeOutletShift) {
+      const openedByName = activeOutletShift.user?.name || 'kasir lain';
+      throw new ConflictException(
+        `Shift di cabang ini sudah dibuka oleh ${openedByName}. Semua kasir di cabang ini otomatis tergabung dalam shift tersebut.`,
+      );
+    }
+
+    // 2. Validasi apakah user ini sudah membuka shift aktif di cabang lain
+    const userActiveShift = await this.shiftRepo.findOne({
       where: {
         tenantId,
         userId,
@@ -57,9 +74,9 @@ export class ShiftService {
       },
     });
 
-    if (activeShift) {
+    if (userActiveShift) {
       throw new ConflictException(
-        'Anda masih memiliki sesi shift yang aktif. Harap tutup shift sebelumnya terlebih dahulu.',
+        'Anda masih memiliki sesi shift yang aktif di cabang lain. Harap tutup shift tersebut terlebih dahulu.',
       );
     }
 
@@ -125,13 +142,16 @@ export class ShiftService {
     const qb = this.shiftRepo
       .createQueryBuilder('s')
       .leftJoinAndSelect('s.outlet', 'o')
+      .leftJoinAndSelect('s.user', 'u')
+      .leftJoinAndSelect('s.closedByUser', 'cu')
       .leftJoinAndSelect('s.pettyCashTransactions', 'pct')
       .where('s.tenantId = :tenantId', { tenantId })
-      .andWhere('s.userId = :userId', { userId })
       .andWhere('s.status = :status', { status: 'OPEN' });
 
     if (outletId) {
       qb.andWhere('s.outletId = :outletId', { outletId });
+    } else {
+      qb.andWhere('s.userId = :userId', { userId });
     }
 
     const shift = await qb.getOne();
@@ -352,6 +372,7 @@ export class ShiftService {
       const cashDifference = actualCash - expectedCash;
 
       shift.closedAt = closedAt;
+      shift.closedById = userId;
       shift.totalCashSales = totalCashSales;
       shift.expectedCash = expectedCash;
       shift.actualCash = actualCash;
@@ -430,6 +451,9 @@ export class ShiftService {
           actorId: userId,
           metadata: {
             shiftId: savedShift.id,
+            outletId: shift.outletId,
+            openedById: shift.userId,
+            closedById: userId,
             expectedCash,
             actualCash,
             cashDifference,
@@ -450,7 +474,7 @@ export class ShiftService {
   async getShiftSummary(tenantId: string, shiftId: string) {
     const shift = await this.shiftRepo.findOne({
       where: { id: shiftId, tenantId },
-      relations: ['outlet', 'user', 'pettyCashTransactions'],
+      relations: ['outlet', 'user', 'closedByUser', 'pettyCashTransactions'],
     });
 
     if (!shift) {
@@ -489,6 +513,7 @@ export class ShiftService {
     return {
       shift,
       cashierName: shift.user?.name || 'Kasir',
+      closedByName: shift.closedByUser?.name || null,
       outletName: shift.outlet?.name || 'Cabang',
       openedAt: shift.openedAt,
       closedAt,
@@ -519,6 +544,7 @@ export class ShiftService {
       .createQueryBuilder('s')
       .leftJoinAndSelect('s.outlet', 'o')
       .leftJoinAndSelect('s.user', 'u')
+      .leftJoinAndSelect('s.closedByUser', 'cu')
       .leftJoinAndSelect('s.pettyCashTransactions', 'pct')
       .where('s.tenantId = :tenantId', { tenantId });
 

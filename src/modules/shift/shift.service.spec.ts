@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ShiftService } from './shift.service';
 import { PosShift } from './entities/pos-shift.entity';
@@ -126,18 +126,68 @@ describe('ShiftService', () => {
     ).toHaveBeenCalled();
   });
 
-  it('should reject opening shift if another shift is already active', async () => {
-    mockShiftRepo.findOne.mockResolvedValue({
-      id: 'active-shift',
+  it('should reject opening shift if another cashier has already opened a shift for the same outlet', async () => {
+    mockShiftRepo.findOne.mockResolvedValueOnce({
+      id: 'active-shift-1',
+      outletId: 'outlet-1',
+      userId: 'cashier-A',
+      user: { name: 'Kasir A' },
       status: 'OPEN',
     });
 
     await expect(
-      service.openShift('tenant-1', 'user-1', {
+      service.openShift('tenant-1', 'cashier-B', {
         outletId: 'outlet-1',
-        openingCash: 200000,
+        openingCash: 100000,
       }),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(
+      'Shift di cabang ini sudah dibuka oleh Kasir A. Semua kasir di cabang ini otomatis tergabung dalam shift tersebut.',
+    );
+  });
+
+  it('should close shift successfully and record closedById', async () => {
+    const existingShift = {
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'cashier-A',
+      status: 'OPEN',
+      openingCash: 100000,
+      totalCashOut: 0,
+      openedAt: new Date(),
+    };
+    mockShiftRepo.findOne.mockResolvedValue(existingShift);
+    mockOrderRepo.count.mockResolvedValue(0);
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '150000' }),
+    });
+
+    const result = await service.closeShift(
+      'tenant-1',
+      'cashier-B',
+      'shift-1',
+      {
+        actualCash: 250000,
+        notes: 'Shift closed by Kasir B',
+      },
+    );
+
+    expect(result.status).toBe('CLOSED');
+    expect(result.closedById).toBe('cashier-B');
+    expect(mockAuditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SHIFT_CLOSED',
+        actorId: 'cashier-B',
+        metadata: expect.objectContaining({
+          openedById: 'cashier-A',
+          closedById: 'cashier-B',
+        }),
+      }),
+      expect.anything(),
+    );
   });
 
   it('should reject closing shift if there are pending orders in the outlet', async () => {

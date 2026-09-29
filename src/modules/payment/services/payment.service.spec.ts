@@ -490,6 +490,41 @@ describe('PaymentService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('allows Kasir B to process CASH payment when Kasir A opened the shift for the outlet', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        orderNumber: 'ORD-123',
+        status: 'PENDING',
+        totalAmount: 50000,
+        items: [],
+      };
+      mockOrderRepo.findOne.mockResolvedValue(order);
+      mockShiftRepo.findOne.mockResolvedValueOnce({
+        id: 'shift-opened-by-kasir-a',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        userId: 'kasir-a',
+        status: 'OPEN',
+      });
+
+      const res = await service.create('tenant-1', 'kasir-b', {
+        orderId: 'ord-1',
+        paymentMethod: 'CASH',
+        amount: 50000,
+      });
+
+      expect(res).toBeDefined();
+      expect(mockShiftRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-1',
+          outletId: 'outlet-1',
+          status: 'OPEN',
+        },
+      });
+    });
   });
 
   describe('generateQris', () => {
@@ -508,6 +543,56 @@ describe('PaymentService', () => {
           orderId: 'ord-1',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows Kasir B to generate QRIS payment when Kasir A opened the shift for the outlet', async () => {
+      const order = {
+        id: 'ord-1',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        orderNumber: 'ORD-123',
+        status: 'PENDING',
+        totalAmount: 50000,
+      };
+      mockOrderRepo.findOne.mockResolvedValue(order);
+      mockShiftRepo.findOne.mockResolvedValueOnce({
+        id: 'shift-opened-by-kasir-a',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        userId: 'kasir-a',
+        status: 'OPEN',
+      });
+      mockPaymentRepo.findOne.mockResolvedValueOnce(null);
+      mockQrisProvider.generateQris.mockResolvedValueOnce({
+        qrString: '00020101...540550000',
+        qrUrl: 'https://api.qrserver.com/test.png',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        gatewayProvider: 'mock',
+        gatewayReference: 'MOCK-QR-ORD-123',
+      });
+
+      const paymentRecord = {
+        id: 'pay-qris-1',
+        tenantId: 'tenant-1',
+        orderId: 'ord-1',
+        status: 'PENDING',
+        qrString: '00020101...540550000',
+      };
+      mockPaymentRepo.create.mockReturnValueOnce(paymentRecord);
+      mockPaymentRepo.save.mockResolvedValueOnce(paymentRecord);
+
+      const qris = await service.generateQris('tenant-1', 'kasir-b', {
+        orderId: 'ord-1',
+      });
+
+      expect(qris).toBeDefined();
+      expect(mockShiftRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-1',
+          outletId: 'outlet-1',
+          status: 'OPEN',
+        },
+      });
     });
     it('generates dynamic QRIS for a pending order', async () => {
       const order = {

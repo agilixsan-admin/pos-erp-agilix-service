@@ -298,6 +298,79 @@ describe('OrderService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('allows Kasir B to create order when Kasir A opened the shift for the outlet', async () => {
+      mockOutletRepo.findOne.mockResolvedValueOnce({
+        id: 'outlet-1',
+        tenantId: 'tenant-1',
+      });
+      mockShiftRepo.findOne.mockResolvedValueOnce({
+        id: 'shift-opened-by-kasir-a',
+        tenantId: 'tenant-1',
+        outletId: 'outlet-1',
+        userId: 'kasir-a',
+        status: 'OPEN',
+      });
+      mockVariantRepo.find.mockResolvedValueOnce([
+        {
+          id: 'var-1',
+          productId: 'prod-1',
+          name: 'Regular',
+          price: 15000,
+          tenantId: 'tenant-1',
+          product: { name: 'Latte' },
+        },
+      ]);
+      mockOutletProductRepo.find.mockResolvedValueOnce([]);
+
+      const managerOrderRepo = {
+        create: jest.fn((o: Record<string, unknown>) => ({
+          ...o,
+          id: 'ord-created-by-kasir-b',
+        })),
+        save: jest.fn((o: Record<string, unknown>) => Promise.resolve(o)),
+        findOne: jest.fn().mockResolvedValue({
+          id: 'ord-created-by-kasir-b',
+          orderNumber: 'ORD-B-1',
+          totalAmount: 15000,
+        }),
+      };
+      const managerItemRepo = {
+        create: jest.fn((i: Record<string, unknown>) => i),
+        save: jest.fn().mockResolvedValue([]),
+      };
+      const defaultRepo = {
+        find: jest.fn().mockResolvedValue([]),
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((x: any) => x),
+        save: jest.fn((x: any) => Promise.resolve(x)),
+      };
+
+      mockDataSource.transaction.mockImplementationOnce(
+        (callback: (m: unknown) => Promise<unknown>) => {
+          return callback({
+            getRepository: (entityClass: unknown) => {
+              if (entityClass === Order) return managerOrderRepo;
+              if (entityClass === OrderItem) return managerItemRepo;
+              return defaultRepo;
+            },
+          });
+        },
+      );
+
+      const order = await service.create('tenant-1', 'kasir-b', 'outlet-1', {
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(order).toBeDefined();
+      expect(mockShiftRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-1',
+          outletId: 'outlet-1',
+          status: 'OPEN',
+        },
+      });
+    });
+
     it('throws BadRequestException if discount belongs to another outlet', async () => {
       mockOutletRepo.findOne.mockResolvedValue({
         id: 'outlet-1',

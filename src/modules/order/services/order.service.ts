@@ -96,7 +96,6 @@ export class OrderService {
       where: {
         tenantId,
         outletId: targetOutletId,
-        userId,
         status: 'OPEN',
       },
     });
@@ -1214,7 +1213,6 @@ export class OrderService {
       where: {
         tenantId,
         outletId: order.outletId,
-        userId,
         status: 'OPEN',
       },
     });
