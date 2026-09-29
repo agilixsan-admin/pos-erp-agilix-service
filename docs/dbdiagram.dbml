@@ -1,0 +1,853 @@
+// =====================================================================
+// AGILIX POS & ERP BACKEND DATABASE SCHEMA (DBML)
+// Copy-paste this script directly into https://dbdiagram.io
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// 1. ORGANISASI, OUTLET, AUTH & RBAC
+// ---------------------------------------------------------------------
+
+Table tenants {
+  id uuid [pk]
+  business_name varchar [not null]
+  owner_name varchar [not null]
+  owner_email varchar [not null]
+  owner_phone varchar
+  plan_type varchar [not null]
+  expiry_date timestamptz
+  status varchar [not null, default: 'ACTIVE', note: 'ACTIVE | LOCKED']
+  console_api_key varchar
+  max_outlets integer [default: 1]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table outlets {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  code varchar [not null]
+  address varchar
+  phone varchar
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table roles {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  name varchar [not null]
+  description varchar
+  menu_access jsonb [not null]
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table users {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid
+  role_id uuid
+  name varchar [not null]
+  email varchar [not null, unique]
+  password_hash varchar [not null]
+  is_super_admin boolean [default: false]
+  status varchar [default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table user_invitations {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid
+  role_id uuid [not null]
+  email varchar [not null]
+  token varchar [not null, unique]
+  status varchar [default: 'PENDING', note: 'PENDING | ACCEPTED | EXPIRED']
+  expires_at timestamptz [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table audit_logs {
+  id uuid [pk]
+  tenant_id uuid
+  actor_type varchar [not null]
+  actor_id uuid
+  action varchar [not null]
+  metadata jsonb
+  created_at timestamptz [default: `now()`]
+}
+
+Table external_commands {
+  id uuid [pk]
+  event_id varchar [not null, unique]
+  event_name varchar [not null]
+  tenant_id uuid
+  payload jsonb [not null]
+  status varchar [default: 'PROCESSED']
+  received_at timestamptz [default: `now()`]
+  processed_at timestamptz
+}
+
+// ---------------------------------------------------------------------
+// 2. KASIR & SESI SHIFT OUTLET (SHARED SHIFT CABANG)
+// ---------------------------------------------------------------------
+
+Table pos_shifts {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  user_id uuid [not null, note: 'Kasir yang membuka shift']
+  closed_by_id uuid [note: 'Kasir yang menutup shift']
+  opened_at timestamptz [not null, default: `now()`]
+  closed_at timestamptz
+  opening_cash numeric(12,2) [not null, default: 0]
+  expected_cash numeric(12,2)
+  actual_cash numeric(12,2)
+  cash_difference numeric(12,2)
+  total_cash_sales numeric(12,2) [not null, default: 0]
+  total_cash_out numeric(12,2) [not null, default: 0]
+  notes text
+  status varchar(20) [not null, default: 'OPEN', note: 'OPEN | CLOSED']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (tenant_id, outlet_id)
+    (tenant_id, outlet_id, status)
+    (tenant_id, user_id, status)
+  }
+}
+
+Table petty_cash_transactions {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  shift_id uuid
+  amount numeric(12,2) [not null]
+  category varchar(100) [not null]
+  notes text
+  receipt_photo_url text [not null]
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (tenant_id, outlet_id)
+    shift_id
+  }
+}
+
+// ---------------------------------------------------------------------
+// 3. MENU, PRODUK & RESEP
+// ---------------------------------------------------------------------
+
+Table categories {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table products {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  category_id uuid
+  name varchar [not null]
+  description varchar
+  image_url text
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table product_variants {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  product_id uuid [not null]
+  name varchar [not null]
+  sku varchar
+  price numeric(12,2) [not null, default: 0]
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table outlet_products {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  product_id uuid [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (outlet_id, product_id) [unique]
+  }
+}
+
+Table recipes {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  variant_id uuid [not null]
+  inventory_item_id uuid [not null]
+  quantity numeric(12,2) [not null, default: 1]
+  unit varchar [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+// ---------------------------------------------------------------------
+// 4. INVENTORI, BAHAN BAKU & STOK
+// ---------------------------------------------------------------------
+
+Table inventory_categories {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table inventory_items {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  category_id uuid
+  name varchar [not null]
+  sku varchar
+  unit varchar [not null, default: 'pcs']
+  item_type varchar [default: 'RAW_MATERIAL', note: 'RAW_MATERIAL | PACKAGING | ASSET']
+  cost_price numeric(12,2) [default: 0]
+  minimum_stock numeric(12,2) [not null, default: 0]
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table inventory_stocks {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  inventory_item_id uuid [not null]
+  quantity numeric(12,2) [not null, default: 0]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  indexes {
+    (outlet_id, inventory_item_id) [unique]
+  }
+}
+
+Table inventory_movements {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  inventory_item_id uuid [not null]
+  movement_type varchar [not null, note: 'SALE | PURCHASE | ADJUSTMENT_IN | ADJUSTMENT_OUT | WASTE']
+  quantity numeric(12,2) [not null]
+  reference_type varchar
+  reference_id varchar
+  reason_category_id uuid
+  notes varchar
+  movement_date timestamptz [not null, default: `now()`]
+  created_by uuid
+  created_at timestamptz [default: `now()`]
+  metadata jsonb
+}
+
+Table reason_categories {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  type varchar [not null, default: 'BOTH', note: 'IN | OUT | BOTH']
+  status varchar [not null, default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  deleted_at timestamptz
+}
+
+Table stock_adjustments {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  adjustment_number varchar [not null]
+  adjustment_date date [not null]
+  type varchar [not null, note: 'IN | OUT']
+  reason_category_id uuid [not null]
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table stock_opnames {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  opname_number varchar [not null]
+  opname_date date [not null]
+  status varchar [not null, default: 'COMPLETED']
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table stock_opname_items {
+  id uuid [pk]
+  stock_opname_id uuid [not null]
+  inventory_item_id uuid [not null]
+  system_stock numeric(12,2) [not null]
+  physical_stock numeric(12,2) [not null]
+  difference numeric(12,2) [not null]
+  notes text
+  created_at timestamptz [default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// 5. TRANSAKSI POS: ORDER, PAYMENT & VOID
+// ---------------------------------------------------------------------
+
+Table orders {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  order_number varchar [not null]
+  status varchar [not null, default: 'PENDING', note: 'PENDING | PROCESSING | COMPLETED | CANCELLED | VOID']
+  order_type varchar [not null, default: 'DINE_IN', note: 'DINE_IN | TAKE_AWAY']
+  table_id uuid
+  table_number varchar
+  customer_name varchar
+  subtotal numeric(12,2) [not null, default: 0]
+  discount_amount numeric(12,2) [not null, default: 0]
+  discount_id uuid
+  service_charge_amount numeric(12,2) [not null, default: 0]
+  tax_amount numeric(12,2) [not null, default: 0]
+  packaging_fee numeric(12,2) [not null, default: 0]
+  total_amount numeric(12,2) [not null, default: 0]
+  notes varchar
+  created_by uuid
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  completed_at timestamptz
+}
+
+Table order_items {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  order_id uuid [not null]
+  product_id uuid [not null]
+  variant_id uuid [not null]
+  product_name varchar [not null]
+  variant_name varchar [not null]
+  quantity numeric(12,2) [not null, default: 1]
+  unit_price numeric(12,2) [not null, default: 0]
+  discount_amount numeric(12,2) [not null, default: 0]
+  subtotal numeric(12,2) [not null, default: 0]
+  notes varchar
+  status varchar [not null, default: 'ACTIVE', note: 'ACTIVE | VOID']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table payments {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  order_id uuid [not null]
+  payment_method varchar [not null, note: 'CASH | QRIS']
+  amount numeric(12,2) [not null]
+  change_amount numeric(12,2) [not null, default: 0]
+  status varchar [not null, default: 'SUCCESS', note: 'PENDING | SUCCESS | FAILED | EXPIRED']
+  reference_number varchar
+  qr_string text
+  qr_url text
+  expires_at timestamptz
+  gateway_provider varchar
+  paid_at timestamptz [default: `now()`]
+  created_by uuid
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table transactions {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  order_id uuid [not null]
+  payment_id uuid [not null, unique]
+  transaction_number varchar [not null]
+  amount numeric(12,2) [not null]
+  status varchar [not null, default: 'COMPLETED']
+  completed_at timestamptz [default: `now()`]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table voids {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  order_id uuid [not null]
+  order_item_id uuid
+  reason_category_id uuid
+  reason varchar [not null]
+  voided_by uuid
+  approved_by uuid [note: 'Supervisor yang menyetujui void']
+  voided_at timestamptz [default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// 6. OPERASIONAL: MEJA, PRINTER, PACKAGING & PENGATURAN
+// ---------------------------------------------------------------------
+
+Table tables {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  table_number varchar [not null]
+  capacity integer [not null, default: 4]
+  section varchar [default: 'Indoor']
+  status varchar [not null, default: 'AVAILABLE', note: 'AVAILABLE | OCCUPIED | RESERVED']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table printers {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  name varchar [not null]
+  type varchar [not null, note: 'RECEIPT | KITCHEN | BAR']
+  connection_type varchar [not null, note: 'NETWORK | BLUETOOTH | USB']
+  ip_address varchar
+  port integer [default: 9100]
+  is_active boolean [default: true]
+  is_default boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table printer_category_routings {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  printer_id uuid [not null]
+  category_id uuid [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table packaging_categories {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table packagings {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  category_id uuid
+  name varchar [not null]
+  cost numeric(12,2) [not null, default: 0]
+  price numeric(12,2) [not null, default: 0]
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table taxes {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  name varchar [not null]
+  rate numeric(5,2) [not null]
+  calculation_type varchar [not null, default: 'EXCLUSIVE', note: 'EXCLUSIVE | INCLUSIVE']
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table discounts {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  name varchar [not null]
+  type varchar [not null, note: 'PERCENTAGE | FIXED']
+  value numeric(12,2) [not null]
+  min_order_amount numeric(12,2) [default: 0]
+  max_discount_amount numeric(12,2)
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table pos_settings {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  cash_enabled boolean [default: true]
+  qris_enabled boolean [default: true]
+  tax_enabled boolean [default: false]
+  tax_name varchar [default: 'PB1 / Resto Tax']
+  tax_rate numeric(5,2) [default: 0]
+  tax_calculation_type varchar [default: 'EXCLUSIVE']
+  service_charge_enabled boolean [default: false]
+  service_charge_name varchar [default: 'Service Charge']
+  service_charge_rate numeric(5,2) [default: 0]
+  service_charge_applicable_to varchar [default: 'DINE_IN']
+  discount_enabled boolean [default: false]
+  discount_type varchar [default: 'PERCENTAGE']
+  discount_value numeric(12,2) [default: 0]
+  void_verification_mode varchar [default: 'SUPERVISOR_APPROVAL', note: 'SUPERVISOR_APPROVAL | SELF_PASSWORD | NONE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// 7. PENGADAAN (PURCHASING) & SUPPLIER
+// ---------------------------------------------------------------------
+
+Table suppliers {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  contact_person varchar
+  phone varchar
+  email varchar
+  address text
+  status varchar [default: 'ACTIVE']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table purchases {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  supplier_id uuid
+  purchase_number varchar [not null]
+  purchase_date date [not null]
+  due_date date
+  status varchar [not null, default: 'COMPLETED', note: 'DRAFT | RECEIVED | COMPLETED | CANCELLED']
+  payment_status varchar [not null, default: 'UNPAID', note: 'PAID | PARTIAL | UNPAID']
+  total_amount numeric(15,2) [not null, default: 0]
+  paid_amount numeric(15,2) [not null, default: 0]
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table purchase_items {
+  id uuid [pk]
+  purchase_id uuid [not null]
+  inventory_item_id uuid [not null]
+  quantity numeric(12,2) [not null]
+  unit_price numeric(12,2) [not null]
+  subtotal numeric(15,2) [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table purchase_payments {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  purchase_id uuid [not null]
+  financial_account_id uuid [not null]
+  amount numeric(15,2) [not null]
+  payment_date date [not null]
+  payment_method varchar [not null]
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// 8. KEUANGAN, AKUNTANSI & KAS/BANK
+// ---------------------------------------------------------------------
+
+Table financial_accounts {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid
+  account_code varchar(50) [not null]
+  account_name varchar(150) [not null]
+  account_type varchar(30) [not null, note: 'CASH | BANK']
+  account_number varchar(100)
+  bank_name varchar(100)
+  current_balance numeric(15,2) [not null, default: 0]
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table financial_transfers {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  from_account_id uuid [not null]
+  to_account_id uuid [not null]
+  amount numeric(15,2) [not null]
+  transfer_date date [not null, default: `CURRENT_DATE`]
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table expense_categories {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  name varchar(100) [not null]
+  description text
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table expenses {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  category_id uuid [not null]
+  financial_account_id uuid [not null]
+  amount numeric(15,2) [not null]
+  expense_date date [not null, default: `CURRENT_DATE`]
+  recipient varchar(150)
+  notes text
+  receipt_url text
+  petty_cash_id uuid
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table chart_of_accounts {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  account_code varchar(30) [not null]
+  account_name varchar(150) [not null]
+  category varchar(30) [not null, note: 'ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE']
+  normal_balance varchar(10) [not null, note: 'DEBIT | CREDIT']
+  is_system boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table journal_entries {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid
+  entry_date date [not null, default: `CURRENT_DATE`]
+  source_type varchar(50) [not null, note: 'ORDER_SALE | EXPENSE | PETTY_CASH | PURCHASE | CAPITAL | MANUAL']
+  source_id uuid
+  description text [not null]
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table journal_entry_lines {
+  id uuid [pk]
+  journal_entry_id uuid [not null]
+  chart_of_account_id uuid [not null]
+  debit numeric(15,2) [not null, default: 0]
+  credit numeric(15,2) [not null, default: 0]
+  notes text
+  created_at timestamptz [default: `now()`]
+}
+
+Table capital_transactions {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid
+  financial_account_id uuid [not null]
+  type varchar(30) [not null, note: 'INJECTION | WITHDRAWAL']
+  amount numeric(15,2) [not null]
+  transaction_date date [not null, default: `CURRENT_DATE`]
+  investor_name varchar(150) [not null]
+  notes text
+  created_by uuid [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table fixed_assets {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  outlet_id uuid [not null]
+  asset_code varchar(50) [not null]
+  name varchar(150) [not null]
+  category varchar(100) [not null]
+  purchase_date date [not null]
+  acquisition_cost numeric(15,2) [not null]
+  useful_life_months integer [not null]
+  salvage_value numeric(15,2) [default: 0]
+  status varchar(30) [default: 'ACTIVE', note: 'ACTIVE | DISPOSED | WRITTEN_OFF']
+  notes text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+// =====================================================================
+// RELATIONSHIPS (FOREIGN KEYS)
+// =====================================================================
+
+// Organization & Auth
+Ref: outlets.tenant_id > tenants.id
+Ref: roles.tenant_id > tenants.id
+Ref: roles.outlet_id > outlets.id
+Ref: users.tenant_id > tenants.id
+Ref: users.outlet_id > outlets.id
+Ref: users.role_id > roles.id
+Ref: user_invitations.tenant_id > tenants.id
+Ref: user_invitations.outlet_id > outlets.id
+Ref: user_invitations.role_id > roles.id
+Ref: audit_logs.tenant_id > tenants.id
+Ref: external_commands.tenant_id > tenants.id
+
+// Shift & Petty Cash
+Ref: pos_shifts.tenant_id > tenants.id
+Ref: pos_shifts.outlet_id > outlets.id
+Ref: pos_shifts.user_id > users.id
+Ref: pos_shifts.closed_by_id > users.id
+Ref: petty_cash_transactions.tenant_id > tenants.id
+Ref: petty_cash_transactions.outlet_id > outlets.id
+Ref: petty_cash_transactions.shift_id > pos_shifts.id
+Ref: petty_cash_transactions.created_by > users.id
+
+// Products & Recipes
+Ref: categories.tenant_id > tenants.id
+Ref: products.tenant_id > tenants.id
+Ref: products.category_id > categories.id
+Ref: product_variants.tenant_id > tenants.id
+Ref: product_variants.product_id > products.id
+Ref: outlet_products.tenant_id > tenants.id
+Ref: outlet_products.outlet_id > outlets.id
+Ref: outlet_products.product_id > products.id
+Ref: recipes.tenant_id > tenants.id
+Ref: recipes.variant_id > product_variants.id
+Ref: recipes.inventory_item_id > inventory_items.id
+
+// Inventory
+Ref: inventory_categories.tenant_id > tenants.id
+Ref: inventory_items.tenant_id > tenants.id
+Ref: inventory_items.category_id > inventory_categories.id
+Ref: inventory_stocks.tenant_id > tenants.id
+Ref: inventory_stocks.outlet_id > outlets.id
+Ref: inventory_stocks.inventory_item_id > inventory_items.id
+Ref: inventory_movements.tenant_id > tenants.id
+Ref: inventory_movements.outlet_id > outlets.id
+Ref: inventory_movements.inventory_item_id > inventory_items.id
+Ref: inventory_movements.reason_category_id > reason_categories.id
+Ref: inventory_movements.created_by > users.id
+Ref: reason_categories.tenant_id > tenants.id
+Ref: stock_adjustments.tenant_id > tenants.id
+Ref: stock_adjustments.outlet_id > outlets.id
+Ref: stock_adjustments.reason_category_id > reason_categories.id
+Ref: stock_adjustments.created_by > users.id
+Ref: stock_opnames.tenant_id > tenants.id
+Ref: stock_opnames.outlet_id > outlets.id
+Ref: stock_opnames.created_by > users.id
+Ref: stock_opname_items.stock_opname_id > stock_opnames.id
+Ref: stock_opname_items.inventory_item_id > inventory_items.id
+
+// POS Sales
+Ref: orders.tenant_id > tenants.id
+Ref: orders.outlet_id > outlets.id
+Ref: orders.table_id > tables.id
+Ref: orders.discount_id > discounts.id
+Ref: orders.created_by > users.id
+Ref: order_items.tenant_id > tenants.id
+Ref: order_items.order_id > orders.id
+Ref: order_items.product_id > products.id
+Ref: order_items.variant_id > product_variants.id
+Ref: payments.tenant_id > tenants.id
+Ref: payments.outlet_id > outlets.id
+Ref: payments.order_id > orders.id
+Ref: payments.created_by > users.id
+Ref: transactions.tenant_id > tenants.id
+Ref: transactions.outlet_id > outlets.id
+Ref: transactions.order_id > orders.id
+Ref: transactions.payment_id - payments.id
+Ref: voids.tenant_id > tenants.id
+Ref: voids.outlet_id > outlets.id
+Ref: voids.order_id > orders.id
+Ref: voids.order_item_id > order_items.id
+Ref: voids.reason_category_id > reason_categories.id
+Ref: voids.voided_by > users.id
+Ref: voids.approved_by > users.id
+
+// Operations
+Ref: tables.tenant_id > tenants.id
+Ref: tables.outlet_id > outlets.id
+Ref: printers.tenant_id > tenants.id
+Ref: printers.outlet_id > outlets.id
+Ref: printer_category_routings.tenant_id > tenants.id
+Ref: printer_category_routings.outlet_id > outlets.id
+Ref: printer_category_routings.printer_id > printers.id
+Ref: printer_category_routings.category_id > categories.id
+Ref: packaging_categories.tenant_id > tenants.id
+Ref: packagings.tenant_id > tenants.id
+Ref: packagings.outlet_id > outlets.id
+Ref: packagings.category_id > packaging_categories.id
+Ref: taxes.tenant_id > tenants.id
+Ref: taxes.outlet_id > outlets.id
+Ref: discounts.tenant_id > tenants.id
+Ref: discounts.outlet_id > outlets.id
+Ref: pos_settings.tenant_id > tenants.id
+Ref: pos_settings.outlet_id > outlets.id
+
+// Purchases
+Ref: suppliers.tenant_id > tenants.id
+Ref: purchases.tenant_id > tenants.id
+Ref: purchases.outlet_id > outlets.id
+Ref: purchases.supplier_id > suppliers.id
+Ref: purchases.created_by > users.id
+Ref: purchase_items.purchase_id > purchases.id
+Ref: purchase_items.inventory_item_id > inventory_items.id
+Ref: purchase_payments.tenant_id > tenants.id
+Ref: purchase_payments.purchase_id > purchases.id
+Ref: purchase_payments.financial_account_id > financial_accounts.id
+Ref: purchase_payments.created_by > users.id
+
+// Finance
+Ref: financial_accounts.tenant_id > tenants.id
+Ref: financial_accounts.outlet_id > outlets.id
+Ref: financial_transfers.tenant_id > tenants.id
+Ref: financial_transfers.from_account_id > financial_accounts.id
+Ref: financial_transfers.to_account_id > financial_accounts.id
+Ref: financial_transfers.created_by > users.id
+Ref: expense_categories.tenant_id > tenants.id
+Ref: expenses.tenant_id > tenants.id
+Ref: expenses.outlet_id > outlets.id
+Ref: expenses.category_id > expense_categories.id
+Ref: expenses.financial_account_id > financial_accounts.id
+Ref: expenses.petty_cash_id > petty_cash_transactions.id
+Ref: expenses.created_by > users.id
+Ref: chart_of_accounts.tenant_id > tenants.id
+Ref: journal_entries.tenant_id > tenants.id
+Ref: journal_entries.outlet_id > outlets.id
+Ref: journal_entries.created_by > users.id
+Ref: journal_entry_lines.journal_entry_id > journal_entries.id
+Ref: journal_entry_lines.chart_of_account_id > chart_of_accounts.id
+Ref: capital_transactions.tenant_id > tenants.id
+Ref: capital_transactions.outlet_id > outlets.id
+Ref: capital_transactions.financial_account_id > financial_accounts.id
+Ref: capital_transactions.created_by > users.id
+Ref: fixed_assets.tenant_id > tenants.id
+Ref: fixed_assets.outlet_id > outlets.id
