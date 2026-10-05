@@ -147,7 +147,7 @@ jobs:
             echo "==== Verifying Service Convergence ===="
             SUCCESS=0
             for i in {1..20}; do
-              REPLICAS=$(docker service ls --filter name=demo-pos-service --format "{{.Replicas}}")
+              REPLICAS=$(docker service ls --filter name=agilix_demo_pos-service --format "{{.Replicas}}")
               echo "Replicas status: $REPLICAS (Checking $i/20)"
               
               CURRENT=$(echo "$REPLICAS" | cut -d'/' -f1)
@@ -161,7 +161,7 @@ jobs:
 
             if [ $SUCCESS -ne 1 ]; then
               echo "Deployment stabilization timed out!"
-              docker service ps demo-pos-service
+              docker service ps agilix_demo_pos-service
               exit 1
             fi
 
