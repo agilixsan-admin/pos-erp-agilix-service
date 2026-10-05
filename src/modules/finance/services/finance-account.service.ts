@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { FinancialAccount } from '../entities/financial-account.entity';
 import { FinancialTransfer } from '../entities/financial-transfer.entity';
+import { Outlet } from '../../outlet/outlet.entity';
 import {
   CreateFinancialAccountDto,
   CreateFinancialTransferDto,
@@ -45,19 +46,41 @@ export class FinanceAccountService {
         accountType: 'CASH',
         isActive: true,
       },
+      relations: ['outlet'],
     });
 
     if (!account) {
+      const outletRepo = manager
+        ? manager.getRepository(Outlet)
+        : this.dataSource.getRepository(Outlet);
+      const outlet = await outletRepo.findOne({
+        where: { id: outletId, tenantId },
+      });
+      const outletLabel = outlet?.name || outletId.slice(0, 8);
+
       account = repo.create({
         tenantId,
         outletId,
         accountCode: `1-1100-${outletId.slice(0, 4)}`,
-        accountName: `Kas Laci Kasir (${outletId.slice(0, 8)})`,
+        accountName: `Kas Laci Kasir (${outletLabel})`,
         accountType: 'CASH',
         currentBalance: 0,
         isActive: true,
       });
       account = await repo.save(account);
+      if (outlet) {
+        account.outlet = outlet;
+      }
+    } else if (account.accountName.includes('(') && account.outlet?.name) {
+      // Perbarui nama menjadi nama cabang yang jelas jika sebelumnya hanya UUID potongan
+      const expectedName = `Kas Laci Kasir (${account.outlet.name})`;
+      if (
+        account.accountName !== expectedName &&
+        account.accountName.startsWith('Kas Laci Kasir (')
+      ) {
+        account.accountName = expectedName;
+        await repo.save(account);
+      }
     }
 
     return account;
@@ -69,6 +92,7 @@ export class FinanceAccountService {
   ): Promise<FinancialAccount[]> {
     const qb = this.accountRepo
       .createQueryBuilder('fa')
+      .leftJoinAndSelect('fa.outlet', 'outlet')
       .where('fa.tenantId = :tenantId', { tenantId })
       .andWhere('fa.isActive = true');
 

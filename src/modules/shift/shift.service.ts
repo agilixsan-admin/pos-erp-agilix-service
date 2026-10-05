@@ -102,11 +102,6 @@ export class ShiftService {
 
       const savedShift = await manager.save(shift);
 
-      // Sinkronkan saldo kas laci dengan modal awal
-      cashAccount.currentBalance =
-        Number(cashAccount.currentBalance) + Number(dto.openingCash);
-      await manager.save(cashAccount);
-
       await this.auditService.record(
         {
           action: 'SHIFT_OPENED',
@@ -117,6 +112,7 @@ export class ShiftService {
             shiftId: savedShift.id,
             outletId: dto.outletId,
             openingCash: dto.openingCash,
+            systemDrawerBalance: Number(cashAccount.currentBalance),
           },
         },
         manager,
@@ -382,8 +378,20 @@ export class ShiftService {
 
       const savedShift = await manager.save(shift);
 
-      // Jika ada selisih kas (over / short), catat auto-journal penyesuaian selisih kas
+      // Jika ada selisih kas (over / short), sesuaikan saldo Kas Laci dan catat auto-journal penyesuaian selisih kas
       if (cashDifference !== 0) {
+        const cashAccount =
+          await this.financeAccountService.ensureOutletCashAccount(
+            tenantId,
+            shift.outletId,
+            manager,
+          );
+        cashAccount.currentBalance = Math.max(
+          0,
+          Number(cashAccount.currentBalance) + cashDifference,
+        );
+        await manager.save(cashAccount);
+
         if (cashDifference < 0) {
           // Uang kurang (shortage) -> Beban Selisih Kas (Debit), Kas Laci (Kredit)
           await this.journalService.recordJournal(

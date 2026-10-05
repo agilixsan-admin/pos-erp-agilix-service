@@ -112,8 +112,16 @@ describe('ShiftService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should open shift successfully', async () => {
+  it('should open shift successfully without duplicating cash drawer balance', async () => {
     mockShiftRepo.findOne.mockResolvedValue(null);
+    const mockCashAccount = {
+      id: 'acc-cash',
+      accountName: 'Kas Laci Kasir',
+      currentBalance: 500000,
+    };
+    mockFinanceAccountService.ensureOutletCashAccount.mockResolvedValue(
+      mockCashAccount,
+    );
 
     const shift = await service.openShift('tenant-1', 'user-1', {
       outletId: 'outlet-1',
@@ -124,6 +132,18 @@ describe('ShiftService', () => {
     expect(
       mockFinanceAccountService.ensureOutletCashAccount,
     ).toHaveBeenCalled();
+    // Saldo kas laci tidak boleh bertambah saat buka shift
+    expect(mockCashAccount.currentBalance).toBe(500000);
+    expect(mockAuditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SHIFT_OPENED',
+        metadata: expect.objectContaining({
+          openingCash: 200000,
+          systemDrawerBalance: 500000,
+        }),
+      }),
+      expect.anything(),
+    );
   });
 
   it('should reject opening shift if another cashier has already opened a shift for the same outlet', async () => {
@@ -177,6 +197,7 @@ describe('ShiftService', () => {
 
     expect(result.status).toBe('CLOSED');
     expect(result.closedById).toBe('cashier-B');
+    expect(result.cashDifference).toBe(0);
     expect(mockAuditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'SHIFT_CLOSED',
@@ -185,6 +206,116 @@ describe('ShiftService', () => {
           openedById: 'cashier-A',
           closedById: 'cashier-B',
         }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should close shift with shortage and deduct cash difference from drawer balance', async () => {
+    const existingShift = {
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'cashier-A',
+      status: 'OPEN',
+      openingCash: 100000,
+      totalCashOut: 0,
+      openedAt: new Date(),
+    };
+    mockShiftRepo.findOne.mockResolvedValue(existingShift);
+    mockOrderRepo.count.mockResolvedValue(0);
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '150000' }),
+    });
+
+    const mockCashAccount = {
+      id: 'acc-cash',
+      accountName: 'Kas Laci Kasir',
+      currentBalance: 250000,
+    };
+    mockFinanceAccountService.ensureOutletCashAccount.mockResolvedValue(
+      mockCashAccount,
+    );
+
+    // Expected is 100,000 + 150,000 = 250,000. Actual is 200,000 (shortage of 50,000)
+    const result = await service.closeShift(
+      'tenant-1',
+      'cashier-A',
+      'shift-1',
+      {
+        actualCash: 200000,
+      },
+    );
+
+    expect(result.cashDifference).toBe(-50000);
+    expect(mockCashAccount.currentBalance).toBe(200000); // 250000 - 50000
+    expect(mockJournalService.recordJournal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'PETTY_CASH',
+        lines: expect.arrayContaining([
+          expect.objectContaining({
+            accountCode: '6-9000',
+            debit: 50000,
+          }),
+        ]),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should close shift with surplus and add cash difference to drawer balance', async () => {
+    const existingShift = {
+      id: 'shift-1',
+      tenantId: 'tenant-1',
+      outletId: 'outlet-1',
+      userId: 'cashier-A',
+      status: 'OPEN',
+      openingCash: 100000,
+      totalCashOut: 0,
+      openedAt: new Date(),
+    };
+    mockShiftRepo.findOne.mockResolvedValue(existingShift);
+    mockOrderRepo.count.mockResolvedValue(0);
+    mockPaymentRepo.createQueryBuilder.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ total: '150000' }),
+    });
+
+    const mockCashAccount = {
+      id: 'acc-cash',
+      accountName: 'Kas Laci Kasir',
+      currentBalance: 250000,
+    };
+    mockFinanceAccountService.ensureOutletCashAccount.mockResolvedValue(
+      mockCashAccount,
+    );
+
+    // Expected is 250,000. Actual is 280,000 (surplus of 30,000)
+    const result = await service.closeShift(
+      'tenant-1',
+      'cashier-A',
+      'shift-1',
+      {
+        actualCash: 280000,
+      },
+    );
+
+    expect(result.cashDifference).toBe(30000);
+    expect(mockCashAccount.currentBalance).toBe(280000); // 250000 + 30000
+    expect(mockJournalService.recordJournal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'ORDER_SALE',
+        lines: expect.arrayContaining([
+          expect.objectContaining({
+            accountCode: '4-3000',
+            credit: 30000,
+          }),
+        ]),
       }),
       expect.anything(),
     );

@@ -3,12 +3,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Outlet } from './outlet.entity';
 import { Tenant } from '../tenant/tenant.entity';
 import { AuditService } from '../audit/audit.service';
+import { FinanceAccountService } from '../finance/services/finance-account.service';
 import { CreateOutletDto, UpdateOutletDto } from './dto/outlet.dto';
 
 @Injectable()
@@ -19,6 +21,8 @@ export class OutletService {
     @InjectRepository(Tenant)
     private readonly tenants: Repository<Tenant>,
     private readonly auditService: AuditService,
+    @Optional()
+    private readonly financeAccountService?: FinanceAccountService,
   ) {}
 
   findForTenant(tenantId: string, outletId: string) {
@@ -114,6 +118,18 @@ export class OutletService {
     });
 
     const saved = await this.outlets.save(outlet);
+
+    // Otomatis buat akun Kas Laci Kasir untuk outlet baru
+    if (this.financeAccountService) {
+      try {
+        await this.financeAccountService.ensureOutletCashAccount(
+          tenantId,
+          saved.id,
+        );
+      } catch {
+        // Abaikan jika akun kas sudah ada / dalam proses migrasi
+      }
+    }
 
     await this.auditService.record({
       action: 'OUTLET_CREATED',
