@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -44,7 +45,7 @@ export class OutletService {
 
   async findAll(tenantId: string): Promise<Outlet[]> {
     return this.outlets.find({
-      where: { tenantId },
+      where: { tenantId, status: 'ACTIVE' },
       order: { createdAt: 'ASC' },
     });
   }
@@ -200,6 +201,18 @@ export class OutletService {
   }
 
   async delete(tenantId: string, actorId: string, id: string): Promise<void> {
+    const activeCount = await this.outlets.count({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+
+    if (activeCount <= 1) {
+      throw new BadRequestException({
+        success: false,
+        message: 'Cannot delete the last remaining active outlet',
+        code: 'CANNOT_DELETE_LAST_OUTLET',
+      });
+    }
+
     const outlet = await this.findById(tenantId, id);
 
     outlet.status = 'INACTIVE';

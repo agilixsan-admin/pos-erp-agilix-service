@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -90,7 +91,7 @@ describe('OutletService', () => {
 
       expect(result).toEqual([mockOutlet]);
       expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { tenantId: 'tenant-1' },
+        where: { tenantId: 'tenant-1', status: 'ACTIVE' },
         order: { createdAt: 'ASC' },
       });
     });
@@ -238,6 +239,7 @@ describe('OutletService', () => {
   describe('delete', () => {
     it('marks outlet status as INACTIVE and creates audit log', async () => {
       const existing = { ...mockOutlet, status: 'ACTIVE' } as Outlet;
+      mockRepo.count.mockResolvedValue(2);
       mockRepo.findOne.mockResolvedValue(existing);
       mockRepo.save.mockImplementation((data: Outlet) => Promise.resolve(data));
 
@@ -252,6 +254,14 @@ describe('OutletService', () => {
           action: 'OUTLET_DELETED',
         }),
       );
+    });
+
+    it('throws BadRequestException if attempting to delete the last active outlet', async () => {
+      mockRepo.count.mockResolvedValue(1);
+
+      await expect(
+        service.delete('tenant-1', 'user-1', 'outlet-1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
