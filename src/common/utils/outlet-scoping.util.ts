@@ -1,35 +1,33 @@
 import { User } from '../../modules/user/user.entity';
 
 /**
- * Determine if a user has tenant-wide or administrative authority to view
- * aggregated data across all outlets or switch between outlets.
+ * Determine if a user has true tenant-wide administrative authority to view
+ * aggregated data across all outlets or switch freely between any outlet.
  *
- * Evaluation is based strictly on dynamic RBAC permissions and user scoping:
+ * Evaluation:
  * 1. Super Admin flag (`user.isSuperAdmin === true`)
- * 2. Unassigned outlet (`!user.outletId` -> headquarters / tenant-wide user)
- * 3. Wildcard permission (`menuAccess.includes('*')`)
- * 4. Reporting & Financial permissions (`menuAccess.includes('report.read')` or `menuAccess.includes('report.financial.read')` or `menuAccess.includes('finance.account.read')`)
- * 5. Fallback check on managerial role designations (e.g. Manager, Owner, Admin, Supervisor, Akuntan)
+ * 2. Unassigned headquarters user without any specific outlet restrictions:
+ *    (!user.outletId && (!user.assignedOutlets || user.assignedOutlets.length === 0))
+ *    and possesses wildcard access ('*') or an executive role (Owner / Direktur).
+ *
+ * NOTE: Regular staff, Store Managers, and Area Managers who have assigned outlets
+ * are NEVER tenant-wide, even if they have reporting permissions (e.g. 'report.read').
  */
 export function isTenantWideUser(user: User): boolean {
   if (user.isSuperAdmin) return true;
-  if (!user.outletId) return true;
 
-  const menuAccess = user.role?.menuAccess ?? [];
-  if (
-    menuAccess.includes('*') ||
-    menuAccess.includes('report.read') ||
-    menuAccess.includes('report.financial.read') ||
-    menuAccess.includes('finance.account.read')
-  ) {
-    return true;
-  }
+  const hasSpecificOutlets =
+    Boolean(user.outletId) ||
+    (user.assignedOutlets && user.assignedOutlets.length > 0);
 
-  const roleName = user.role?.name?.toLowerCase() || '';
-  if (
-    /owner|admin|manager|supervisor|direktur|akuntan|finance/i.test(roleName)
-  ) {
-    return true;
+  if (!hasSpecificOutlets) {
+    const menuAccess = user.role?.menuAccess ?? [];
+    if (
+      menuAccess.includes('*') ||
+      /owner|direktur/i.test(user.role?.name || '')
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -40,25 +38,21 @@ export function isTenantWideUser(user: User): boolean {
  *
  * Rules:
  * 1. If outletId === 'ALL':
- *    - For tenant-wide / managerial users: returns `undefined` (query all outlets without filter).
- *    - For restricted regular staff: returns `user.outletId` (preserve outlet isolation).
+ *    - For true tenant-wide / Super Admin users: returns `undefined` (query all outlets).
+ *    - For restricted staff/managers: returns their primary permitted outlet (prevents cross-outlet leakage).
  * 2. If outletId is a specific outlet UUID:
- *    - For tenant-wide / managerial users: returns the requested outlet ID.
- *    - For restricted regular staff: returns `user.outletId` if attempting to cross outlets.
+ *    - For true tenant-wide / Super Admin users: returns the requested outlet ID.
+ *    - For restricted staff/managers: returns requested ID ONLY IF it is in their permitted outlets;
+ *      otherwise falls back to their primary outlet.
  * 3. If outletId is omitted / undefined / empty:
- *    - If user has no outletId: returns `undefined` (tenant-wide).
- *    - If user has outletId: returns `user.outletId` (default to their assigned home outlet).
+ *    - For true tenant-wide / Super Admin users: returns `undefined` (aggregate all outlets).
+ *    - For restricted staff/managers: returns their primary permitted outlet.
  */
 export function resolveEffectiveOutletId(
   user: User,
   outletId?: string,
 ): string | undefined {
   const isTenantWide = isTenantWideUser(user);
-
-  const requested =
-    outletId && outletId !== 'ALL' && outletId.trim() !== ''
-      ? outletId.trim()
-      : undefined;
 
   // Collect all permitted outlet IDs for this user
   const permittedIds = new Set<string>();
@@ -67,27 +61,37 @@ export function resolveEffectiveOutletId(
     user.assignedOutlets.forEach((o) => permittedIds.add(o.id));
   }
 
+  const primaryOutletId =
+    user.outletId ??
+    (permittedIds.size > 0 ? Array.from(permittedIds)[0] : undefined);
+
+  const requested =
+    outletId && outletId !== 'ALL' && outletId.trim() !== ''
+      ? outletId.trim()
+      : undefined;
+
+  // 1. Specific outlet requested
   if (requested) {
-    if (
-      !isTenantWide &&
-      permittedIds.size > 0 &&
-      !permittedIds.has(requested)
-    ) {
-      return user.outletId ?? Array.from(permittedIds)[0];
+    if (!isTenantWide) {
+      if (permittedIds.size > 0 && !permittedIds.has(requested)) {
+        return primaryOutletId;
+      }
     }
     return requested;
   }
 
+  // 2. 'ALL' requested
   if (outletId === 'ALL') {
-    return isTenantWide ? undefined : (user.outletId ?? undefined);
+    if (isTenantWide) {
+      return undefined;
+    }
+    return primaryOutletId;
   }
 
-  if (isTenantWide && !user.outletId) {
+  // 3. Omitted / undefined
+  if (isTenantWide) {
     return undefined;
   }
 
-  return (
-    user.outletId ??
-    (permittedIds.size > 0 ? Array.from(permittedIds)[0] : undefined)
-  );
+  return primaryOutletId;
 }

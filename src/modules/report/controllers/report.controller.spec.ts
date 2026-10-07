@@ -35,6 +35,13 @@ describe('ReportController', () => {
     reportService = module.get(ReportService);
   });
 
+  const superAdminUser = {
+    tenantId: 'tenant-1',
+    outletId: null,
+    isSuperAdmin: true,
+    role: null,
+  } as unknown as User;
+
   const storeManagerUser = {
     tenantId: 'tenant-1',
     outletId: 'outlet-deilema',
@@ -66,8 +73,8 @@ describe('ReportController', () => {
   } as unknown as User;
 
   describe('getBalanceSheet outlet scoping', () => {
-    it('passes undefined (all branches) when Store Manager selects ALL', async () => {
-      await controller.getBalanceSheet(storeManagerUser, '2026-09-28', 'ALL');
+    it('passes undefined (all branches) when Super Admin selects ALL', async () => {
+      await controller.getBalanceSheet(superAdminUser, '2026-09-28', 'ALL');
 
       expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
         'tenant-1',
@@ -76,7 +83,31 @@ describe('ReportController', () => {
       );
     });
 
-    it('passes undefined (all branches) for dynamic role with report.financial.read when selecting ALL', async () => {
+    it('passes specific branch when Super Admin selects Bims Outlet', async () => {
+      await controller.getBalanceSheet(
+        superAdminUser,
+        '2026-09-28',
+        'outlet-bims',
+      );
+
+      expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
+        'tenant-1',
+        '2026-09-28',
+        'outlet-bims',
+      );
+    });
+
+    it('falls back to assigned outlet when Store Manager selects ALL', async () => {
+      await controller.getBalanceSheet(storeManagerUser, '2026-09-28', 'ALL');
+
+      expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
+        'tenant-1',
+        '2026-09-28',
+        'outlet-deilema',
+      );
+    });
+
+    it('falls back to assigned outlet when dynamic role with report.financial.read selects ALL', async () => {
       await controller.getBalanceSheet(
         dynamicAccountantUser,
         '2026-09-28',
@@ -86,11 +117,11 @@ describe('ReportController', () => {
       expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
         'tenant-1',
         '2026-09-28',
-        undefined,
+        'outlet-deilema',
       );
     });
 
-    it('passes specific branch when Store Manager selects Bims Outlet', async () => {
+    it('blocks Store Manager from accessing unassigned branch (e.g. Bims Outlet, falls back to home outlet)', async () => {
       await controller.getBalanceSheet(
         storeManagerUser,
         '2026-09-28',
@@ -100,7 +131,7 @@ describe('ReportController', () => {
       expect(reportService.getBalanceSheet).toHaveBeenCalledWith(
         'tenant-1',
         '2026-09-28',
-        'outlet-bims',
+        'outlet-deilema',
       );
     });
 
@@ -116,8 +147,8 @@ describe('ReportController', () => {
   });
 
   describe('getIncomeStatement outlet scoping', () => {
-    it('passes undefined when Store Manager selects ALL', async () => {
-      await controller.getIncomeStatement(storeManagerUser, {
+    it('passes undefined when Super Admin selects ALL', async () => {
+      await controller.getIncomeStatement(superAdminUser, {
         startDate: '2026-09-01',
         endDate: '2026-09-30',
         outletId: 'ALL',
@@ -127,6 +158,21 @@ describe('ReportController', () => {
         'tenant-1',
         expect.objectContaining({
           outletId: undefined,
+        }),
+      );
+    });
+
+    it('falls back to assigned outlet when Store Manager selects ALL', async () => {
+      await controller.getIncomeStatement(storeManagerUser, {
+        startDate: '2026-09-01',
+        endDate: '2026-09-30',
+        outletId: 'ALL',
+      });
+
+      expect(reportService.getIncomeStatement).toHaveBeenCalledWith(
+        'tenant-1',
+        expect.objectContaining({
+          outletId: 'outlet-deilema',
         }),
       );
     });
