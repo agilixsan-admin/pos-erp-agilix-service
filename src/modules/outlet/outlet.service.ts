@@ -219,6 +219,41 @@ export class OutletService {
 
     const outlet = await this.findById(tenantId, id);
 
+    // Verifikasi saldo kas & QRIS cabang wajib Rp 0 sebelum dihapus
+    if (this.financeAccountService) {
+      const accounts = await this.financeAccountService.getOutletAccounts(
+        tenantId,
+        id,
+      );
+      const accountsWithBalance = accounts.filter(
+        (a) => Math.abs(Number(a.currentBalance || 0)) > 0,
+      );
+
+      if (accountsWithBalance.length > 0) {
+        const total = accountsWithBalance.reduce(
+          (sum, a) => sum + Number(a.currentBalance || 0),
+          0,
+        );
+        throw new BadRequestException({
+          success: false,
+          message: `Tidak dapat menghapus cabang. Masih terdapat sisa saldo sebesar Rp ${total.toLocaleString('id-ID')} pada akun kas/QRIS cabang ini. Harap transfer seluruh saldo sebelum menghapus cabang.`,
+          code: 'OUTLET_HAS_REMAINING_BALANCE',
+          data: {
+            totalBalance: total,
+            accounts: accountsWithBalance.map((a) => ({
+              id: a.id,
+              name: a.accountName,
+              type: a.accountType,
+              balance: Number(a.currentBalance || 0),
+            })),
+          },
+        });
+      }
+
+      // Arsipkan (nonaktifkan) seluruh akun kas/QRIS cabang yang sudah bersaldo Rp 0
+      await this.financeAccountService.deactivateOutletAccounts(tenantId, id);
+    }
+
     outlet.status = 'INACTIVE';
     await this.outlets.save(outlet);
 

@@ -10,6 +10,7 @@ import { OutletService } from './outlet.service';
 import { Outlet } from './outlet.entity';
 import { Tenant } from '../tenant/tenant.entity';
 import { AuditService } from '../audit/audit.service';
+import { FinanceAccountService } from '../finance/services/finance-account.service';
 
 describe('OutletService', () => {
   let service: OutletService;
@@ -45,10 +46,18 @@ describe('OutletService', () => {
     record: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockFinanceAccountService = {
+    ensureOutletCashAccount: jest.fn().mockResolvedValue({ id: 'acc-1' }),
+    ensureOutletQrisAccount: jest.fn().mockResolvedValue({ id: 'acc-2' }),
+    getOutletAccounts: jest.fn().mockResolvedValue([]),
+    deactivateOutletAccounts: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     mockTenantRepo.findOne.mockResolvedValue(mockTenant);
     mockRepo.count.mockResolvedValue(0);
+    mockFinanceAccountService.getOutletAccounts.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +65,7 @@ describe('OutletService', () => {
         { provide: getRepositoryToken(Outlet), useValue: mockRepo },
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: FinanceAccountService, useValue: mockFinanceAccountService },
       ],
     }).compile();
 
@@ -237,15 +247,22 @@ describe('OutletService', () => {
   });
 
   describe('delete', () => {
-    it('marks outlet status as INACTIVE and creates audit log', async () => {
+    it('marks outlet status as INACTIVE, deactivates accounts, and creates audit log when balances are zero', async () => {
       const existing = { ...mockOutlet, status: 'ACTIVE' } as Outlet;
       mockRepo.count.mockResolvedValue(2);
       mockRepo.findOne.mockResolvedValue(existing);
       mockRepo.save.mockImplementation((data: Outlet) => Promise.resolve(data));
+      mockFinanceAccountService.getOutletAccounts.mockResolvedValue([
+        { id: 'acc-1', accountName: 'Kas Laci Kasir', currentBalance: 0 },
+        { id: 'acc-2', accountName: 'Saldo QRIS', currentBalance: 0 },
+      ]);
 
       await service.delete('tenant-1', 'user-1', 'outlet-1');
 
       expect(existing.status).toBe('INACTIVE');
+      expect(
+        mockFinanceAccountService.deactivateOutletAccounts,
+      ).toHaveBeenCalledWith('tenant-1', 'outlet-1');
       expect(mockRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'INACTIVE' }),
       );
@@ -254,6 +271,25 @@ describe('OutletService', () => {
           action: 'OUTLET_DELETED',
         }),
       );
+    });
+
+    it('throws BadRequestException if outlet still has remaining active account balance', async () => {
+      const existing = { ...mockOutlet, status: 'ACTIVE' } as Outlet;
+      mockRepo.count.mockResolvedValue(2);
+      mockRepo.findOne.mockResolvedValue(existing);
+      mockFinanceAccountService.getOutletAccounts.mockResolvedValue([
+        { id: 'acc-1', accountName: 'Kas Laci Kasir', currentBalance: 500000 },
+        { id: 'acc-2', accountName: 'Saldo QRIS', currentBalance: 1200000 },
+      ]);
+
+      await expect(
+        service.delete('tenant-1', 'user-1', 'outlet-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        mockFinanceAccountService.deactivateOutletAccounts,
+      ).not.toHaveBeenCalled();
+      expect(mockRepo.save).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException if attempting to delete the last active outlet', async () => {

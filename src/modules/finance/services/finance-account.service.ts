@@ -158,6 +158,48 @@ export class FinanceAccountService {
     }
   }
 
+  /**
+   * Mengambil semua akun keuangan aktif milik outlet tertentu
+   */
+  async getOutletAccounts(
+    tenantId: string,
+    outletId: string,
+    manager?: EntityManager,
+  ): Promise<FinancialAccount[]> {
+    const repo = manager
+      ? manager.getRepository(FinancialAccount)
+      : this.accountRepo;
+
+    return repo.find({
+      where: { tenantId, outletId, isActive: true },
+      order: { accountType: 'ASC', accountName: 'ASC' },
+    });
+  }
+
+  /**
+   * Menonaktifkan (arsip) seluruh akun keuangan milik outlet
+   */
+  async deactivateOutletAccounts(
+    tenantId: string,
+    outletId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager
+      ? manager.getRepository(FinancialAccount)
+      : this.accountRepo;
+
+    const accounts = await repo.find({
+      where: { tenantId, outletId, isActive: true },
+    });
+
+    if (accounts.length > 0) {
+      for (const acc of accounts) {
+        acc.isActive = false;
+      }
+      await repo.save(accounts);
+    }
+  }
+
   async getAccounts(
     tenantId: string,
     outletId?: string,
