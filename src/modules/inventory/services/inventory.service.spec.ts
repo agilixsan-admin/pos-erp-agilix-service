@@ -228,6 +228,54 @@ describe('InventoryService', () => {
       expect(result.data[0].stockStatus).toBe('NORMAL');
       expect(result.summary.totalInventoryValue).toBe(180000);
     });
+
+    it('isolates unitCost to 0 and stockValue to 0 for an outlet that has 0 stock and no purchase history', async () => {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'item-2',
+              name: 'Coffee Beans',
+              unitCost: 14000, // Master/Tenant benchmark
+              minimumStock: 100,
+              stocks: [
+                { quantity: 0, outletId: 'outlet-cabang-b', unitCost: 0 },
+              ],
+            },
+          ],
+          1,
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({
+          totalItems: 1,
+          totalInventoryValue: 0,
+          lowStockCount: 0,
+          outOfStockCount: 1,
+        }),
+      } as unknown as SelectQueryBuilder<InventoryItem>;
+      mockItemRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll('tenant-1', {
+        outletId: 'outlet-cabang-b',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].currentStock).toBe(0);
+      expect(result.data[0].unitCost).toBe(0);
+      expect(result.data[0].stockValue).toBe(0);
+      expect(result.data[0].masterUnitCost).toBe(14000);
+      expect(result.data[0].stockStatus).toBe('OUT_OF_STOCK');
+    });
   });
 
   describe('create', () => {

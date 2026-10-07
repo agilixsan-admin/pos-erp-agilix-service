@@ -636,6 +636,41 @@ export class PurchaseService {
 
       // 3. Recalculate Cumulative Average Unit Cost for all affected items
       for (const inventoryItemId of affectedItemIds) {
+        // A. Outlet-specific cumulative unit cost
+        const outletAggregateResult = await purchaseItemRepo
+          .createQueryBuilder('pi')
+          .innerJoin('pi.purchase', 'p')
+          .select('SUM(pi.quantityReceived * pi.unitCost)', 'totalCost')
+          .addSelect('SUM(pi.quantityReceived)', 'totalQty')
+          .where('pi.tenantId = :tenantId', { tenantId })
+          .andWhere('p.outletId = :outletId', { outletId: purchase.outletId })
+          .andWhere('pi.inventoryItemId = :inventoryItemId', {
+            inventoryItemId,
+          })
+          .andWhere('p.status = :status', { status: 'RECEIVED' })
+          .getRawOne<{
+            totalCost?: string | number;
+            totalQty?: string | number;
+          }>();
+
+        const outletTotalCost = Number(outletAggregateResult?.totalCost || 0);
+        const outletTotalQty = Number(outletAggregateResult?.totalQty || 0);
+
+        if (outletTotalQty > 0) {
+          const outletCumulativeUnitCost =
+            Math.round((outletTotalCost / outletTotalQty) * 100) / 100;
+
+          await stockRepo.update(
+            {
+              tenantId,
+              outletId: purchase.outletId,
+              inventoryItemId,
+            },
+            { unitCost: outletCumulativeUnitCost },
+          );
+        }
+
+        // B. Tenant-level benchmark cumulative unit cost
         const aggregateResult = await purchaseItemRepo
           .createQueryBuilder('pi')
           .innerJoin('pi.purchase', 'p')

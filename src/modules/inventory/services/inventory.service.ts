@@ -229,13 +229,28 @@ export class InventoryService {
     const [items, total] = await qb.getManyAndCount();
 
     const data = items.map((item) => {
-      const currentStock =
-        item.stocks && item.stocks.length > 0
-          ? Number(item.stocks[0].quantity || 0)
+      const outletStockRecord =
+        item.stocks && item.stocks.length > 0 ? item.stocks[0] : null;
+      const currentStock = outletStockRecord
+        ? Number(outletStockRecord.quantity || 0)
+        : item.stocks
+          ? item.stocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0)
           : 0;
-      const unitCost = Number(item.unitCost || 0);
+
+      let effectiveUnitCost = Number(item.unitCost || 0);
+      if (query.outletId) {
+        if (outletStockRecord && Number(outletStockRecord.unitCost) > 0) {
+          effectiveUnitCost = Number(outletStockRecord.unitCost);
+        } else if (currentStock > 0) {
+          effectiveUnitCost = Number(item.unitCost || 0);
+        } else {
+          effectiveUnitCost = 0;
+        }
+      }
+
       const minimumStock = Number(item.minimumStock || 0);
-      const stockValue = Math.round(currentStock * unitCost * 100) / 100;
+      const stockValue =
+        Math.round(currentStock * effectiveUnitCost * 100) / 100;
 
       let stockStatus = 'NORMAL';
       if (currentStock <= 0) {
@@ -246,8 +261,9 @@ export class InventoryService {
 
       return {
         ...item,
-        unitCost,
-        costPrice: unitCost,
+        unitCost: effectiveUnitCost,
+        costPrice: effectiveUnitCost,
+        masterUnitCost: Number(item.unitCost || 0),
         currentStock,
         stockValue,
         stockStatus,
@@ -276,7 +292,9 @@ export class InventoryService {
     const summaryResult = await summaryQb
       .select('COUNT(DISTINCT item.id)', 'totalItems')
       .addSelect(
-        'SUM(COALESCE(stock.quantity, 0) * COALESCE(item.unitCost, 0))',
+        query.outletId
+          ? 'SUM(COALESCE(stock.quantity, 0) * COALESCE(stock.unitCost, 0))'
+          : 'SUM(COALESCE(stock.quantity, 0) * COALESCE(item.unitCost, 0))',
         'totalInventoryValue',
       )
       .addSelect(
@@ -340,13 +358,25 @@ export class InventoryService {
       });
     }
 
-    const currentStock =
-      item.stocks && item.stocks.length > 0
-        ? Number(item.stocks[0].quantity || 0)
+    const outletStockRecord =
+      item.stocks && item.stocks.length > 0 ? item.stocks[0] : null;
+    const currentStock = outletStockRecord
+      ? Number(outletStockRecord.quantity || 0)
+      : item.stocks
+        ? item.stocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0)
         : 0;
-    const unitCost = Number(item.unitCost || 0);
+    let effectiveUnitCost = Number(item.unitCost || 0);
+    if (outletId) {
+      if (outletStockRecord && Number(outletStockRecord.unitCost) > 0) {
+        effectiveUnitCost = Number(outletStockRecord.unitCost);
+      } else if (currentStock > 0) {
+        effectiveUnitCost = Number(item.unitCost || 0);
+      } else {
+        effectiveUnitCost = 0;
+      }
+    }
     const minimumStock = Number(item.minimumStock || 0);
-    const stockValue = Math.round(currentStock * unitCost * 100) / 100;
+    const stockValue = Math.round(currentStock * effectiveUnitCost * 100) / 100;
 
     let stockStatus = 'NORMAL';
     if (currentStock <= 0) {
@@ -357,8 +387,9 @@ export class InventoryService {
 
     return {
       ...item,
-      unitCost,
-      costPrice: unitCost,
+      unitCost: effectiveUnitCost,
+      costPrice: effectiveUnitCost,
+      masterUnitCost: Number(item.unitCost || 0),
       currentStock,
       stockValue,
       stockStatus,

@@ -430,7 +430,11 @@ export class ReportService {
         0,
       );
       const minimumStock = Number(item.minimumStock || 0);
-      const unitCost = Number(item.unitCost || 0);
+      const outletStockRecord =
+        outletId && stocks.length > 0 ? stocks[0] : null;
+      const unitCost = outletId
+        ? Number(outletStockRecord?.unitCost || 0)
+        : Number(item.unitCost || 0);
       const valuation = currentStock * unitCost;
       const isLowStock = currentStock <= minimumStock;
 
@@ -443,6 +447,7 @@ export class ReportService {
         category: item.category?.name ?? 'Umum',
         unit: item.unit,
         unitCost,
+        masterUnitCost: Number(item.unitCost || 0),
         minimumStock,
         currentStock,
         totalStock: currentStock,
@@ -753,7 +758,12 @@ export class ReportService {
     const stockQb = this.stockRepo
       .createQueryBuilder('s')
       .innerJoin('s.inventoryItem', 'ii')
-      .select('SUM(s.quantity * ii.unit_cost)', 'totalValuation')
+      .select(
+        targetOutlet
+          ? 'SUM(s.quantity * s.unit_cost)'
+          : 'SUM(s.quantity * CASE WHEN s.unit_cost > 0 THEN s.unit_cost ELSE ii.unit_cost END)',
+        'totalValuation',
+      )
       .where('s.tenant_id = :tenantId', { tenantId })
       .andWhere('ii.deleted_at IS NULL');
 

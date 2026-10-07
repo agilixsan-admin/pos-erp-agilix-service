@@ -31,6 +31,19 @@ export class InventoryStock {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   quantity!: number;
 
+  @Column({
+    name: 'unit_cost',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => Number(value),
+    },
+  })
+  unitCost!: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

@@ -249,15 +249,18 @@ export class PackagingService {
     outletId?: string,
   ): PackagingWithStock {
     const stocks = pkg.inventoryItem?.stocks || [];
+    const matchingStock = outletId
+      ? stocks.find((s) => s.outletId === outletId)
+      : null;
     const currentStock = outletId
-      ? stocks
-          .filter((s) => s.outletId === outletId)
-          .reduce((sum, s) => sum + Number(s.quantity || 0), 0)
+      ? Number(matchingStock?.quantity || 0)
       : stocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
 
     const minimumStock = Number(pkg.inventoryItem?.minimumStock ?? 0);
     const unit = pkg.inventoryItem?.unit || 'pcs';
-    const unitCost = Number(pkg.inventoryItem?.unitCost ?? pkg.costPrice ?? 0);
+    const unitCost = outletId
+      ? Number(matchingStock?.unitCost ?? 0)
+      : Number(pkg.inventoryItem?.unitCost ?? pkg.costPrice ?? 0);
 
     return Object.assign(pkg, {
       currentStock,

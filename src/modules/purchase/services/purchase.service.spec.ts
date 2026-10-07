@@ -115,6 +115,7 @@ describe('PurchaseService', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
+      update: jest.fn(),
     } as any;
     movementRepo = { create: jest.fn(), save: jest.fn() } as any;
     packagingRepo = {
@@ -487,6 +488,14 @@ describe('PurchaseService', () => {
       expect(movementRepo.save).toHaveBeenCalled();
       expect(inventoryItemRepo.update).toHaveBeenCalledWith(
         { id: 'inv-susu', tenantId: 'tenant-1' },
+        { unitCost: 13 },
+      );
+      expect(stockRepo.update).toHaveBeenCalledWith(
+        {
+          tenantId: 'tenant-1',
+          outletId: 'outlet-1',
+          inventoryItemId: 'inv-susu',
+        },
         { unitCost: 13 },
       );
       expect(auditService.record).toHaveBeenCalledWith(
