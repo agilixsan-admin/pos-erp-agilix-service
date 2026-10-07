@@ -86,10 +86,88 @@ export class FinanceAccountService {
     return account;
   }
 
+  /**
+   * Memastikan akun Saldo QRIS & Payment Gateway bawaan untuk outlet tertentu sudah tersedia
+   */
+  async ensureOutletQrisAccount(
+    tenantId: string,
+    outletId: string,
+    manager?: EntityManager,
+  ): Promise<FinancialAccount> {
+    const repo = manager
+      ? manager.getRepository(FinancialAccount)
+      : this.accountRepo;
+
+    let account = await repo.findOne({
+      where: {
+        tenantId,
+        outletId,
+        accountType: 'PAYMENT_GATEWAY',
+        isActive: true,
+      },
+      relations: ['outlet'],
+    });
+
+    if (!account) {
+      const outletRepo = manager
+        ? manager.getRepository(Outlet)
+        : this.dataSource.getRepository(Outlet);
+      const outlet = await outletRepo.findOne({
+        where: { id: outletId, tenantId },
+      });
+      const outletLabel = outlet?.name || outletId.slice(0, 8);
+
+      account = repo.create({
+        tenantId,
+        outletId,
+        accountCode: `1-1250-${outletId.slice(0, 4)}`,
+        accountName: `Saldo QRIS & E-Wallet (${outletLabel})`,
+        accountType: 'PAYMENT_GATEWAY',
+        currentBalance: 0,
+        isActive: true,
+      });
+      account = await repo.save(account);
+      if (outlet) {
+        account.outlet = outlet;
+      }
+    } else if (account.accountName.includes('(') && account.outlet?.name) {
+      const expectedName = `Saldo QRIS & E-Wallet (${account.outlet.name})`;
+      if (
+        account.accountName !== expectedName &&
+        account.accountName.startsWith('Saldo QRIS & E-Wallet (')
+      ) {
+        account.accountName = expectedName;
+        await repo.save(account);
+      }
+    }
+
+    return account;
+  }
+
+  /**
+   * Memastikan seluruh akun bawaan (Kas Laci & QRIS) untuk outlet aktif sudah dibuat
+   */
+  async ensureDefaultAccounts(tenantId: string): Promise<void> {
+    const outletRepo = this.dataSource.getRepository(Outlet);
+    const outlets = await outletRepo.find({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+    for (const outlet of outlets) {
+      await this.ensureOutletCashAccount(tenantId, outlet.id);
+      await this.ensureOutletQrisAccount(tenantId, outlet.id);
+    }
+  }
+
   async getAccounts(
     tenantId: string,
     outletId?: string,
   ): Promise<FinancialAccount[]> {
+    try {
+      await this.ensureDefaultAccounts(tenantId);
+    } catch {
+      // Abaikan jika database terkunci atau outlet belum ada
+    }
+
     const qb = this.accountRepo
       .createQueryBuilder('fa')
       .leftJoinAndSelect('fa.outlet', 'outlet')

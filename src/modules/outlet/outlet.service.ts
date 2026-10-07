@@ -120,10 +120,14 @@ export class OutletService {
 
     const saved = await this.outlets.save(outlet);
 
-    // Otomatis buat akun Kas Laci Kasir untuk outlet baru
+    // Otomatis buat akun Kas Laci Kasir & QRIS untuk outlet baru
     if (this.financeAccountService) {
       try {
         await this.financeAccountService.ensureOutletCashAccount(
+          tenantId,
+          saved.id,
+        );
+        await this.financeAccountService.ensureOutletQrisAccount(
           tenantId,
           saved.id,
         );

@@ -121,6 +121,10 @@ describe('PaymentService', () => {
               id: 'cash-acc-1',
               currentBalance: 0,
             }),
+            ensureOutletQrisAccount: jest.fn().mockResolvedValue({
+              id: 'qris-acc-1',
+              currentBalance: 0,
+            }),
           },
         },
         {

@@ -139,24 +139,13 @@ export class PaymentService {
           Number(cashAccount.currentBalance) + orderTotal;
         await manager.save(cashAccount);
       } else {
-        const faRepo = manager.getRepository(FinancialAccount);
-        let qrisAccount = await faRepo.findOne({
-          where: {
-            tenantId: order.tenantId,
-            accountType: 'PAYMENT_GATEWAY',
-            isActive: true,
-          },
-        });
-        if (!qrisAccount) {
-          qrisAccount = faRepo.create({
-            tenantId: order.tenantId,
-            accountCode: '1-1250',
-            accountName: 'Saldo QRIS & Payment Gateway',
-            accountType: 'PAYMENT_GATEWAY',
-            currentBalance: 0,
-            isActive: true,
-          });
-        }
+        targetAccountCode = '1-1250';
+        const qrisAccount =
+          await this.financeAccountService.ensureOutletQrisAccount(
+            order.tenantId,
+            order.outletId,
+            manager,
+          );
         qrisAccount.currentBalance =
           Number(qrisAccount.currentBalance) + orderTotal;
         await manager.save(qrisAccount);
