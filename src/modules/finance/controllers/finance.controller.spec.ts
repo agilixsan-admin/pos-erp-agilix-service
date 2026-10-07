@@ -46,6 +46,16 @@ describe('FinanceController', () => {
     controller = module.get<FinanceController>(FinanceController);
   });
 
+  const superAdmin = {
+    tenantId: 'tenant-1',
+    outletId: null,
+    isSuperAdmin: true,
+    role: {
+      name: 'Super Admin',
+      menuAccess: ['*'],
+    },
+  } as unknown as User;
+
   const storeManager = {
     tenantId: 'tenant-1',
     outletId: 'outlet-deilema',
@@ -61,40 +71,89 @@ describe('FinanceController', () => {
   } as unknown as User;
 
   describe('outlet scoping', () => {
-    it('passes undefined (all outlets) to accountService when ALL is selected by manager', async () => {
-      await controller.getAccounts(storeManager, 'ALL');
+    describe('Super Admin (tenant-wide access)', () => {
+      it('passes undefined (all outlets) to accountService when ALL is selected by Super Admin', async () => {
+        await controller.getAccounts(superAdmin, 'ALL');
 
-      expect(accountService.getAccounts).toHaveBeenCalledWith(
-        'tenant-1',
-        undefined,
-      );
+        expect(accountService.getAccounts).toHaveBeenCalledWith(
+          'tenant-1',
+          undefined,
+        );
+      });
+
+      it('passes specific outlet to accountService when selected by Super Admin', async () => {
+        await controller.getAccounts(superAdmin, 'outlet-bims');
+
+        expect(accountService.getAccounts).toHaveBeenCalledWith(
+          'tenant-1',
+          'outlet-bims',
+        );
+      });
+
+      it('passes undefined to expenseService when ALL is selected by Super Admin', async () => {
+        await controller.getExpenses(superAdmin, { outletId: 'ALL' });
+
+        expect(expenseService.getExpenses).toHaveBeenCalledWith(
+          'tenant-1',
+          expect.objectContaining({ outletId: undefined }),
+        );
+      });
+
+      it('passes undefined to journalService when ALL is selected by Super Admin', async () => {
+        await controller.getJournals(superAdmin, { outletId: 'ALL' });
+
+        expect(journalService.getJournals).toHaveBeenCalledWith(
+          'tenant-1',
+          expect.objectContaining({ outletId: undefined }),
+        );
+      });
     });
 
-    it('passes undefined to expenseService when ALL is selected by manager', async () => {
-      await controller.getExpenses(storeManager, { outletId: 'ALL' });
+    describe('Store Manager (strictly isolated to assigned outlet)', () => {
+      it('falls back to assigned outlet in accountService when ALL is selected by Store Manager', async () => {
+        await controller.getAccounts(storeManager, 'ALL');
 
-      expect(expenseService.getExpenses).toHaveBeenCalledWith(
-        'tenant-1',
-        expect.objectContaining({ outletId: undefined }),
-      );
-    });
+        expect(accountService.getAccounts).toHaveBeenCalledWith(
+          'tenant-1',
+          'outlet-deilema',
+        );
+      });
 
-    it('passes undefined to journalService when ALL is selected by manager', async () => {
-      await controller.getJournals(storeManager, { outletId: 'ALL' });
+      it('falls back to assigned outlet in expenseService when ALL is selected by Store Manager', async () => {
+        await controller.getExpenses(storeManager, { outletId: 'ALL' });
 
-      expect(journalService.getJournals).toHaveBeenCalledWith(
-        'tenant-1',
-        expect.objectContaining({ outletId: undefined }),
-      );
-    });
+        expect(expenseService.getExpenses).toHaveBeenCalledWith(
+          'tenant-1',
+          expect.objectContaining({ outletId: 'outlet-deilema' }),
+        );
+      });
 
-    it('passes specific outlet when requested by manager', async () => {
-      await controller.getAccounts(storeManager, 'outlet-bims');
+      it('falls back to assigned outlet in journalService when ALL is selected by Store Manager', async () => {
+        await controller.getJournals(storeManager, { outletId: 'ALL' });
 
-      expect(accountService.getAccounts).toHaveBeenCalledWith(
-        'tenant-1',
-        'outlet-bims',
-      );
+        expect(journalService.getJournals).toHaveBeenCalledWith(
+          'tenant-1',
+          expect.objectContaining({ outletId: 'outlet-deilema' }),
+        );
+      });
+
+      it('blocks Store Manager from accessing unassigned outlet (falls back to home outlet)', async () => {
+        await controller.getAccounts(storeManager, 'outlet-bims');
+
+        expect(accountService.getAccounts).toHaveBeenCalledWith(
+          'tenant-1',
+          'outlet-deilema',
+        );
+      });
+
+      it('passes assigned outlet when requested by Store Manager', async () => {
+        await controller.getAccounts(storeManager, 'outlet-deilema');
+
+        expect(accountService.getAccounts).toHaveBeenCalledWith(
+          'tenant-1',
+          'outlet-deilema',
+        );
+      });
     });
   });
 });
