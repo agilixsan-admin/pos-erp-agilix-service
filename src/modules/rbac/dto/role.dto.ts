@@ -16,7 +16,8 @@ export class CreateRoleDto {
   name!: string;
 
   @IsUUID()
-  outletId!: string;
+  @IsOptional()
+  outletId?: string;
 
   @IsString()
   @IsOptional()

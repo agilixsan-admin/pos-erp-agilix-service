@@ -214,11 +214,15 @@ export class AuthService {
     const expiresIn = parseTtlToSeconds(accessTokenTtl);
     const refreshExpiresIn = parseTtlToSeconds(refreshTokenTtl);
 
+    const accessibleOutlets = await this.users.getAccessibleOutlets(user);
+    const effectiveOutletId = user.outletId || accessibleOutlets[0]?.id || null;
+
     const accessPayload = {
       sub: user.id,
       tenantId: user.tenantId,
-      outletId: user.outletId,
+      outletId: effectiveOutletId,
       roleId: user.roleId,
+      outletIds: accessibleOutlets.map((o) => o.id),
     };
 
     const refreshPayload = {
@@ -247,6 +251,7 @@ export class AuthService {
       refreshToken,
       refreshExpiresIn,
       user: safeUser,
+      outlets: accessibleOutlets,
       tenant: user.tenant
         ? {
             id: user.tenant.id,

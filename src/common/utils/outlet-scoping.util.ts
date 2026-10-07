@@ -60,9 +60,20 @@ export function resolveEffectiveOutletId(
       ? outletId.trim()
       : undefined;
 
+  // Collect all permitted outlet IDs for this user
+  const permittedIds = new Set<string>();
+  if (user.outletId) permittedIds.add(user.outletId);
+  if (user.assignedOutlets && user.assignedOutlets.length > 0) {
+    user.assignedOutlets.forEach((o) => permittedIds.add(o.id));
+  }
+
   if (requested) {
-    if (!isTenantWide && user.outletId && user.outletId !== requested) {
-      return user.outletId;
+    if (
+      !isTenantWide &&
+      permittedIds.size > 0 &&
+      !permittedIds.has(requested)
+    ) {
+      return user.outletId ?? Array.from(permittedIds)[0];
     }
     return requested;
   }
@@ -75,5 +86,8 @@ export function resolveEffectiveOutletId(
     return undefined;
   }
 
-  return user.outletId ?? undefined;
+  return (
+    user.outletId ??
+    (permittedIds.size > 0 ? Array.from(permittedIds)[0] : undefined)
+  );
 }

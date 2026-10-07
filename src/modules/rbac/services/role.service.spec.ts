@@ -112,9 +112,12 @@ describe('RoleService', () => {
 
       await service.findAll('tenant-1', { outletId: 'outlet-1' });
 
-      expect(qb.andWhere).toHaveBeenCalledWith('role.outletId = :outletId', {
-        outletId: 'outlet-1',
-      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        '(role.outletId = :outletId OR role.outletId IS NULL)',
+        {
+          outletId: 'outlet-1',
+        },
+      );
     });
   });
 
@@ -205,21 +208,16 @@ describe('RoleService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ConflictException if role name already exists in the outlet', async () => {
-      mockOutletRepo.findOne.mockResolvedValue({
-        id: 'outlet-1',
-        tenantId: 'tenant-1',
-      });
+    it('throws ConflictException if role name already exists in the tenant', async () => {
       mockRoleRepo.findOne.mockResolvedValue({
         id: 'r-existing',
-        outletId: 'outlet-1',
+        tenantId: 'tenant-1',
         name: 'Cashier',
       });
 
       await expect(
         service.create('tenant-1', 'user-1', {
           name: 'Cashier',
-          outletId: 'outlet-1',
           permissions: ['order.read'],
         }),
       ).rejects.toThrow(ConflictException);

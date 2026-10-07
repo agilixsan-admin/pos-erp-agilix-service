@@ -185,7 +185,12 @@ describe('UserService', () => {
       expect(result).toEqual(mockUser);
       expect(findOneUserMock).toHaveBeenCalledWith({
         where: { id: 'user-1' },
-        relations: { role: true, outlet: true, tenant: true },
+        relations: {
+          role: true,
+          outlet: true,
+          tenant: true,
+          assignedOutlets: true,
+        },
       });
     });
 
@@ -222,9 +227,12 @@ describe('UserService', () => {
       expect(whereMock).toHaveBeenCalledWith('user.tenantId = :tenantId', {
         tenantId: 'tenant-1',
       });
-      expect(andWhereMock).toHaveBeenCalledWith('user.outletId = :outletId', {
-        outletId: 'outlet-1',
-      });
+      expect(andWhereMock).toHaveBeenCalledWith(
+        '(user.outletId = :outletId OR assignedOutlets.id = :outletId)',
+        {
+          outletId: 'outlet-1',
+        },
+      );
       expect(andWhereMock).toHaveBeenCalledWith('user.roleId = :roleId', {
         roleId: 'role-1',
       });
@@ -251,7 +259,12 @@ describe('UserService', () => {
       expect(result).toEqual(mockUser);
       expect(findOneUserMock).toHaveBeenCalledWith({
         where: { id: 'user-1', tenantId: 'tenant-1' },
-        relations: { role: true, outlet: true, tenant: true },
+        relations: {
+          role: true,
+          outlet: true,
+          tenant: true,
+          assignedOutlets: true,
+        },
       });
     });
 

@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -46,6 +47,11 @@ export class CreateUserDto {
   @IsOptional()
   outletId?: string;
 
+  @IsArray()
+  @IsOptional()
+  @IsUUID('4', { each: true })
+  outletIds?: string[];
+
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])
   status?: string;
@@ -79,6 +85,11 @@ export class UpdateUserDto {
   @IsUUID()
   @IsOptional()
   outletId?: string;
+
+  @IsArray()
+  @IsOptional()
+  @IsUUID('4', { each: true })
+  outletIds?: string[];
 
   @IsOptional()
   @IsIn(['ACTIVE', 'INACTIVE'])

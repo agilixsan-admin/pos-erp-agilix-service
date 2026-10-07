@@ -39,7 +39,9 @@ export class RoleService {
       .where('role.tenantId = :tenantId', { tenantId });
 
     if (query?.outletId) {
-      qb.andWhere('role.outletId = :outletId', { outletId: query.outletId });
+      qb.andWhere('(role.outletId = :outletId OR role.outletId IS NULL)', {
+        outletId: query.outletId,
+      });
     }
 
     return qb.orderBy('role.name', 'ASC').getMany();
@@ -67,33 +69,37 @@ export class RoleService {
     actorId: string,
     dto: CreateRoleDto,
   ): Promise<Role> {
-    const outlet = await this.outletRepository.findOne({
-      where: { id: dto.outletId, tenantId },
-    });
-
-    if (!outlet) {
-      throw new NotFoundException({
-        success: false,
-        message: 'Outlet not found',
-        code: 'OUTLET_NOT_FOUND',
+    let outletId: string | null = null;
+    if (dto.outletId) {
+      const outlet = await this.outletRepository.findOne({
+        where: { id: dto.outletId, tenantId },
       });
+
+      if (!outlet) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Outlet not found',
+          code: 'OUTLET_NOT_FOUND',
+        });
+      }
+      outletId = dto.outletId;
     }
 
     const existing = await this.roleRepository.findOne({
-      where: { outletId: dto.outletId, name: dto.name.trim() },
+      where: { tenantId, name: dto.name.trim() },
     });
 
     if (existing) {
       throw new ConflictException({
         success: false,
-        message: `Role with name "${dto.name}" already exists in this outlet`,
+        message: `Role with name "${dto.name}" already exists`,
         code: 'ROLE_NAME_EXISTS',
       });
     }
 
     const role = this.roleRepository.create({
       tenantId,
-      outletId: dto.outletId,
+      outletId,
       name: dto.name.trim(),
       description: dto.description?.trim() || null,
       menuAccess: dto.permissions,
@@ -128,13 +134,13 @@ export class RoleService {
 
     if (dto.name && dto.name.trim() !== role.name) {
       const conflict = await this.roleRepository.findOne({
-        where: { outletId: role.outletId, name: dto.name.trim() },
+        where: { tenantId, name: dto.name.trim() },
       });
 
       if (conflict && conflict.id !== role.id) {
         throw new ConflictException({
           success: false,
-          message: `Role with name "${dto.name}" already exists in this outlet`,
+          message: `Role with name "${dto.name}" already exists`,
           code: 'ROLE_NAME_EXISTS',
         });
       }

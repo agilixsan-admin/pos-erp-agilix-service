@@ -4,6 +4,8 @@ import {
   Entity,
   Index,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -55,6 +57,14 @@ export class User {
   @ManyToOne(() => Outlet, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'outlet_id' })
   outlet!: Outlet | null;
+
+  @ManyToMany(() => Outlet)
+  @JoinTable({
+    name: 'user_outlets',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'outlet_id', referencedColumnName: 'id' },
+  })
+  assignedOutlets!: Outlet[];
 
   @ManyToOne(() => Role, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'role_id' })

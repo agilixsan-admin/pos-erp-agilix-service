@@ -12,7 +12,7 @@ import { Outlet } from '../outlet/outlet.entity';
 import { Tenant } from '../tenant/tenant.entity';
 
 @Entity('roles')
-@Index(['outletId', 'name'], { unique: true })
+@Index(['tenantId', 'name'], { unique: true })
 export class Role {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -20,8 +20,8 @@ export class Role {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId!: string;
 
-  @Column({ name: 'outlet_id', type: 'uuid' })
-  outletId!: string;
+  @Column({ name: 'outlet_id', type: 'uuid', nullable: true })
+  outletId!: string | null;
 
   @Column()
   name!: string;
@@ -45,7 +45,7 @@ export class Role {
   @JoinColumn({ name: 'tenant_id' })
   tenant!: Tenant;
 
-  @ManyToOne(() => Outlet, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Outlet, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'outlet_id' })
-  outlet!: Outlet;
+  outlet!: Outlet | null;
 }

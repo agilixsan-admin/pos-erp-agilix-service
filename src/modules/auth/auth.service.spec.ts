@@ -47,10 +47,15 @@ describe('AuthService', () => {
     save: jest.fn().mockResolvedValue({}),
   } as unknown as Repository<UserInvitation>;
 
+  const getAccessibleOutlets = jest
+    .fn()
+    .mockResolvedValue([{ id: 'outlet-1', name: 'Outlet Pusat' }]);
+
   const mockUserService = {
     findByEmail,
     findById,
     update: updateUser,
+    getAccessibleOutlets,
   } as unknown as UserService;
   const mockJwtService = {
     signAsync,
@@ -126,6 +131,12 @@ describe('AuthService', () => {
         expiresIn: 900,
         refreshToken: 'signed-token',
         refreshExpiresIn: 604800,
+        outlets: [
+          {
+            id: 'outlet-1',
+            name: 'Outlet Pusat',
+          },
+        ],
         user: expect.objectContaining({
           id: 'user-1',
           name: 'Cashier User',
@@ -214,6 +225,12 @@ describe('AuthService', () => {
         expiresIn: 900,
         refreshToken: 'signed-token',
         refreshExpiresIn: 604800,
+        outlets: [
+          {
+            id: 'outlet-1',
+            name: 'Outlet Pusat',
+          },
+        ],
         user: expect.objectContaining({
           id: 'user-1',
           name: 'Cashier User',

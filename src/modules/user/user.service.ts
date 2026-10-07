@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
@@ -66,6 +66,7 @@ export class UserService {
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.outlet', 'outlet')
       .leftJoinAndSelect('user.tenant', 'tenant')
+      .leftJoinAndSelect('user.assignedOutlets', 'assignedOutlets')
       .where('LOWER(user.email) = LOWER(:email)', { email })
       .getOne();
   }
@@ -76,7 +77,12 @@ export class UserService {
   findById(id: string) {
     return this.users.findOne({
       where: { id },
-      relations: { role: true, outlet: true, tenant: true },
+      relations: {
+        role: true,
+        outlet: true,
+        tenant: true,
+        assignedOutlets: true,
+      },
     });
   }
 
@@ -101,13 +107,17 @@ export class UserService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.outlet', 'outlet')
+      .leftJoinAndSelect('user.assignedOutlets', 'assignedOutlets')
       .where('user.tenantId = :tenantId', { tenantId })
       .orderBy('user.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (outletId) {
-      qb.andWhere('user.outletId = :outletId', { outletId });
+      qb.andWhere(
+        '(user.outletId = :outletId OR assignedOutlets.id = :outletId)',
+        { outletId },
+      );
     }
 
     if (roleId) {
@@ -148,7 +158,12 @@ export class UserService {
   async findDetail(tenantId: string, id: string): Promise<User> {
     const user = await this.users.findOne({
       where: { id, tenantId },
-      relations: { role: true, outlet: true, tenant: true },
+      relations: {
+        role: true,
+        outlet: true,
+        tenant: true,
+        assignedOutlets: true,
+      },
     });
 
     if (!user) {
@@ -160,6 +175,31 @@ export class UserService {
     }
 
     return user;
+  }
+
+  /**
+   * Helper to resolve active accessible outlets for a user
+   */
+  async getAccessibleOutlets(user: User): Promise<Outlet[]> {
+    if (user.isSuperAdmin) {
+      return this.outlets.find({
+        where: { tenantId: user.tenantId, status: 'ACTIVE' },
+        order: { name: 'ASC' },
+      });
+    }
+
+    if (user.assignedOutlets && user.assignedOutlets.length > 0) {
+      return user.assignedOutlets.filter((o) => o.status === 'ACTIVE');
+    }
+
+    if (user.outletId) {
+      const single = await this.outlets.findOne({
+        where: { id: user.outletId, tenantId: user.tenantId, status: 'ACTIVE' },
+      });
+      return single ? [single] : [];
+    }
+
+    return [];
   }
 
   /**
@@ -195,18 +235,37 @@ export class UserService {
       }
     }
 
-    // 3. Validate outlet belongs to tenant if provided
-    let outlet: Outlet | null = null;
-    if (dto.outletId) {
-      outlet = await this.outlets.findOne({
-        where: { id: dto.outletId, tenantId },
-      });
-      if (!outlet) {
-        throw new BadRequestException({
-          success: false,
-          message: 'Outlet not found or does not belong to this tenant',
-          code: 'OUTLET_NOT_FOUND',
+    // 3. Validate outlet / outlets belong to tenant if provided
+    let assignedOutlets: Outlet[] = [];
+    let primaryOutletId: string | null = null;
+
+    if (!dto.isSuperAdmin) {
+      if (dto.outletIds && dto.outletIds.length > 0) {
+        assignedOutlets = await this.outlets.find({
+          where: { id: In(dto.outletIds), tenantId },
         });
+        if (assignedOutlets.length !== dto.outletIds.length) {
+          throw new BadRequestException({
+            success: false,
+            message:
+              'One or more assigned outlets were not found or do not belong to this tenant',
+            code: 'OUTLET_NOT_FOUND',
+          });
+        }
+        primaryOutletId = dto.outletId || dto.outletIds[0];
+      } else if (dto.outletId) {
+        const outlet = await this.outlets.findOne({
+          where: { id: dto.outletId, tenantId },
+        });
+        if (!outlet) {
+          throw new BadRequestException({
+            success: false,
+            message: 'Outlet not found or does not belong to this tenant',
+            code: 'OUTLET_NOT_FOUND',
+          });
+        }
+        assignedOutlets = [outlet];
+        primaryOutletId = dto.outletId;
       }
     }
 
@@ -223,7 +282,8 @@ export class UserService {
       passwordHash,
       isSuperAdmin: Boolean(dto.isSuperAdmin),
       roleId: dto.roleId ?? null,
-      outletId: dto.outletId ?? null,
+      outletId: primaryOutletId,
+      assignedOutlets,
       status: dto.status ?? 'ACTIVE',
     });
 
@@ -258,8 +318,11 @@ export class UserService {
         email: savedUser.email,
         businessName: tenant?.businessName ?? 'SAJI',
         outletName:
-          outlet?.name ??
-          (savedUser.isSuperAdmin ? 'Semua Outlet' : 'Belum Ditugaskan'),
+          assignedOutlets.length > 0
+            ? assignedOutlets.map((o) => o.name).join(', ')
+            : savedUser.isSuperAdmin
+              ? 'Semua Outlet'
+              : 'Belum Ditugaskan',
         roleName:
           role?.name ?? (savedUser.isSuperAdmin ? 'SUPER ADMIN' : 'Staff'),
         accessLevel: savedUser.isSuperAdmin
@@ -407,26 +470,53 @@ export class UserService {
       user.roleId = dto.roleId;
     }
 
-    if (dto.outletId) {
-      const outlet = await this.outlets.findOne({
-        where: { id: dto.outletId, tenantId },
-      });
-      if (!outlet) {
-        throw new BadRequestException({
-          success: false,
-          message: 'Outlet not found or does not belong to this tenant',
-          code: 'OUTLET_NOT_FOUND',
-        });
-      }
-      user.outletId = dto.outletId;
-    }
-
-    if (dto.name !== undefined) {
-      user.name = dto.name;
-    }
-
     if (dto.isSuperAdmin !== undefined) {
       user.isSuperAdmin = dto.isSuperAdmin;
+      if (dto.isSuperAdmin) {
+        user.outletId = null;
+        user.assignedOutlets = [];
+      }
+    }
+
+    if (!user.isSuperAdmin) {
+      if (dto.outletIds !== undefined) {
+        if (dto.outletIds.length > 0) {
+          const matched = await this.outlets.find({
+            where: { id: In(dto.outletIds), tenantId },
+          });
+          if (matched.length !== dto.outletIds.length) {
+            throw new BadRequestException({
+              success: false,
+              message:
+                'One or more assigned outlets were not found or do not belong to this tenant',
+              code: 'OUTLET_NOT_FOUND',
+            });
+          }
+          user.assignedOutlets = matched;
+          user.outletId = dto.outletId || dto.outletIds[0];
+        } else {
+          user.assignedOutlets = [];
+          user.outletId = null;
+        }
+      } else if (dto.outletId !== undefined) {
+        if (dto.outletId) {
+          const outlet = await this.outlets.findOne({
+            where: { id: dto.outletId, tenantId },
+          });
+          if (!outlet) {
+            throw new BadRequestException({
+              success: false,
+              message: 'Outlet not found or does not belong to this tenant',
+              code: 'OUTLET_NOT_FOUND',
+            });
+          }
+          user.outletId = dto.outletId;
+          user.assignedOutlets = [outlet];
+        } else {
+          user.outletId = null;
+          user.assignedOutlets = [];
+        }
+      }
     }
 
     if (dto.status !== undefined) {
