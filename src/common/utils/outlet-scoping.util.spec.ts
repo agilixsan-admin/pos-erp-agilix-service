@@ -108,7 +108,9 @@ describe('outlet-scoping.util', () => {
       });
 
       it('allows SuperAdmin to query a specific branch', () => {
-        expect(resolveEffectiveOutletId(superAdmin, 'outlet-bims')).toBe('outlet-bims');
+        expect(resolveEffectiveOutletId(superAdmin, 'outlet-bims')).toBe(
+          'outlet-bims',
+        );
       });
 
       it('allows HQ Owner to query ALL branches', () => {
@@ -119,37 +121,53 @@ describe('outlet-scoping.util', () => {
 
     describe('Store Manager assigned to 1 outlet (Dellema Coffee)', () => {
       it('blocks Store Manager from querying ALL branches (falls back to outlet-dellema)', () => {
-        expect(resolveEffectiveOutletId(storeManagerDellema, 'ALL')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(storeManagerDellema, 'ALL')).toBe(
+          'outlet-dellema',
+        );
       });
 
       it('blocks Store Manager from accessing unassigned branch (e.g. Bims Outlet, falls back to outlet-dellema)', () => {
-        expect(resolveEffectiveOutletId(storeManagerDellema, 'outlet-bims')).toBe('outlet-dellema');
+        expect(
+          resolveEffectiveOutletId(storeManagerDellema, 'outlet-bims'),
+        ).toBe('outlet-dellema');
       });
 
       it('allows Store Manager to access their own branch', () => {
-        expect(resolveEffectiveOutletId(storeManagerDellema, 'outlet-dellema')).toBe('outlet-dellema');
+        expect(
+          resolveEffectiveOutletId(storeManagerDellema, 'outlet-dellema'),
+        ).toBe('outlet-dellema');
       });
 
       it('defaults Store Manager to their assigned branch when outletId is omitted', () => {
-        expect(resolveEffectiveOutletId(storeManagerDellema, undefined)).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(storeManagerDellema, undefined)).toBe(
+          'outlet-dellema',
+        );
       });
     });
 
     describe('Area Manager assigned to multiple outlets (Dellema & Store 2)', () => {
       it('allows Area Manager to query first assigned outlet (outlet-dellema)', () => {
-        expect(resolveEffectiveOutletId(areaManager, 'outlet-dellema')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(areaManager, 'outlet-dellema')).toBe(
+          'outlet-dellema',
+        );
       });
 
       it('allows Area Manager to query second assigned outlet (outlet-store2)', () => {
-        expect(resolveEffectiveOutletId(areaManager, 'outlet-store2')).toBe('outlet-store2');
+        expect(resolveEffectiveOutletId(areaManager, 'outlet-store2')).toBe(
+          'outlet-store2',
+        );
       });
 
       it('blocks Area Manager from accessing unassigned branch (outlet-bims, falls back to primary outlet-dellema)', () => {
-        expect(resolveEffectiveOutletId(areaManager, 'outlet-bims')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(areaManager, 'outlet-bims')).toBe(
+          'outlet-dellema',
+        );
       });
 
       it('blocks Area Manager from querying ALL branches (falls back to primary outlet-dellema)', () => {
-        expect(resolveEffectiveOutletId(areaManager, 'ALL')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(areaManager, 'ALL')).toBe(
+          'outlet-dellema',
+        );
       });
     });
 
@@ -159,11 +177,15 @@ describe('outlet-scoping.util', () => {
       });
 
       it('blocks Cashier from accessing other branches (falls back to home outlet)', () => {
-        expect(resolveEffectiveOutletId(cashier, 'outlet-bims')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(cashier, 'outlet-bims')).toBe(
+          'outlet-dellema',
+        );
       });
 
       it('allows Cashier to access their own branch', () => {
-        expect(resolveEffectiveOutletId(cashier, 'outlet-dellema')).toBe('outlet-dellema');
+        expect(resolveEffectiveOutletId(cashier, 'outlet-dellema')).toBe(
+          'outlet-dellema',
+        );
       });
     });
   });
