@@ -14,7 +14,6 @@ import { Table } from '../../table/entities/table.entity';
 import { AuditService } from '../../audit/audit.service';
 import { OrderItem } from '../../order/entities/order-item.entity';
 import { Recipe } from '../../recipe/entities/recipe.entity';
-import { FinancialAccount } from '../../finance/entities/financial-account.entity';
 import { FinanceAccountService } from '../../finance/services/finance-account.service';
 import { JournalService } from '../../finance/services/journal.service';
 import { retryOnUniqueViolation } from '../../../common/utils/retry-on-unique-violation.util';
