@@ -11,7 +11,10 @@ import {
 } from '@nestjs/common';
 import { TaxService } from '../services/tax.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
 import {
   CreateTaxDto,
@@ -36,7 +39,7 @@ export class TaxController {
   }
 
   @Get('global-config')
-  @Permissions('settings.read')
+  @PermissionsAny('settings.read', 'tax.read', 'order.read', 'order.create')
   async getGlobalConfig(
     @CurrentUser() user: User,
     @Query('outletId') outletId?: string,

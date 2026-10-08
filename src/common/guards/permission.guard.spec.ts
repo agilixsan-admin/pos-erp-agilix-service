@@ -1,6 +1,10 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from './permission.guard';
+import {
+  REQUIRED_MENUS_KEY,
+  REQUIRED_PERMISSIONS_ANY_KEY,
+} from '../decorators/permissions.decorator';
 
 describe('PermissionGuard', () => {
   const getAllAndOverride = jest.fn();
@@ -12,8 +16,13 @@ describe('PermissionGuard', () => {
   const buildContext = (
     user: unknown,
     permissions: string[] | null = null,
+    permissionsAny: string[] | null = null,
   ): ExecutionContext => {
-    getAllAndOverride.mockReturnValue(permissions);
+    getAllAndOverride.mockImplementation((key: string) => {
+      if (key === REQUIRED_PERMISSIONS_ANY_KEY) return permissionsAny;
+      if (key === REQUIRED_MENUS_KEY) return permissions;
+      return null;
+    });
     return {
       getHandler: jest.fn(),
       getClass: jest.fn(),
@@ -129,5 +138,49 @@ describe('PermissionGuard', () => {
     );
 
     expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  describe('PermissionsAny (OR condition)', () => {
+    it('allows CASHIER with order.read to access products (PermissionsAny: product.read, order.read, order.create)', () => {
+      const ctx = buildContext(
+        {
+          role: {
+            menuAccess: ['order.read', 'order.create', 'payment.create'],
+          },
+        },
+        null,
+        ['product.read', 'order.read', 'order.create'],
+      );
+
+      expect(guard.canActivate(ctx)).toBe(true);
+    });
+
+    it('allows user with product.read to access products', () => {
+      const ctx = buildContext(
+        {
+          role: {
+            menuAccess: ['product.read'],
+          },
+        },
+        null,
+        ['product.read', 'order.read', 'order.create'],
+      );
+
+      expect(guard.canActivate(ctx)).toBe(true);
+    });
+
+    it('throws ForbiddenException when user has none of the PermissionsAny permissions', () => {
+      const ctx = buildContext(
+        {
+          role: {
+            menuAccess: ['finance.account.read'],
+          },
+        },
+        null,
+        ['product.read', 'order.read', 'order.create'],
+      );
+
+      expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
+    });
   });
 });

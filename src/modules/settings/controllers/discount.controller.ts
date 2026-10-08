@@ -17,20 +17,24 @@ import {
   UpdateDiscountDto,
 } from '../dto/discount.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
 @Controller('settings/discounts')
 export class DiscountController {
   constructor(private readonly discountService: DiscountService) {}
 
   @Get('applicable')
-  @Permissions('discount.read')
+  @PermissionsAny('discount.read', 'order.read', 'order.create')
   async findApplicable(
     @CurrentUser() user: User,
     @Query() query: QueryApplicableDiscountDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const data = await this.discountService.findApplicable(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,

@@ -17,8 +17,12 @@ import {
   UpdatePosSettingsDto,
 } from '../dto/pos-settings.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
 @Controller('settings')
 export class SettingsController {
@@ -48,12 +52,12 @@ export class SettingsController {
   }
 
   @Get()
-  @Permissions('settings.read')
+  @PermissionsAny('settings.read', 'order.read', 'order.create')
   async getSettings(
     @CurrentUser() user: User,
     @Query() query: QueryPosSettingsDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const data = await this.settingsService.getSettings(
       user.tenantId,
       effectiveOutletId,

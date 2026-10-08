@@ -22,17 +22,25 @@ import {
   UpdateProductOutletAvailabilityDto,
 } from '../dto/product.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
-  @Permissions('product.read')
+  @PermissionsAny('product.read', 'order.read', 'order.create')
   async findAll(@CurrentUser() user: User, @Query() query: QueryProductsDto) {
-    const result = await this.productService.findAll(user.tenantId, query);
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
+    const result = await this.productService.findAll(user.tenantId, {
+      ...query,
+      outletId: effectiveOutletId,
+    });
     return {
       success: true,
       message: 'Products retrieved successfully',
@@ -41,16 +49,17 @@ export class ProductController {
   }
 
   @Get(':id')
-  @Permissions('product.read')
+  @PermissionsAny('product.read', 'order.read', 'order.create')
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('outletId') outletId?: string,
   ) {
+    const effectiveOutletId = resolveEffectiveOutletId(user, outletId);
     const data = await this.productService.findById(
       user.tenantId,
       id,
-      outletId,
+      effectiveOutletId,
     );
     return {
       success: true,

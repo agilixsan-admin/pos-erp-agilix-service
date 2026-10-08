@@ -16,17 +16,21 @@ import {
   UpdateTableDto,
 } from '../dto/table.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
 @Controller('tables')
 export class TableController {
   constructor(private readonly tableService: TableService) {}
 
   @Get()
-  @Permissions('table.read')
+  @PermissionsAny('table.read', 'order.read', 'order.create')
   async findAll(@CurrentUser() user: User, @Query() query: QueryTableDto) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.tableService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -39,7 +43,7 @@ export class TableController {
   }
 
   @Get(':id')
-  @Permissions('table.read')
+  @PermissionsAny('table.read', 'order.read', 'order.create')
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,

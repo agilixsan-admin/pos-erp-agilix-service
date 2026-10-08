@@ -11,7 +11,10 @@ import {
 import { CategoryService } from '../services/category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
 
 @Controller('categories')
@@ -19,7 +22,7 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Get()
-  @Permissions('product.read')
+  @PermissionsAny('product.read', 'order.read', 'order.create')
   async findAll(@CurrentUser() user: User) {
     const data = await this.categoryService.findAll(user.tenantId);
     return {
@@ -30,7 +33,7 @@ export class CategoryController {
   }
 
   @Get(':id')
-  @Permissions('product.read')
+  @PermissionsAny('product.read', 'order.read', 'order.create')
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
