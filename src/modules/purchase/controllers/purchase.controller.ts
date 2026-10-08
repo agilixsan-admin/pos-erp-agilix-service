@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -20,6 +21,10 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from '../../../common/utils/outlet-scoping.util';
 
 @Controller('purchases')
 export class PurchaseController {
@@ -28,7 +33,7 @@ export class PurchaseController {
   @Get()
   @Permissions('inventory.read', 'purchase.read')
   async findAll(@CurrentUser() user: User, @Query() query: QueryPurchaseDto) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.purchaseService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -47,6 +52,20 @@ export class PurchaseController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const data = await this.purchaseService.findById(user.tenantId, id);
+    if (!isTenantWideUser(user)) {
+      const permitted = new Set<string>();
+      if (user.outletId) permitted.add(user.outletId);
+      if (user.assignedOutlets) {
+        user.assignedOutlets.forEach((o) => permitted.add(o.id));
+      }
+      if (data.outletId && !permitted.has(data.outletId)) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Purchase not found',
+          code: 'PURCHASE_NOT_FOUND',
+        });
+      }
+    }
     return {
       success: true,
       message: 'Purchase retrieved successfully',

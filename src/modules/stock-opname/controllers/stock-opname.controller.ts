@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,6 +18,10 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from '../../../common/utils/outlet-scoping.util';
 
 @Controller('stock-opnames')
 export class StockOpnameController {
@@ -28,11 +33,7 @@ export class StockOpnameController {
     @CurrentUser() user: User,
     @Query() query: QueryStockOpnameDto,
   ) {
-    const requestedOutletId =
-      query.outletId && query.outletId !== 'ALL' && query.outletId.trim() !== ''
-        ? query.outletId
-        : undefined;
-    const effectiveOutletId = requestedOutletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.stockOpnameService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -51,6 +52,20 @@ export class StockOpnameController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const data = await this.stockOpnameService.findById(user.tenantId, id);
+    if (!isTenantWideUser(user)) {
+      const permitted = new Set<string>();
+      if (user.outletId) permitted.add(user.outletId);
+      if (user.assignedOutlets) {
+        user.assignedOutlets.forEach((o) => permitted.add(o.id));
+      }
+      if (data.outletId && !permitted.has(data.outletId)) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Stock opname session not found',
+          code: 'STOCK_OPNAME_NOT_FOUND',
+        });
+      }
+    }
     return {
       success: true,
       message: 'Stock opname session retrieved successfully',

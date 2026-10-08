@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -34,6 +35,10 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from '../../../common/utils/outlet-scoping.util';
 
 @Controller('inventory')
 export class InventoryController {
@@ -130,7 +135,7 @@ export class InventoryController {
   @Get()
   @Permissions('inventory.read')
   async findAll(@CurrentUser() user: User, @Query() query: QueryInventoryDto) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.inventoryService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -148,7 +153,7 @@ export class InventoryController {
     @CurrentUser() user: User,
     @Query() query: QueryMovementDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.inventoryService.findMovements(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -240,7 +245,7 @@ export class InventoryController {
     @CurrentUser() user: User,
     @Query() query: QueryStockAdjustmentDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.inventoryService.findAllAdjustments(
       user.tenantId,
       {
@@ -265,6 +270,20 @@ export class InventoryController {
       user.tenantId,
       id,
     );
+    if (!isTenantWideUser(user)) {
+      const permitted = new Set<string>();
+      if (user.outletId) permitted.add(user.outletId);
+      if (user.assignedOutlets) {
+        user.assignedOutlets.forEach((o) => permitted.add(o.id));
+      }
+      if (data.outletId && !permitted.has(data.outletId)) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Stock adjustment not found',
+          code: 'STOCK_ADJUSTMENT_NOT_FOUND',
+        });
+      }
+    }
     return {
       success: true,
       message: 'Stock adjustment retrieved successfully',

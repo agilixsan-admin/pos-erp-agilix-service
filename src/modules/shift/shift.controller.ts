@@ -21,6 +21,7 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { User } from '../user/user.entity';
+import { resolveEffectiveOutletId } from '../../common/utils/outlet-scoping.util';
 
 @Controller('shifts')
 export class ShiftController {
@@ -151,10 +152,7 @@ export class ShiftController {
   @Get()
   @Permissions('shift.read')
   async getShifts(@CurrentUser() user: User, @Query() query: QueryShiftDto) {
-    const effectiveOutletId =
-      query.outletId && query.outletId !== 'ALL'
-        ? query.outletId
-        : (user.outletId ?? undefined);
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
 
     const data = await this.shiftService.getShifts(user.tenantId, {
       ...query,

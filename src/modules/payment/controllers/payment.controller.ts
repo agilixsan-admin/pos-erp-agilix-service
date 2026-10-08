@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,6 +18,10 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from '../../../common/utils/outlet-scoping.util';
 
 @Controller()
 export class PaymentController {
@@ -28,7 +33,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Query() query: QueryPaymentDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.paymentService.findPayments(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -128,7 +133,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Query() query: QueryTransactionDto,
   ) {
-    const effectiveOutletId = query.outletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.paymentService.findTransactions(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -150,6 +155,20 @@ export class PaymentController {
       user.tenantId,
       id,
     );
+    if (!isTenantWideUser(user)) {
+      const permitted = new Set<string>();
+      if (user.outletId) permitted.add(user.outletId);
+      if (user.assignedOutlets) {
+        user.assignedOutlets.forEach((o) => permitted.add(o.id));
+      }
+      if (data.outletId && !permitted.has(data.outletId)) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Transaction not found',
+          code: 'TRANSACTION_NOT_FOUND',
+        });
+      }
+    }
     return {
       success: true,
       message: 'Transaction details retrieved successfully',

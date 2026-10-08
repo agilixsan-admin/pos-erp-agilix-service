@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -20,6 +21,10 @@ import {
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
+import {
+  isTenantWideUser,
+  resolveEffectiveOutletId,
+} from '../../../common/utils/outlet-scoping.util';
 
 @Controller('orders')
 export class OrderController {
@@ -28,11 +33,7 @@ export class OrderController {
   @Get()
   @Permissions('order.read')
   async findAll(@CurrentUser() user: User, @Query() query: QueryOrderDto) {
-    const requestedOutletId =
-      query.outletId && query.outletId !== 'ALL' && query.outletId.trim() !== ''
-        ? query.outletId
-        : undefined;
-    const effectiveOutletId = requestedOutletId ?? user.outletId ?? undefined;
+    const effectiveOutletId = resolveEffectiveOutletId(user, query.outletId);
     const result = await this.orderService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -50,11 +51,21 @@ export class OrderController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.orderService.findById(
-      user.tenantId,
-      id,
-      user.outletId ?? undefined,
-    );
+    const data = await this.orderService.findById(user.tenantId, id);
+    if (!isTenantWideUser(user)) {
+      const permitted = new Set<string>();
+      if (user.outletId) permitted.add(user.outletId);
+      if (user.assignedOutlets) {
+        user.assignedOutlets.forEach((o) => permitted.add(o.id));
+      }
+      if (data.outletId && !permitted.has(data.outletId)) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Order not found',
+          code: 'ORDER_NOT_FOUND',
+        });
+      }
+    }
     return {
       success: true,
       message: 'Order retrieved successfully',
