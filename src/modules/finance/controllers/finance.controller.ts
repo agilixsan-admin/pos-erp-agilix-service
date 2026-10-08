@@ -30,7 +30,10 @@ import {
   UpdateFinancialAccountDto,
 } from '../dto/finance.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
 import { resolveEffectiveOutletId } from '../../../common/utils/outlet-scoping.util';
 
@@ -47,7 +50,13 @@ export class FinanceController {
   // ─── Kas & Bank ─────────────────────────────────────────────────────────────
 
   @Get('accounts')
-  @Permissions('finance.account.read')
+  @PermissionsAny(
+    'finance.account.read',
+    'shift.open',
+    'shift.read',
+    'order.read',
+    'order.create',
+  )
   async getAccounts(
     @CurrentUser() user: User,
     @Query('outletId') outletId?: string,
