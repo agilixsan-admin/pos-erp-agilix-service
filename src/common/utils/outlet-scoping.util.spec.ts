@@ -21,6 +21,16 @@ describe('outlet-scoping.util', () => {
       expect(isTenantWideUser(user)).toBe(true);
     });
 
+    it('returns true for Owner even if user has a default home outletId assigned', () => {
+      const user = {
+        isSuperAdmin: false,
+        outletId: 'outlet-dellema',
+        assignedOutlets: [{ id: 'outlet-dellema' }],
+        role: { menuAccess: ['*'], name: 'Owner' },
+      } as unknown as User;
+      expect(isTenantWideUser(user)).toBe(true);
+    });
+
     it('returns false for Store Manager assigned to an outlet, even with report.read permission', () => {
       const user = {
         isSuperAdmin: false,
@@ -116,6 +126,18 @@ describe('outlet-scoping.util', () => {
       it('allows HQ Owner to query ALL branches', () => {
         expect(resolveEffectiveOutletId(hqOwner, 'ALL')).toBeUndefined();
         expect(resolveEffectiveOutletId(hqOwner, undefined)).toBeUndefined();
+      });
+
+      it('allows Owner with home outlet to switch to another branch (e.g. outlet-bims)', () => {
+        const ownerWithHomeOutlet = {
+          isSuperAdmin: false,
+          outletId: 'outlet-dellema',
+          assignedOutlets: [{ id: 'outlet-dellema' }],
+          role: { name: 'Owner', menuAccess: ['*'] },
+        } as unknown as User;
+        expect(
+          resolveEffectiveOutletId(ownerWithHomeOutlet, 'outlet-bims'),
+        ).toBe('outlet-bims');
       });
     });
 

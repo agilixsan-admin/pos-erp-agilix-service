@@ -16,15 +16,24 @@ import { User } from '../../modules/user/user.entity';
 export function isTenantWideUser(user: User): boolean {
   if (user.isSuperAdmin) return true;
 
+  const menuAccess = user.role?.menuAccess ?? [];
+  // Executive and business owners always have tenant-wide authority
+  if (
+    menuAccess.includes('*') ||
+    /owner|direktur/i.test(user.role?.name || '')
+  ) {
+    return true;
+  }
+
   const hasSpecificOutlets =
     Boolean(user.outletId) ||
     (user.assignedOutlets && user.assignedOutlets.length > 0);
 
   if (!hasSpecificOutlets) {
-    const menuAccess = user.role?.menuAccess ?? [];
     if (
-      menuAccess.includes('*') ||
-      /owner|direktur/i.test(user.role?.name || '')
+      menuAccess.includes('report.read') ||
+      menuAccess.includes('report.financial.read') ||
+      /finance|akuntan|admin/i.test(user.role?.name || '')
     ) {
       return true;
     }

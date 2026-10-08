@@ -48,12 +48,12 @@ export class DiscountController {
   }
 
   @Get()
-  @Permissions('discount.read')
+  @PermissionsAny('discount.read', 'order.read', 'order.create')
   async findAll(@CurrentUser() user: User, @Query() query: QueryDiscountDto) {
     const effectiveOutletId =
       query.outletId === 'GLOBAL' || query.outletId === ''
         ? undefined
-        : (query.outletId ?? user.outletId ?? undefined);
+        : resolveEffectiveOutletId(user, query.outletId);
     const data = await this.discountService.findAll(user.tenantId, {
       ...query,
       outletId: effectiveOutletId,
@@ -86,7 +86,7 @@ export class DiscountController {
   }
 
   @Get(':id')
-  @Permissions('discount.read')
+  @PermissionsAny('discount.read', 'order.read', 'order.create')
   async findById(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
