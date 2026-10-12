@@ -814,7 +814,6 @@ export class InventoryService {
     id: string,
     manager?: EntityManager,
   ): Promise<StockAdjustment> {
-s
     const repo = manager
       ? manager.getRepository(StockAdjustment)
       : this.adjustmentRepository;
