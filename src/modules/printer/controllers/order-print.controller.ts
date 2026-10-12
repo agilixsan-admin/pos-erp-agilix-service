@@ -2,7 +2,10 @@ import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { PrinterService } from '../services/printer.service';
 import { DispatchOrderDto, PrintOrderDto } from '../dto/printer.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
+import {
+  Permissions,
+  PermissionsAny,
+} from '../../../common/decorators/permissions.decorator';
 import { User } from '../../user/user.entity';
 
 @Controller('orders')
@@ -10,7 +13,7 @@ export class OrderPrintController {
   constructor(private readonly printerService: PrinterService) {}
 
   @Post(':id/print')
-  @Permissions('order.read')
+  @PermissionsAny('order.read', 'order.create')
   async printOrder(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
@@ -32,7 +35,7 @@ export class OrderPrintController {
   }
 
   @Post(':id/dispatch')
-  @Permissions('order.read')
+  @PermissionsAny('order.read', 'order.create')
   async dispatchOrder(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
