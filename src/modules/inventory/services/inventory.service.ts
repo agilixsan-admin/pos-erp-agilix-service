@@ -814,9 +814,7 @@ export class InventoryService {
     id: string,
     manager?: EntityManager,
   ): Promise<StockAdjustment> {
-    // Pass the active transaction's manager when called right after a write
-    // in that same transaction — the just-inserted row isn't visible yet on
-    // a separate (non-transactional) connection until it commits.
+s
     const repo = manager
       ? manager.getRepository(StockAdjustment)
       : this.adjustmentRepository;

@@ -1,14 +1,5 @@
 import { Client } from 'pg';
 import { Logger } from '@nestjs/common';
-
-/**
- * Ensures the PostgreSQL database exists before TypeORM attempts connection.
- * - In Development & Staging: Checks and automatically creates the database if missing.
- * - In Production: Skipped by default (manual database provisioning is required),
- *   unless explicitly enabled via DB_AUTO_CREATE=true.
- * - Non-blocking: If maintenance database connection or creation fails (e.g. limited cloud permissions),
- *   it logs a helpful note and lets the main application connection proceed gracefully.
- */
 export async function ensureDatabaseExists(logger?: Logger): Promise<void> {
   const log = logger ?? new Logger('DatabaseInit');
 

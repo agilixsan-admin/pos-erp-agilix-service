@@ -1,18 +1,4 @@
 import { User } from '../../modules/user/user.entity';
-
-/**
- * Determine if a user has true tenant-wide administrative authority to view
- * aggregated data across all outlets or switch freely between any outlet.
- *
- * Evaluation:
- * 1. Super Admin flag (`user.isSuperAdmin === true`)
- * 2. Unassigned headquarters user without any specific outlet restrictions:
- *    (!user.outletId && (!user.assignedOutlets || user.assignedOutlets.length === 0))
- *    and possesses wildcard access ('*') or an executive role (Owner / Direktur).
- *
- * NOTE: Regular staff, Store Managers, and Area Managers who have assigned outlets
- * are NEVER tenant-wide, even if they have reporting permissions (e.g. 'report.read').
- */
 export function isTenantWideUser(user: User): boolean {
   if (user.isSuperAdmin) return true;
 
@@ -42,21 +28,6 @@ export function isTenantWideUser(user: User): boolean {
   return false;
 }
 
-/**
- * Resolve the effective outlet ID for multi-tenant and multi-outlet scoped queries.
- *
- * Rules:
- * 1. If outletId === 'ALL':
- *    - For true tenant-wide / Super Admin users: returns `undefined` (query all outlets).
- *    - For restricted staff/managers: returns their primary permitted outlet (prevents cross-outlet leakage).
- * 2. If outletId is a specific outlet UUID:
- *    - For true tenant-wide / Super Admin users: returns the requested outlet ID.
- *    - For restricted staff/managers: returns requested ID ONLY IF it is in their permitted outlets;
- *      otherwise falls back to their primary outlet.
- * 3. If outletId is omitted / undefined / empty:
- *    - For true tenant-wide / Super Admin users: returns `undefined` (aggregate all outlets).
- *    - For restricted staff/managers: returns their primary permitted outlet.
- */
 export function resolveEffectiveOutletId(
   user: User,
   outletId?: string,
