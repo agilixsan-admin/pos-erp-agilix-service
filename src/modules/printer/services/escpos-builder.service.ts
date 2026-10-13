@@ -61,7 +61,9 @@ export class EscPosBuilderService {
   ]);
 
   getColumnWidth(paperSize: PrinterPaperSize): number {
-    return paperSize === '80mm' ? 48 : 32;
+    // 58mm printer thermal standar menggunakan Font B (48 karakter/kolom)
+    // 80mm printer thermal standar menggunakan Font A (48 karakter/kolom)
+    return paperSize === '80mm' ? 48 : 48;
   }
 
   private formatCurrency(amount: number): string {

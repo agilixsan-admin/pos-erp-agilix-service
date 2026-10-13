@@ -11,8 +11,8 @@ describe('EscPosBuilderService', () => {
   });
 
   describe('getColumnWidth', () => {
-    it('returns 32 for 58mm', () => {
-      expect(service.getColumnWidth('58mm')).toBe(32);
+    it('returns 48 for 58mm (calibrated for Font B thermal standard)', () => {
+      expect(service.getColumnWidth('58mm')).toBe(48);
     });
 
     it('returns 48 for 80mm', () => {
