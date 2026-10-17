@@ -150,9 +150,6 @@ export class EscPosBuilderService {
     append(`No: ${data.order.orderNumber}`);
     append(`Waktu: ${orderDate}`);
 
-    const cashier = data.cashierName || 'Kasir';
-    append(`Kasir: ${cashier}`);
-
     const tableLabel =
       data.order.orderType === 'DINE_IN'
         ? `Meja: ${data.order.table?.tableNumber || data.order.tableNumber || '-'}`
@@ -160,6 +157,9 @@ export class EscPosBuilderService {
     append(
       this.padTwoColumns(`Tipe: ${data.order.orderType}`, tableLabel, width),
     );
+
+    const cashier = data.cashierName || 'Kasir';
+    append(`Kasir: ${cashier}`);
 
     append(divider);
 
