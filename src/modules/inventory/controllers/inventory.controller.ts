@@ -381,7 +381,7 @@ export class InventoryController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.inventoryService.delete(user.tenantId, id);
+    const data = await this.inventoryService.delete(user.tenantId, id, user.id);
     return {
       success: true,
       message: 'Inventory item deleted successfully',

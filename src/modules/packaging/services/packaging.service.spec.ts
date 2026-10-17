@@ -7,6 +7,7 @@ import { Packaging } from '../entities/packaging.entity';
 import { PackagingCategory } from '../entities/packaging-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 import { AuditService } from '../../audit/audit.service';
 
 describe('PackagingService', () => {
@@ -46,6 +47,10 @@ describe('PackagingService', () => {
     update: jest.fn().mockResolvedValue({ affected: 1 }),
   };
 
+  const mockRecipeRepo = {
+    createQueryBuilder: jest.fn(),
+  };
+
   const mockAuditService = {
     record: jest.fn().mockResolvedValue(undefined),
   };
@@ -71,6 +76,10 @@ describe('PackagingService', () => {
         {
           provide: getRepositoryToken(InventoryItem),
           useValue: mockInventoryItemRepo,
+        },
+        {
+          provide: getRepositoryToken(Recipe),
+          useValue: mockRecipeRepo,
         },
         {
           provide: AuditService,
@@ -343,6 +352,41 @@ describe('PackagingService', () => {
       await expect(
         service.delete('tenant-1', 'nonexistent', 'user-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when packaging inventory item is used in active recipes', async () => {
+      const existing = {
+        id: 'pkg-1',
+        tenantId: 'tenant-1',
+        name: 'Take Away Cup',
+        inventoryItemId: 'inv-item-1',
+      };
+      mockPackagingRepo.findOne.mockResolvedValue(existing);
+
+      const recipeQb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 'rec-1',
+            variant: {
+              id: 'var-1',
+              name: 'Large',
+              product: { id: 'prod-1', name: 'Iced Latte' },
+            },
+          },
+        ]),
+      };
+      mockRecipeRepo.createQueryBuilder.mockReturnValue(recipeQb);
+
+      await expect(
+        service.delete('tenant-1', 'pkg-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPackagingRepo.softDelete).not.toHaveBeenCalled();
     });
   });
 

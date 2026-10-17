@@ -9,6 +9,7 @@ import { Packaging } from '../entities/packaging.entity';
 import { PackagingCategory } from '../entities/packaging-category.entity';
 import { Outlet } from '../../outlet/outlet.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 import { AuditService } from '../../audit/audit.service';
 import {
   CreatePackagingDto,
@@ -50,6 +51,8 @@ export class PackagingService {
     private readonly outlets: Repository<Outlet>,
     @InjectRepository(InventoryItem)
     private readonly inventoryItems: Repository<InventoryItem>,
+    @InjectRepository(Recipe)
+    private readonly recipes: Repository<Recipe>,
     private readonly audit: AuditService,
   ) {}
 
@@ -569,6 +572,51 @@ export class PackagingService {
         message: 'Packaging not found',
         code: 'PACKAGING_NOT_FOUND',
       });
+    }
+
+    if (packaging.inventoryItemId) {
+      const activeRecipes = await this.recipes
+        .createQueryBuilder('recipe')
+        .innerJoinAndSelect('recipe.variant', 'variant')
+        .innerJoinAndSelect('variant.product', 'product')
+        .where('recipe.tenantId = :tenantId', { tenantId })
+        .andWhere('recipe.inventoryItemId = :id', {
+          id: packaging.inventoryItemId,
+        })
+        .andWhere('recipe.deletedAt IS NULL')
+        .andWhere('variant.deletedAt IS NULL')
+        .andWhere('product.deletedAt IS NULL')
+        .orderBy('product.name', 'ASC')
+        .addOrderBy('variant.name', 'ASC')
+        .getMany();
+
+      if (activeRecipes.length > 0) {
+        const menuNames = activeRecipes.map((r) => {
+          const prodName = r.variant?.product?.name || 'Menu';
+          const varName = r.variant?.name;
+          return varName && varName !== 'Default'
+            ? `${prodName} (${varName})`
+            : prodName;
+        });
+
+        const uniqueMenus = Array.from(new Set(menuNames));
+        const previewLimit = 3;
+        const previewList = uniqueMenus.slice(0, previewLimit).join(', ');
+        const remainingCount = uniqueMenus.length - previewLimit;
+        const remainingText =
+          remainingCount > 0 ? ` dan ${remainingCount} menu lainnya` : '';
+
+        throw new BadRequestException({
+          success: false,
+          message: `Kemasan "${packaging.name}" tidak dapat dihapus karena masih digunakan dalam resep menu: ${previewList}${remainingText}. Harap ubah atau hapus resep menu terkait terlebih dahulu.`,
+          code: 'PACKAGING_IN_USE',
+          details: {
+            packagingId: id,
+            packagingName: packaging.name,
+            linkedMenus: uniqueMenus,
+          },
+        });
+      }
     }
 
     await this.packagings.softDelete(id);

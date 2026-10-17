@@ -71,7 +71,8 @@ export class ProductService {
             if (currentStock <= 0 || currentStock < quantity) {
               isVariantOutOfStock = true;
               missingIngredients.push(
-                recipe.inventoryItem?.name || recipe.inventoryItemId,
+                recipe.inventoryItem?.name ||
+                  'Bahan Baku (Terhapus/Tidak Ditemukan)',
               );
               availableStock = 0;
             } else if (quantity > 0) {

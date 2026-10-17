@@ -13,6 +13,7 @@ import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
 import { StockAdjustment } from '../entities/stock-adjustment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 import {
@@ -51,6 +52,8 @@ export class InventoryService {
     private readonly adjustmentRepository: Repository<StockAdjustment>,
     @InjectRepository(Outlet)
     private readonly outletRepository: Repository<Outlet>,
+    @InjectRepository(Recipe)
+    private readonly recipeRepository: Repository<Recipe>,
     private readonly storageService: StorageService,
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
@@ -455,9 +458,67 @@ export class InventoryService {
     return this.findById(tenantId, id);
   }
 
-  async delete(tenantId: string, id: string) {
+  async delete(tenantId: string, id: string, actorId?: string) {
     const item = await this.findById(tenantId, id);
+
+    // Validate if the inventory item is used in any active product recipes
+    const activeRecipes = await this.recipeRepository
+      .createQueryBuilder('recipe')
+      .innerJoinAndSelect('recipe.variant', 'variant')
+      .innerJoinAndSelect('variant.product', 'product')
+      .where('recipe.tenantId = :tenantId', { tenantId })
+      .andWhere('recipe.inventoryItemId = :id', { id })
+      .andWhere('recipe.deletedAt IS NULL')
+      .andWhere('variant.deletedAt IS NULL')
+      .andWhere('product.deletedAt IS NULL')
+      .orderBy('product.name', 'ASC')
+      .addOrderBy('variant.name', 'ASC')
+      .getMany();
+
+    if (activeRecipes.length > 0) {
+      const menuNames = activeRecipes.map((r) => {
+        const prodName = r.variant?.product?.name || 'Menu';
+        const varName = r.variant?.name;
+        return varName && varName !== 'Default'
+          ? `${prodName} (${varName})`
+          : prodName;
+      });
+
+      const uniqueMenus = Array.from(new Set(menuNames));
+      const previewLimit = 3;
+      const previewList = uniqueMenus.slice(0, previewLimit).join(', ');
+      const remainingCount = uniqueMenus.length - previewLimit;
+      const remainingText =
+        remainingCount > 0 ? ` dan ${remainingCount} menu lainnya` : '';
+
+      throw new BadRequestException({
+        success: false,
+        message: `Bahan baku "${item.name}" tidak dapat dihapus karena masih digunakan dalam resep menu: ${previewList}${remainingText}. Harap ubah atau hapus resep menu terkait terlebih dahulu.`,
+        code: 'INVENTORY_ITEM_IN_USE',
+        details: {
+          inventoryItemId: id,
+          itemName: item.name,
+          linkedMenus: uniqueMenus,
+        },
+      });
+    }
+
     await this.itemRepository.softRemove(item);
+
+    if (actorId) {
+      await this.audit.record({
+        action: 'INVENTORY_ITEM_DELETED',
+        tenantId,
+        actorType: 'USER',
+        actorId,
+        metadata: {
+          inventoryItemId: item.id,
+          name: item.name,
+          sku: item.sku,
+        },
+      });
+    }
+
     return {
       success: true,
       message: 'Inventory item deleted successfully',

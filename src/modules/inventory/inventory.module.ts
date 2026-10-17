@@ -7,6 +7,7 @@ import { InventoryMovement } from './entities/inventory-movement.entity';
 import { ReasonCategory } from './entities/reason-category.entity';
 import { StockAdjustment } from './entities/stock-adjustment.entity';
 import { Outlet } from '../outlet/outlet.entity';
+import { Recipe } from '../recipe/entities/recipe.entity';
 import { AuditModule } from '../audit/audit.module';
 import { StorageModule } from '../storage/storage.module';
 import { InventoryService } from './services/inventory.service';
@@ -22,6 +23,7 @@ import { InventoryController } from './controllers/inventory.controller';
       ReasonCategory,
       StockAdjustment,
       Outlet,
+      Recipe,
     ]),
     AuditModule,
     StorageModule,

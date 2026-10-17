@@ -10,6 +10,7 @@ import { InventoryMovement } from '../entities/inventory-movement.entity';
 import { ReasonCategory } from '../entities/reason-category.entity';
 import { StockAdjustment } from '../entities/stock-adjustment.entity';
 import { Outlet } from '../../outlet/outlet.entity';
+import { Recipe } from '../../recipe/entities/recipe.entity';
 import { AuditService } from '../../audit/audit.service';
 import { StorageService } from '../../storage/services/storage.service';
 
@@ -63,6 +64,12 @@ describe('InventoryService', () => {
     findOne: jest.fn(),
   };
 
+  const mockRecipeRepo = {
+    createQueryBuilder: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+  };
+
   const mockStorageService = {
     uploadAdjustmentProof: jest
       .fn()
@@ -110,6 +117,10 @@ describe('InventoryService', () => {
         {
           provide: getRepositoryToken(Outlet),
           useValue: mockOutletRepo,
+        },
+        {
+          provide: getRepositoryToken(Recipe),
+          useValue: mockRecipeRepo,
         },
         {
           provide: StorageService,
@@ -309,6 +320,100 @@ describe('InventoryService', () => {
       expect(result.id).toBe('item-1');
       expect(mockItemRepo.create).toHaveBeenCalled();
       expect(mockItemRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('delete', () => {
+    it('throws BadRequestException with INVENTORY_ITEM_IN_USE when item is used in active product recipes', async () => {
+      const findByIdQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'item-1',
+          name: 'Kopi Arabika',
+          tenantId: 'tenant-1',
+        }),
+      };
+      mockItemRepo.createQueryBuilder.mockReturnValue(findByIdQb);
+
+      const recipeQb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 'recipe-1',
+            variant: {
+              id: 'var-1',
+              name: 'Large',
+              product: { id: 'prod-1', name: 'Americano' },
+            },
+          },
+          {
+            id: 'recipe-2',
+            variant: {
+              id: 'var-2',
+              name: 'Default',
+              product: { id: 'prod-2', name: 'Espresso' },
+            },
+          },
+        ]),
+      };
+      mockRecipeRepo.createQueryBuilder.mockReturnValue(recipeQb);
+
+      await expect(
+        service.delete('tenant-1', 'item-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockItemRepo.softRemove).not.toHaveBeenCalled();
+    });
+
+    it('soft-removes inventory item and records audit when no active recipes exist', async () => {
+      const item = {
+        id: 'item-1',
+        name: 'Kopi Arabika',
+        sku: 'SKU-001',
+        tenantId: 'tenant-1',
+      };
+      const findByIdQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(item),
+      };
+      mockItemRepo.createQueryBuilder.mockReturnValue(findByIdQb);
+
+      const recipeQb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockRecipeRepo.createQueryBuilder.mockReturnValue(recipeQb);
+      mockItemRepo.softRemove.mockResolvedValue(item);
+
+      const result = await service.delete('tenant-1', 'item-1', 'user-1');
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Inventory item deleted successfully',
+      });
+      expect(mockItemRepo.softRemove).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'item-1',
+          name: 'Kopi Arabika',
+        }),
+      );
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'INVENTORY_ITEM_DELETED',
+          tenantId: 'tenant-1',
+          actorId: 'user-1',
+        }),
+      );
     });
   });
 

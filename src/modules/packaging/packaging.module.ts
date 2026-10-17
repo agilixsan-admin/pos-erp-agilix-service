@@ -6,6 +6,7 @@ import { PackagingService } from './services/packaging.service';
 import { PackagingController } from './controllers/packaging.controller';
 import { Outlet } from '../outlet/outlet.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { Recipe } from '../recipe/entities/recipe.entity';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { AuditModule } from '../audit/audit.module';
       PackagingCategory,
       Outlet,
       InventoryItem,
+      Recipe,
     ]),
     AuditModule,
   ],
